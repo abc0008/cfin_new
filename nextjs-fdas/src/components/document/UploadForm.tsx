@@ -127,86 +127,49 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
       setError(null);
       setWarning(null);
       setUploadComplete(false);
+      setProgress(0); // Reset progress at the start of a new upload
       
-      // Create FormData for upload
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      // Create a new XMLHttpRequest for tracking real upload progress
-      const xhr = new XMLHttpRequest();
-      xhrRef.current = xhr;
-      
-      // Set up progress tracking
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          // Only go to 75% for upload - reserve 75-100% for processing & verification
-          const uploadProgress = (event.loaded / event.total) * 75;
-          setProgress(uploadProgress);
-        }
-      };
-      
-      // Create a promise to handle XHR response
-      const uploadPromise = new Promise<{ document_id: string }>((resolve, reject) => {
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const response = JSON.parse(xhr.responseText);
-              resolve(response);
-            } catch (error) {
-              reject(new Error('Invalid response format'));
-            }
-          } else {
-            // Try to parse error response
-            try {
-              const errorData = JSON.parse(xhr.responseText);
-              reject(new Error(errorData.detail || `Upload failed with status ${xhr.status}`));
-            } catch (e) {
-              reject(new Error(`Upload failed with status ${xhr.status}`));
-            }
+      // Use the documentsApi's uploadAndVerifyDocumentWithProgress
+      const document = await documentsApi.uploadAndVerifyDocumentWithProgress(
+        file,
+        (currentProgress, stage) => {
+          // Update progress based on the stage
+          // Example: Uploading (0-75%), Processing (75-90%), Verifying (90-100%)
+          // This is a simplified mapping; adjust as needed based on actual stages
+          let overallProgress = currentProgress; // Default to using the direct progress if specific stages aren't granularly mapped
+          if (stage === 'uploading_file') { // Assuming 'uploading_file' is a stage string from the API
+            overallProgress = currentProgress * 0.75; // Scale upload progress to 0-75%
+          } else if (stage === 'processing_document') { // Assuming 'processing_document'
+            overallProgress = 75 + (currentProgress * 0.15); // Scale processing to 75-90%
+          } else if (stage === 'verifying_data') { // Assuming 'verifying_data'
+            overallProgress = 90 + (currentProgress * 0.10); // Scale verification to 90-100%
+          } else if (stage === 'completed') {
+            overallProgress = 100;
           }
-        };
-        
-        xhr.onerror = () => reject(new Error('Network error during upload'));
-        xhr.onabort = () => reject(new Error('Upload was aborted'));
-      });
-      
-      // Get the API base URL from environment or use default
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      
-      // Open and send the request
-      xhr.open('POST', `${API_BASE_URL}/api/documents/upload`);
-      xhr.send(formData);
-      
-      // Wait for upload to complete
-      const uploadResponse = await uploadPromise;
-      console.log('Upload complete, starting verification:', uploadResponse);
-      
-      // Update progress to indicate verification has started
-      setProgress(80);
-      
-      // Use the document API to verify the upload and wait for processing
-      console.log("Starting document processing and financial data verification...");
-      const document = await documentsApi.uploadAndVerifyDocument(file);
+          setProgress(Math.min(overallProgress, 100)); // Ensure progress doesn't exceed 100
+          console.log(`Upload progress: ${overallProgress.toFixed(2)}%, Stage: ${stage}`);
+        }
+      );
       
       // Document processing and verification complete
       setProgress(100);
       setUploadComplete(true);
       console.log("Document verification completed:", document);
       
-      // Check if the document has financial data
+      // Check if the document has financial data (using the structure from ProcessedDocument)
       if (document.extractedData?.financialVerification) {
         const hasFinancialData = document.extractedData.financialVerification.hasFinancialData;
         const diagnosis = document.extractedData.financialVerification.diagnosis;
         
         if (!hasFinancialData) {
-          // Document doesn't have financial data - show warning but still allow
-          console.warn("Document doesn't have valid financial data:", diagnosis);
-          setWarning(`The document was processed but may not contain valid financial data: ${diagnosis}`);
+          console.warn("Document may not have ideal financial data:", diagnosis);
+          setWarning(`The document was processed but may not contain structured financial data. ${diagnosis || ''}`.trim());
         }
+      } else if (document.processingStatus === 'completed' && (!document.extractedData || Object.keys(document.extractedData).length === 0)) {
+        // If processing completed but no extracted data, it might be a non-financial or problematic PDF
+         console.warn("Document processed, but no specific financial data was extracted.");
+         setWarning("Document processed. It might be a non-financial PDF or the content couldn't be structured.");
       }
-      
-      // Clear the XHR reference as it's complete
-      xhrRef.current = null;
       
       // If we have a session ID, associate the document with the current conversation
       if (sessionId && document.metadata && document.metadata.id) {
@@ -216,7 +179,8 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
           console.log("Document successfully associated with conversation");
         } catch (err) {
           console.error("Failed to associate document with conversation:", err);
-          // We don't want to fail the upload process if this step fails
+          // Do not fail the entire upload for this, but maybe show a non-critical warning
+          setWarning((prevWarning) => (prevWarning ? prevWarning + " " : "") + "Could not link document to the current chat session.");
         }
       }
       
@@ -229,34 +193,36 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
         setProgress(0);
         setIsUploading(false);
         setUploadComplete(false);
-      }, 2000);
+        // setWarning(null); // Optionally clear warning on new upload cycle
+      }, 3000); // Increased delay slightly
       
     } catch (err) {
       console.error("Document upload failed:", err);
       
-      // Clear the XHR reference
-      xhrRef.current = null;
-      
-      // Handle specific error types
       const errorMessage = err instanceof Error ? err.message : 'Failed to upload document';
       
       if (errorMessage.includes('Network error')) {
         setError('Network error. Please check your internet connection and try again.');
-      } else if (errorMessage.includes('aborted')) {
+      } else if (errorMessage.includes('aborted') || errorMessage.includes('cancelled')) { // Added 'cancelled'
         setError('Upload was cancelled.');
       } else if (errorMessage.includes('size limit exceeded')) {
         setError('The file exceeds the maximum size limit (10MB).');
-      } else if (errorMessage.includes('unsupported file type')) {
+      } else if (errorMessage.includes('unsupported file type') || errorMessage.includes('Invalid file type')) {
         setError('The file type is not supported. Please upload a PDF document.');
-      } else if (errorMessage.includes('processing')) {
-        setError('Error processing the document. The PDF might be corrupted or password protected.');
+      } else if (errorMessage.includes('processing failed') || errorMessage.includes('timed out')) { // More generic processing errors
+        setError('Error processing the document. The PDF might be corrupted, password protected, or took too long to process.');
       } else {
         setError(errorMessage);
       }
       
       setIsUploading(false);
       setProgress(0);
-      onUploadError?.(err instanceof Error ? err : new Error('Unknown error'));
+      onUploadError?.(err instanceof Error ? err : new Error(errorMessage)); // Pass more specific error
+    } finally {
+      // Ensure xhrRef is nullified if it was part of the old code, though it's not used in the new logic
+      if (xhrRef && xhrRef.current) {
+        xhrRef.current = null;
+      }
     }
   };
   

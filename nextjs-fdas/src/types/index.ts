@@ -1,3 +1,5 @@
+import { ChartData, TableData, FinancialMetric } from './visualization';
+
 export interface DocumentMetadata {
   id: string;
   filename: string;
@@ -53,15 +55,6 @@ export interface FinancialRatio {
   trend?: number;
 }
 
-export interface FinancialMetric {
-  category: string;
-  name: string;
-  period: string;
-  value: number;
-  unit: string;
-  isEstimated: boolean;
-}
-
 export interface Message {
   id: string;
   sessionId: string;
@@ -100,6 +93,7 @@ export interface AnalysisResult {
   visualizationData?: {
     charts: any[];
     tables: any[];
+    metrics?: FinancialMetric[];
     monetaryValues?: any;
     percentages?: any;
     keywordFrequency?: any;
