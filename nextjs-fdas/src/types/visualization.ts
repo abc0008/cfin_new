@@ -60,8 +60,6 @@ export interface ChartData {
       color?: string;
     };
   };
-  // Added for tool-based visualization approach
-  series?: ChartSeries[];
   xAxisTitle?: string;
   yAxisTitle?: string;
   legendPosition?: 'top' | 'right' | 'bottom' | 'left';
