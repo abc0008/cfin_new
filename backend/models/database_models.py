@@ -1,3 +1,60 @@
+"""
+Database Models Module
+=====================
+
+This module defines the SQLAlchemy ORM models for the CFIN financial analysis platform's database schema.
+It provides the core data structures for users, documents, citations, conversations, messages, and analysis results.
+These models are used throughout the backend for all database operations and are the foundation for repository and service layers.
+
+Primary responsibilities:
+- Define the database schema for all core entities (users, documents, citations, conversations, messages, analysis results)
+- Provide relationships between entities (e.g., documents to users, citations to documents, messages to conversations)
+- Enumerate document types and processing statuses for consistent use across the application
+
+Key Components:
+- User: Model for user authentication and ownership of documents/conversations
+- Document: Model for uploaded financial documents and their metadata/content
+- Citation: Model for document citations, including page, text, and bounding box
+- Message: Model for conversation messages, including content and citations
+- Conversation: Model for chat sessions between users and the AI assistant
+- AnalysisResult: Model for storing results of financial analyses
+- AnalysisBlock: Model for storing analysis blocks (charts, insights, etc.) attached to messages
+- ConversationDocument, MessageCitation: Association tables for many-to-many relationships
+- DocumentType, ProcessingStatusEnum: Enums for document classification and processing state
+
+Interactions with other files:
+-----------------------------
+1. cfin/backend/repositories/document_repository.py:
+   - Uses Document, Citation, User, DocumentType, ProcessingStatusEnum for all document and citation CRUD operations
+   - Converts ORM models to Pydantic models for API responses
+
+2. cfin/backend/repositories/conversation_repository.py:
+   - Uses Conversation, Message, MessageCitation, ConversationDocument for managing conversations and messages
+
+3. cfin/backend/repositories/analysis_repository.py:
+   - Uses AnalysisResult and AnalysisBlock for storing and retrieving analysis data
+
+4. cfin/backend/services/conversation_service.py:
+   - Uses Message, Conversation, Document, Citation, AnalysisBlock, User for orchestrating conversation logic
+
+5. cfin/backend/pdf_processing/claude_service.py:
+   - Uses DocumentType, ProcessingStatusEnum for document processing and status tracking
+
+6. cfin/backend/pdf_processing/document_service.py:
+   - Uses Document, Citation, DocumentType, ProcessingStatusEnum for document upload and processing
+
+7. cfin/backend/pdf_processing/langgraph_service.py:
+   - Uses Document, Citation, Message, Conversation for managing conversational state and document Q&A
+
+8. cfin/backend/create_db.py:
+   - Imports all models to create and initialize the database schema
+
+9. cfin/backend/utils/database.py:
+   - Provides the Base class for all ORM models and manages the database engine/session
+
+These models are the backbone of the backend application, ensuring consistent data structure and relationships across all services and repositories.
+"""
+
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, JSON, Boolean, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import relationship
 import uuid

@@ -1,3 +1,59 @@
+"""
+Document Repository Module
+=========================
+
+This module provides the repository layer for document operations in the CFIN financial analysis platform.
+It handles all database interactions related to documents, citations, and their associated metadata,
+as well as storage operations for the actual document files.
+
+Primary responsibilities:
+- Store, retrieve, and manage document records in the database
+- Handle file storage and retrieval operations (PDF binary content)
+- Create and manage document citations
+- Provide structured API for document operations used by service layers
+- Convert between database models and API/Pydantic models
+
+Key Components:
+- DocumentRepository: Main repository class with methods for CRUD operations on documents and citations
+- Document conversion methods: Transform database models to API schemas and vice versa
+
+Interactions with other files:
+-----------------------------
+1. cfin/backend/models/database_models.py:
+   - Uses Document, Citation, User, DocumentType, ProcessingStatusEnum database models
+   - These SQLAlchemy models define the database schema for documents and citations
+
+2. cfin/backend/models/document.py:
+   - Uses ProcessedDocument, DocumentMetadata, DocumentUploadResponse, Citation (as CitationSchema)
+   - These Pydantic models define the API schemas for documents and citations
+   - Used for converting database models to API responses
+
+3. cfin/backend/utils/storage.py:
+   - Uses StorageService for file storage and retrieval operations
+   - Methods used: save_file, get_file
+   - Handles the actual storage of PDF binary content
+
+4. cfin/backend/pdf_processing/document_service.py:
+   - DocumentService initializes this repository and uses it for all document operations
+   - Creates document records, updates processing status, and adds citations
+
+5. cfin/backend/pdf_processing/langgraph_service.py:
+   - LangGraphService uses this repository to retrieve document binary content
+   - Uses get_document_binary method in simple_document_qa
+
+6. cfin/backend/services/conversation_service.py:
+   - ConversationService initializes this repository for document access during conversations
+   - Uses get_document_content to retrieve document text for Q&A
+
+7. cfin/backend/pdf_processing/claude_service.py:
+   - ClaudeService indirectly uses this repository via _prepare_document_for_citation
+   - If document binary isn't provided directly, fetches it via get_document_file_content
+
+This repository acts as the central point for all document data access in the application,
+ensuring consistent document handling across all services. It manages both the structured
+data in the database and the binary content in the storage system.
+"""
+
 import logging
 import uuid
 from typing import List, Optional, Dict, Any, BinaryIO

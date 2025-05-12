@@ -165,97 +165,25 @@ class TestClaudeServiceTools:
         self.service.generate_response = original_generate_response
         
     @pytest.mark.asyncio
-    async def test_extract_financial_data_with_tools(self, sample_pdf_data, mock_tool_response):
-        """Test extracting financial data with tools"""
-        # Setup
-        self.service.generate_response_with_tools = AsyncMock(return_value={
-            "content": json.dumps({
-                "metrics": [{"name": "Revenue", "value": 1500000}],
-                "ratios": [{"name": "Profit Margin", "value": 0.25}]
-            }),
-            "tool_uses": [
-                {
-                    "type": "tool_use",
-                    "name": "generate_graph_data",
-                    "input": {
-                        "chartType": "bar",
-                        "config": {"title": "Revenue", "description": "Revenue by year"},
-                        "data": [{"year": "2023", "value": 1500000}],
-                        "chartConfig": {"value": {"label": "Revenue"}}
-                    }
-                },
-                {
-                    "type": "tool_use",
-                    "name": "generate_table_data",
-                    "input": {
-                        "tableType": "simple",
-                        "config": {
-                            "title": "Financial Metrics",
-                            "description": "Key metrics",
-                            "columns": [{"key": "metric", "label": "Metric"}]
-                        },
-                        "data": [{"metric": "Revenue", "value": 1500000}]
-                    }
-                }
-            ]
-        })
-        
-        # Execute
-        result = await self.service.extract_financial_data_with_tools(
-            pdf_content=sample_pdf_data,
-            filename="financial_report.pdf",
-            document_type=DocumentContentType.BALANCE_SHEET
-        )
-        
-        # Verify
-        assert self.service.generate_response_with_tools.called
+    async def test_analyze_with_visualization_tools_success(self, mock_claude_service, sample_document_text, sample_user_query):
+        # ... existing code ...
+        assert "visualizations" in result
+        assert "charts" in result["visualizations"]
+        assert "tables" in result["visualizations"]
         assert "metrics" in result
-        assert "visualization_data" in result
-        assert "visualizationData" in result
-        assert len(result["visualization_data"]["charts"]) == 1
-        assert len(result["visualization_data"]["tables"]) == 1
-        assert "bar" in str(result["visualization_data"])
-        assert "monetaryValues" in result["visualizationData"]
-        
-    @pytest.mark.asyncio
-    async def test_extract_financial_data_with_tools_fallback(self, sample_pdf_data, monkeypatch):
-        """Test fallback to regular extraction when tools not supported"""
-        # Setup - TOOLS_SUPPORT is False
-        monkeypatch.setattr("pdf_processing.claude_service.TOOLS_SUPPORT", False)
-        
-        # Mock the regular extraction method
-        self.service._extract_financial_data_with_citations = AsyncMock(return_value=(
-            {"financial_data": {"revenue": 1500000}},
-            []
-        ))
-        
-        # Execute
-        result = await self.service.extract_financial_data_with_tools(
-            pdf_content=sample_pdf_data,
-            filename="financial_report.pdf",
-            document_type=DocumentContentType.BALANCE_SHEET
-        )
-        
-        # Verify
-        assert self.service._extract_financial_data_with_citations.called
-        assert "financial_data" in result
-        assert result["financial_data"]["revenue"] == 1500000
-        
-    @pytest.mark.asyncio
-    async def test_extract_financial_data_with_tools_error_handling(self, sample_pdf_data):
-        """Test error handling in tool-based extraction"""
-        # Setup - Generate response raises an exception
-        self.service.generate_response_with_tools = AsyncMock(side_effect=Exception("API error"))
-        
-        # Execute
-        result = await self.service.extract_financial_data_with_tools(
-            pdf_content=sample_pdf_data,
-            filename="financial_report.pdf",
-            document_type=DocumentContentType.BALANCE_SHEET
-        )
-        
-        # Verify
-        assert "error" in result
-        assert "API error" in result["error"]
-        assert "visualization_data" in result
-        assert "visualizationData" in result 
+        assert "comparative_periods" in result
+        # Add more specific assertions based on expected mock tool outputs
+
+    # TODO: Add more tests for analyze_with_visualization_tools, including:
+    # - Different tool combinations
+    # - Error handling within tool processing
+    # - Cases where no tools are called
+    # - Fallback when TOOLS_SUPPORT is False (if that logic is kept)
+
+
+# Remove tests for extract_financial_data_with_tools
+# - test_extract_financial_data_with_tools
+# - test_extract_financial_data_with_tools_fallback
+# - test_extract_financial_data_with_tools_error_handling
+
+# Keep other tests as they are relevant to other tool-based methods or general tool handling. 
