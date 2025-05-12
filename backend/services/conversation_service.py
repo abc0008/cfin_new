@@ -1,3 +1,58 @@
+"""
+Conversation Service Module
+==========================
+
+This module provides the service layer for managing conversations and messages in the CFIN financial 
+analysis platform. It handles the logic for creating conversations, processing user messages, 
+generating AI responses using Claude, and managing document-based Q&A with citations.
+
+Primary responsibilities:
+- Create and manage conversations between users and the AI assistant
+- Process user messages and generate context-aware responses
+- Integrate document content into conversations for document-based Q&A
+- Manage citations and document references in AI responses
+- Support visualization generation for financial analysis requests
+- Decide on the appropriate processing approach for different types of queries
+
+Key Components:
+- ConversationService: Main service class for conversation management and message processing
+- Methods for building prompts, processing responses, and managing conversation context
+
+Interactions with other files:
+-----------------------------
+1. cfin/backend/repositories/conversation_repository.py:
+   - Uses ConversationRepository for database operations on conversations and messages
+   - Methods used: create_conversation, add_message, get_conversation_messages, etc.
+   - Handles persistence of conversation data
+
+2. cfin/backend/repositories/document_repository.py:
+   - Uses DocumentRepository to access document content for Q&A
+   - Methods used: get_document_content, get_document, get_citation
+   - Retrieves document text and binary content for analysis
+
+3. cfin/backend/repositories/analysis_repository.py:
+   - Uses AnalysisRepository to store and retrieve analysis results
+   - Manages persistence of financial analysis visualizations
+
+4. cfin/backend/pdf_processing/claude_service.py:
+   - Uses ClaudeService for AI response generation and document analysis
+   - Methods used: generate_response, process_pdf, extract_structured_financial_data
+   - Primary interface for Claude AI capabilities
+
+5. cfin/backend/models/database_models.py:
+   - Uses Message, Conversation, Document, Citation, AnalysisBlock, User models
+   - These define the database structure for conversation-related entities
+   
+6. cfin/backend/pdf_processing/langgraph_service.py:
+   - Indirectly uses LangGraphService through ClaudeService
+   - Used for document-based Q&A with citations in the _process_with_langgraph method
+
+The conversation service orchestrates the user-AI interaction flow, connecting the repository 
+layer with the AI processing capabilities. It's responsible for maintaining conversation 
+context and ensuring that document references and citations are properly integrated into 
+the AI responses.
+"""
+
 import os
 import uuid
 import json
@@ -279,26 +334,27 @@ class ConversationService:
                     if raw_text is not None and not raw_text:
                         logger.warning(f"Empty raw_text for document {doc_id}")
                     
+                    # REMOVED PYPDF2 FALLBACK: Rely on raw_text from initial processing
                     # If we don't have text but have binary content, try to extract it
-                    if not raw_text and content_data and isinstance(content_data, bytes):
-                        try:
-                            # Try to extract text directly from PDF
-                            import PyPDF2
-                            from io import BytesIO
-                            
-                            logger.info(f"Attempting direct text extraction from binary PDF for document {doc_id}")
-                            pdf_reader = PyPDF2.PdfReader(BytesIO(content_data))
-                            extracted_text = ""
-                            
-                            for page_num in range(len(pdf_reader.pages)):
-                                page = pdf_reader.pages[page_num]
-                                extracted_text += page.extract_text() + "\n\n"
-                            
-                            if extracted_text.strip():
-                                raw_text = extracted_text
-                                logger.info(f"Successfully extracted {len(raw_text)} chars of text directly from PDF")
-                        except Exception as e:
-                            logger.warning(f"Failed to extract text from PDF: {str(e)}")
+                    # if not raw_text and content_data and isinstance(content_data, bytes):
+                    #     try:
+                    #         # Try to extract text directly from PDF
+                    #         import PyPDF2
+                    #         from io import BytesIO
+                    #         
+                    #         logger.info(f"Attempting direct text extraction from binary PDF for document {doc_id}")
+                    #         pdf_reader = PyPDF2.PdfReader(BytesIO(content_data))
+                    #         extracted_text = ""
+                    #         
+                    #         for page_num in range(len(pdf_reader.pages)):
+                    #             page = pdf_reader.pages[page_num]
+                    #             extracted_text += page.extract_text() + "\n\n"
+                    #         
+                    #         if extracted_text.strip():
+                    #             raw_text = extracted_text
+                    #             logger.info(f"Successfully extracted {len(raw_text)} chars of text directly from PDF")
+                    #     except Exception as e:
+                    #         logger.warning(f"Failed to extract text from PDF: {str(e)}")
                 else:
                     logger.warning(f"Document content not found for {doc_id}")
                 
@@ -422,30 +478,36 @@ class ConversationService:
                             document_texts.append(doc_dict)
                             logger.info(f"Added document {doc_info['id']} dictionary to context (raw_text length: {len(raw_text)})")
                         else:
-                            # Try to extract text from PDF if we have binary content
+                            # REMOVED PYPDF2 FALLBACK: Rely on raw_text from initial processing
+                            # Ensure doc_dict includes 'content' if no raw_text, so ClaudeService can use binary
                             if content_data and isinstance(content_data, bytes):
-                                try:
-                                    import PyPDF2
-                                    from io import BytesIO
-                                    logger.info(f"Trying to extract text directly from PDF for document {doc_info['id']}")
-                                    
-                                    pdf_reader = PyPDF2.PdfReader(BytesIO(content_data))
-                                    extracted_text = ""
-                                    
-                                    for page_num in range(len(pdf_reader.pages)):
-                                        page = pdf_reader.pages[page_num]
-                                        page_text = page.extract_text()
-                                        if page_text:
-                                            extracted_text += page_text + "\n\n"
-                                    
-                                    if extracted_text.strip():
-                                        doc_dict["raw_text"] = extracted_text
-                                        document_texts.append(doc_dict)
-                                        logger.info(f"Added document {doc_info['id']} with extracted text to context (length: {len(extracted_text)})")
-                                    else:
-                                        logger.warning(f"Could not extract text from PDF for document {doc_info['id']}")
-                                except Exception as pdf_error:
-                                    logger.warning(f"Error extracting text from PDF for document {doc_info['id']}: {str(pdf_error)}")
+                                doc_dict["content"] = content_data # Pass binary if no raw_text
+                                document_texts.append(doc_dict)
+                                logger.info(f"Added document {doc_info['id']} with binary content (no raw_text) to context")
+                            # else: # Try to extract text from PDF if we have binary content
+                            # if content_data and isinstance(content_data, bytes):
+                            #     try:
+                            #         import PyPDF2
+                            #         from io import BytesIO
+                            #         logger.info(f"Trying to extract text directly from PDF for document {doc_info['id']}")
+                            #         
+                            #         pdf_reader = PyPDF2.PdfReader(BytesIO(content_data))
+                            #         extracted_text = ""
+                            #         
+                            #         for page_num in range(len(pdf_reader.pages)):
+                            #             page = pdf_reader.pages[page_num]
+                            #             page_text = page.extract_text()
+                            #             if page_text:
+                            #                 extracted_text += page_text + "\n\n"
+                            #         
+                            #         if extracted_text.strip():
+                            #             doc_dict["raw_text"] = extracted_text
+                            #             document_texts.append(doc_dict)
+                            #             logger.info(f"Added document {doc_info['id']} with extracted text to context (length: {len(extracted_text)})")
+                            #         else:
+                            #             logger.warning(f"Could not extract text from PDF for document {doc_info['id']}")
+                            #     except Exception as pdf_error:
+                            #         logger.warning(f"Error extracting text from PDF for document {doc_info['id']}: {str(pdf_error)}")
                             else:
                                 logger.warning(f"No raw_text or PDF content available for document {doc_info['id']}")
                 except Exception as e:
