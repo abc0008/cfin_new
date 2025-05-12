@@ -81,6 +81,7 @@ import httpx
 from models.document import ProcessedDocument, Citation as DocumentCitation, DocumentContentType, DocumentMetadata, ProcessingStatus
 from models.citation import Citation, CitationType, CharLocationCitation, PageLocationCitation, ContentBlockLocationCitation
 from pdf_processing.langchain_service import LangChainService
+from utils.database import get_db
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -774,7 +775,7 @@ Follow these guidelines:
                     "mime_type": "application/pdf"
                 }
                 
-                prepared_document = self._prepare_document_for_citation(document)
+                prepared_document = await self._prepare_document_for_citation(document)
                 if not prepared_document:
                     logger.warning("Failed to prepare document for financial data extraction, falling back to text")
                 else:
@@ -1240,19 +1241,18 @@ Follow these guidelines:
                 try:
                     # Attempt to get the PDF data directly - this is a fallback mechanism
                     from repositories.document_repository import DocumentRepository
-                    from repositories.database import get_database_session
                     
                     # Get session and repository
-                    db_session = get_database_session()
-                    document_repository = DocumentRepository(db_session)
-                    
-                    # Get document content directly
-                    doc_content = asyncio.run(document_repository.get_document_file_content(document.get('id')))
-                    
-                    if doc_content and len(doc_content) > 0:
-                        content_source = "direct PDF from storage"
-                        doc_type = "application/pdf"
-                        logger.info(f"Retrieved PDF content directly from storage for document {doc_id}")
+                    async for db in get_db():
+                        document_repository = DocumentRepository(db)
+                        
+                        # Get document content directly
+                        doc_content = await document_repository.get_document_file_content(document.get('id'))
+                        
+                        if doc_content and len(doc_content) > 0:
+                            content_source = "direct PDF from storage"
+                            doc_type = "application/pdf"
+                            logger.info(f"Retrieved PDF content directly from storage for document {doc_id}")
                 except Exception as storage_e:
                     logger.warning(f"Failed to get PDF directly from storage for document {doc_id}: {storage_e}")
                     
