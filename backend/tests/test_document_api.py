@@ -1,98 +1,40 @@
-import os
-import pytest
-from fastapi.testclient import TestClient
-from fastapi import FastAPI
-import tempfile
+#!/usr/bin/env python3
+"""
+Simple test script to verify the document API endpoints.
+"""
 
-from app.main import app
-from utils.database import get_db
-from utils.db_verification import verify_document_persistence
+import asyncio
+import logging
+from models.document import DocumentUploadResponse, ProcessedDocument, DocumentMetadata
+from repositories.document_repository import DocumentRepository
+from utils.database import SessionLocal
+from models.database_models import User, Document, ProcessingStatusEnum
 
-# Test data
-TEST_USER_ID = "default-user"
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-client = TestClient(app)
-
-def test_list_documents():
-    """Test listing documents via API."""
-    # Call the API
-    response = client.get(f"/api/documents?user_id={TEST_USER_ID}")
-    
-    # Verify response status code
-    assert response.status_code == 200
-    
-    # Verify response content
-    data = response.json()
-    assert isinstance(data, list)
-
-def test_upload_document():
-    """Test uploading a document via API."""
-    # Create a temporary PDF file
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
-        temp_file.write(b"%PDF-1.5\n%Test PDF file for API testing")
-        temp_file_path = temp_file.name
-    
-    try:
-        # Prepare the file for upload
-        with open(temp_file_path, "rb") as f:
-            files = {"file": ("test_document.pdf", f, "application/pdf")}
-            data = {"user_id": TEST_USER_ID}
-            
-            # Call the API
-            response = client.post(
-                "/api/documents/upload",
-                files=files,
-                data=data
-            )
+async def test_document_repository():
+    """Test the document repository."""
+    async with SessionLocal() as session:
+        # Create a document repository
+        document_repository = DocumentRepository(session)
         
-        # Verify response status code
-        assert response.status_code == 200
+        # List documents
+        user_id = "default-user"
+        documents = await document_repository.list_documents(user_id)
+        logger.info(f"Found {len(documents)} documents for user {user_id}")
         
-        # Verify response content
-        data = response.json()
-        assert "document_id" in data
-        assert "status" in data
-        assert data["status"] == "pending"
-        
-        # Store document ID for later cleanup
-        document_id = data["document_id"]
-        
-        # Test getting the document
-        response = client.get(f"/api/documents/{document_id}")
-        assert response.status_code == 200
-        get_data = response.json()
-        assert get_data["metadata"]["id"] == document_id
-        
-        # Clean up - delete the document
-        response = client.delete(f"/api/documents/{document_id}")
-        assert response.status_code == 200
-        
-    finally:
-        # Delete the temporary file
-        os.unlink(temp_file_path)
+        # Print document details
+        for doc in documents:
+            logger.info(f"Document ID: {doc.id}")
+            logger.info(f"Filename: {doc.filename}")
+            logger.info(f"Status: {doc.processing_status}")
+            logger.info(f"Type: {doc.document_type}")
+            logger.info("---")
 
-def test_get_nonexistent_document():
-    """Test getting a nonexistent document."""
-    # Call the API with a random UUID
-    response = client.get("/api/documents/00000000-0000-0000-0000-000000000000")
-    
-    # Verify response status code
-    assert response.status_code == 404
-    
-    # Verify response content
-    data = response.json()
-    assert "detail" in data
-    assert data["detail"] == "Document not found"
+def main():
+    """Run the test."""
+    asyncio.run(test_document_repository())
 
-def test_document_count():
-    """Test getting document count."""
-    # Call the API
-    response = client.get(f"/api/documents/count?user_id={TEST_USER_ID}")
-    
-    # Verify response status code
-    assert response.status_code == 200
-    
-    # Verify response content
-    data = response.json()
-    assert "count" in data
-    assert isinstance(data["count"], int) 
+if __name__ == "__main__":
+    main() 

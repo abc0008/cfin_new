@@ -11,6 +11,12 @@ from repositories.document_repository import DocumentRepository
 from pdf_processing.claude_service import ClaudeService
 from pdf_processing.financial_agent import FinancialAnalysisAgent
 from models.database_models import AnalysisResult, Document
+from utils.visualization_helpers import (
+    generate_monetary_values_data,
+    generate_percentage_data,
+    generate_keyword_frequency_data
+)
+from models.analysis import FinancialMetric
 
 logger = logging.getLogger(__name__)
 
@@ -327,18 +333,44 @@ class AnalysisService:
             result_data = {
                 "analysis_text": analysis_result.get("analysis_text", ""),
                 "visualization_data": analysis_result.get("visualizations", {"charts": [], "tables": []}),
-                # Add other fields if the tool-based method returns them (e.g., metrics)
                 "metrics": analysis_result.get("metrics", []),
                 "ratios": analysis_result.get("ratios", []),
                 "insights": analysis_result.get("insights", []),
                 "comparative_periods": analysis_result.get("comparative_periods", []),
                 "citation_references": analysis_result.get("citation_references", {}),
-                # Add metadata
                 "document_type": document.document_type.value if document.document_type else "other",
                 "periods": document.periods or [],
                 "query": user_query
             }
 
+            # Ensure visualization_data is a dictionary, which it should be from ClaudeService
+            if not isinstance(result_data["visualization_data"], dict):
+                logger.warning("visualization_data from ClaudeService was not a dict, re-initializing to ensure structure.")
+                result_data["visualization_data"] = {"charts": [], "tables": []}
+            
+            # Populate specific visualization keys using helper functions
+            # Ensure metrics and insights are in the expected format (List[FinancialMetric], List[str])
+            current_metrics = result_data.get("metrics", [])
+            # Ensure current_metrics are FinancialMetric objects if they are dicts
+            # This might be overly cautious if ClaudeService guarantees Pydantic model output
+            typed_metrics: List[FinancialMetric] = []
+            if current_metrics and isinstance(current_metrics[0], dict):
+                try:
+                    typed_metrics = [FinancialMetric(**m) for m in current_metrics]
+                except Exception as e:
+                    logger.warning(f"Could not cast metrics to FinancialMetric models: {e}. Proceeding with them as dicts if possible.")
+                    # If casting fails, the helper functions might fail or work if they only access common keys.
+                    # This indicates a potential mismatch in expected types from ClaudeService.
+                    typed_metrics = current_metrics # Pass them as is, helper functions might handle dicts
+            elif current_metrics: # Already list of Pydantic models
+                typed_metrics = current_metrics
+
+            current_insights = result_data.get("insights", []) # Expected to be List[str]
+
+            result_data["visualization_data"]["monetaryValues"] = generate_monetary_values_data(typed_metrics, current_insights)
+            result_data["visualization_data"]["percentages"] = generate_percentage_data(typed_metrics, current_insights)
+            result_data["visualization_data"]["keywordFrequency"] = generate_keyword_frequency_data(current_insights)
+            
             logger.info(f"Completed tool-based comprehensive analysis for document {document.id}")
             # Log counts for verification
             viz_data = result_data['visualization_data']
@@ -347,24 +379,14 @@ class AnalysisService:
             logger.info(f"Metrics extracted: {len(result_data.get('metrics', []))}")
             logger.info(f"Comparisons extracted: {len(result_data.get('comparative_periods', []))}")
 
-
             return result_data
 
         except Exception as e:
-            logger.error(f"Error in tool-based comprehensive analysis: {str(e)}", exc_info=True)
-            # Return error information structure
-            return {
-                "analysis_text": f"Error during comprehensive analysis: {str(e)}",
-                "visualization_data": {"charts": [], "tables": []},
-                "metrics": [],
-                "ratios": [],
-                "insights": [f"Error: {str(e)}"],
-                "comparative_periods": [],
-                "citation_references": {},
-                "document_type": document.document_type.value if document.document_type else "other",
-                "periods": document.periods or [],
-                "query": parameters.get("query", "")
-            }
+            logger.error(f"Error in tool-based comprehensive analysis for document {document.id if document else 'N/A'}: {str(e)}", exc_info=True)
+            # Re-raise the exception to be handled by the calling route/middleware
+            # Consider wrapping in a custom exception if more specific error types are needed downstream.
+            # For example: raise FinancialAnalysisError(f"Tool-based analysis failed: {str(e)}") from e
+            raise # Re-raises the original exception e
 
     async def _run_financial_ratio_analysis(
         self,
