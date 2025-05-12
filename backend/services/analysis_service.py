@@ -14,9 +14,11 @@ from models.database_models import AnalysisResult, Document
 from utils.visualization_helpers import (
     generate_monetary_values_data,
     generate_percentage_data,
-    generate_keyword_frequency_data
+    generate_keyword_frequency_data,
+    get_data_for_visualization_type,
 )
-from models.analysis import FinancialMetric
+from models.analysis import FinancialMetric, FinancialRatio, ComparativePeriod
+from models.visualization import ChartData, TableData # Assuming these are defined
 
 logger = logging.getLogger(__name__)
 
@@ -285,6 +287,7 @@ class AnalysisService:
     ) -> Dict[str, Any]:
         """
         Run comprehensive analysis using Claude with tool-based visualization generation.
+        Now also processes metrics/insights to populate specific visualization keys.
 
         Args:
             document: Document to analyze
@@ -303,10 +306,7 @@ class AnalysisService:
 
             if not document_text:
                 logger.warning(f"No text content found for document {document.id}, attempting fallback.")
-                # Fallback: create minimal text if none exists
                 document_text = f"Document ID: {document.id}, Filename: {document.filename}. No text content could be extracted."
-                # Consider raising an error if text is absolutely required
-                # raise ValueError(f"No text content found in document {document.id}")
 
             # Get user query from parameters or use default
             user_query = parameters.get("query", "Provide a comprehensive financial analysis of this document, generating relevant charts and tables using the provided tools.")
@@ -322,71 +322,49 @@ class AnalysisService:
                 knowledge_base=knowledge_base
             )
 
-            # analysis_result is expected to contain:
-            # {
-            #   "analysis_text": "...",
-            #   "visualizations": { "charts": [...], "tables": [...] }
-            # }
+            # Extract base data from Claude's response
+            analysis_text = analysis_result.get("analysis_text", "")
+            visualizations = analysis_result.get("visualizations", {"charts": [], "tables": []})
+            metrics = analysis_result.get("metrics", [])
+            ratios = analysis_result.get("ratios", [])
+            insights = analysis_result.get("insights", []) # Assuming insights are returned
+            comparative_periods = analysis_result.get("comparative_periods", [])
+            citation_references = analysis_result.get("citation_references", {})
+
+            # Ensure visualizations is a dict
+            if not isinstance(visualizations, dict):
+                 logger.warning("visualizations from ClaudeService was not a dict, re-initializing.")
+                 visualizations = {"charts": [], "tables": []}
+            
+            # --- Populate specific visualization keys using helpers ---
+            # Use metrics, insights, or other relevant data as input to helpers
+            # Example: Assuming helpers process the raw metrics list
+            visualizations["monetaryValues"] = generate_monetary_values_data(metrics, insights)
+            visualizations["percentages"] = generate_percentage_data(metrics, ratios, insights)
+            visualizations["keywordFrequency"] = generate_keyword_frequency_data(analysis_text, insights)
+            # --- End population ---
+
 
             # Format the result for the analysis repository and API response
-            # The structure returned by analyze_with_visualization_tools should already be close
             result_data = {
-                "analysis_text": analysis_result.get("analysis_text", ""),
-                "visualization_data": analysis_result.get("visualizations", {"charts": [], "tables": []}),
-                "metrics": analysis_result.get("metrics", []),
-                "ratios": analysis_result.get("ratios", []),
-                "insights": analysis_result.get("insights", []),
-                "comparative_periods": analysis_result.get("comparative_periods", []),
-                "citation_references": analysis_result.get("citation_references", {}),
+                "analysis_text": analysis_text,
+                "visualization_data": visualizations, # Now includes specific keys + charts/tables
+                "metrics": metrics,
+                "ratios": ratios,
+                "insights": insights, # Include insights if returned and processed
+                "comparative_periods": comparative_periods,
+                "citation_references": citation_references,
                 "document_type": document.document_type.value if document.document_type else "other",
                 "periods": document.periods or [],
                 "query": user_query
             }
 
-            # Ensure visualization_data is a dictionary, which it should be from ClaudeService
-            if not isinstance(result_data["visualization_data"], dict):
-                logger.warning("visualization_data from ClaudeService was not a dict, re-initializing to ensure structure.")
-                result_data["visualization_data"] = {"charts": [], "tables": []}
-            
-            # Populate specific visualization keys using helper functions
-            # Ensure metrics and insights are in the expected format (List[FinancialMetric], List[str])
-            current_metrics = result_data.get("metrics", [])
-            # Ensure current_metrics are FinancialMetric objects if they are dicts
-            # This might be overly cautious if ClaudeService guarantees Pydantic model output
-            typed_metrics: List[FinancialMetric] = []
-            if current_metrics and isinstance(current_metrics[0], dict):
-                try:
-                    typed_metrics = [FinancialMetric(**m) for m in current_metrics]
-                except Exception as e:
-                    logger.warning(f"Could not cast metrics to FinancialMetric models: {e}. Proceeding with them as dicts if possible.")
-                    # If casting fails, the helper functions might fail or work if they only access common keys.
-                    # This indicates a potential mismatch in expected types from ClaudeService.
-                    typed_metrics = current_metrics # Pass them as is, helper functions might handle dicts
-            elif current_metrics: # Already list of Pydantic models
-                typed_metrics = current_metrics
-
-            current_insights = result_data.get("insights", []) # Expected to be List[str]
-
-            result_data["visualization_data"]["monetaryValues"] = generate_monetary_values_data(typed_metrics, current_insights)
-            result_data["visualization_data"]["percentages"] = generate_percentage_data(typed_metrics, current_insights)
-            result_data["visualization_data"]["keywordFrequency"] = generate_keyword_frequency_data(current_insights)
-            
-            logger.info(f"Completed tool-based comprehensive analysis for document {document.id}")
-            # Log counts for verification
-            viz_data = result_data['visualization_data']
-            logger.info(f"Charts generated: {len(viz_data.get('charts', []))}")
-            logger.info(f"Tables generated: {len(viz_data.get('tables', []))}")
-            logger.info(f"Metrics extracted: {len(result_data.get('metrics', []))}")
-            logger.info(f"Comparisons extracted: {len(result_data.get('comparative_periods', []))}")
-
             return result_data
 
         except Exception as e:
-            logger.error(f"Error in tool-based comprehensive analysis for document {document.id if document else 'N/A'}: {str(e)}", exc_info=True)
-            # Re-raise the exception to be handled by the calling route/middleware
-            # Consider wrapping in a custom exception if more specific error types are needed downstream.
-            # For example: raise FinancialAnalysisError(f"Tool-based analysis failed: {str(e)}") from e
-            raise # Re-raises the original exception e
+            logger.error(f"Error in tool-based comprehensive analysis for {document.id}: {str(e)}", exc_info=True)
+            # Re-raise to be caught by run_analysis
+            raise
 
     async def _run_financial_ratio_analysis(
         self,
