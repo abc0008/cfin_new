@@ -100,6 +100,10 @@ export interface AnalysisResult {
   };
   citationReferences?: Record<string, string>;
   query?: string;
+  insights: string[];
+  comparativePeriods?: any[];
+  documentType?: string;
+  periods?: string[];
 }
 
 export interface ClaudeCitation {

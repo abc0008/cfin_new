@@ -14,6 +14,7 @@ from pdf_processing.document_service import DocumentService
 from utils.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.dependencies import get_document_service, get_document_repository
+from repositories.analysis_repository import AnalysisRepository
 
 logger = logging.getLogger(__name__)
 
@@ -139,20 +140,24 @@ async def get_citation(
 @router.delete("/{document_id}")
 async def delete_document(
     document_id: str,
-    document_repository: DocumentRepository = Depends(get_document_repository)
+    document_service: DocumentService = Depends(get_document_service),
+    analysis_repository: AnalysisRepository = Depends(get_analysis_repository)
 ):
     """
-    Delete a document.
+    Delete a document. Prevent deletion if referenced in any analysis result (enforced in service layer).
     """
-    document = await document_repository.get_document(document_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-    
-    success = await document_repository.delete_document(document_id)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to delete document")
-    
-    return {"message": f"Document {document_id} deleted successfully"}
+    try:
+        document = await document_service.document_repository.get_document(document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        success = await document_service.delete_document(document_id, analysis_repository)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete document")
+
+        return {"message": f"Document {document_id} deleted successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 @router.post("/{document_id}/retry-extraction", response_model=Dict[str, Any])
 async def retry_extraction(

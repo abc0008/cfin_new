@@ -67,6 +67,7 @@ class AnalysisRequest(BaseModel):
     document_ids: List[str] = Field(alias="documentIds")
     parameters: Dict[str, Any] = Field(default_factory=dict)
     query: Optional[str] = None
+    custom_knowledge_base: Optional[str] = Field(default=None, alias="customKnowledgeBase")
 
     class Config:
         alias_generator = to_camel
