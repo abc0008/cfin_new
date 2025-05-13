@@ -73,7 +73,7 @@ class AnalysisApiResponse(BaseModel):
     comparativePeriods: List[ComparativePeriod] = Field(default_factory=list)
     insights: List[str] = Field(default_factory=list)
     citationReferences: Dict[str, str] = Field(default_factory=dict)
-    document_type: Optional[str] = None
+    documentType: Optional[str] = None  # <-- camelCase
     periods: List[str] = Field(default_factory=list)
     query: Optional[str] = None
 
@@ -89,18 +89,16 @@ async def run_analysis_endpoint(
     try:
         logger.info(f"API Request - Run Analysis: Type='{analysis_request.analysisType}', Docs='{analysis_request.documentIds}', Query='{analysis_request.query}'")
 
-        # Prepare parameters dictionary
         parameters = analysis_request.parameters or {}
-        
-        # Always include the query if provided
-        if analysis_request.query:
-            parameters["query"] = analysis_request.query
+        custom_knowledge_base = analysis_request.custom_knowledge_base
+        query = analysis_request.query
 
-        # Call the analysis service
         analysis_id, result_data = await analysis_service.run_analysis(
             document_ids=[str(doc_id) for doc_id in analysis_request.documentIds],
             analysis_type=analysis_request.analysisType,
-            parameters=parameters
+            parameters=parameters,
+            custom_knowledge_base=custom_knowledge_base,
+            query=query  # <-- pass query explicitly
         )
 
         # Log the structure of the result_data before validation
@@ -128,7 +126,7 @@ async def run_analysis_endpoint(
             comparativePeriods=result_data.get("comparativePeriods", []),
             insights=result_data.get("insights", []),
             citationReferences=result_data.get("citationReferences", {}),
-            document_type=result_data.get("document_type"),
+            documentType=result_data.get("documentType"),  # <-- camelCase
             periods=result_data.get("periods", []),
             query=result_data.get("query")
         )
@@ -138,7 +136,7 @@ async def run_analysis_endpoint(
         logger.info(f"Charts: {len(api_response.visualizationData.charts)}, Tables: {len(api_response.visualizationData.tables)}")
         logger.info(f"Metrics: {len(api_response.metrics)}, Ratios: {len(api_response.ratios)}, Comparisons: {len(api_response.comparativePeriods)}")
 
-        return api_response
+        return api_response.dict(by_alias=True)
 
     except ValueError as ve:
         logger.warning(f"Value error during analysis run: {ve}")
@@ -192,11 +190,11 @@ async def get_analysis_result(
             comparativePeriods=result_data.get("comparativePeriods", []),
             insights=result_data.get("insights", []),
             citationReferences=result_data.get("citationReferences", {}),
-            document_type=result_data.get("document_type"),
+            documentType=result_data.get("documentType"),  # <-- camelCase
             periods=result_data.get("periods", []),
             query=result_data.get("query")
         )
-        return api_response
+        return api_response.dict(by_alias=True)
 
     except ValueError as ve:
         logger.warning(f"Analysis not found: {ve}")
@@ -460,3 +458,10 @@ async def get_chart_data(
         
         logger.error(f"Error getting chart data: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error retrieving chart data: {str(e)}")
+
+@router.get("/types")
+async def get_analysis_types():
+    """
+    List all supported analysis types with display names and descriptions.
+    """
+    return AnalysisService.get_supported_analysis_types()
