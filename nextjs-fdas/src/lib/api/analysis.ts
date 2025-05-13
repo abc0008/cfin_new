@@ -1,4 +1,4 @@
-import { AnalysisResult } from '@/types';
+import type { AnalysisResult } from '@/validation/schemas';
 import { apiService } from './apiService';
 import { AnalysisResultSchema, ConversationAnalysisResponseSchema } from '@/validation/schemas';
 import { EnhancedAnalysisResult, ConversationAnalysisResponse } from '@/types/enhanced';
@@ -57,17 +57,20 @@ export const analysisApi = {
         payload.custom_user_query = customUserQuery;
       }
 
-      const response = await apiService.post('/analysis/run', payload);
+      const response = await apiService.post<{ data: AnalysisResult }>(
+        '/analysis/run',
+        payload
+      );
       console.log('Raw analysis response from backend:', response.data);
 
       // Validate the response against the Pydantic model schema
       const validationResult = AnalysisResultSchema.safeParse(response.data);
       if (!validationResult.success) {
         console.error('Backend response validation error:', validationResult.error.errors);
-        // Consider a more robust error handling or data correction mechanism here
+        throw new Error('Invalid analysis result received from backend: ' + JSON.stringify(validationResult.error.errors));
       }
       
-      let result = validationResult.success ? validationResult.data : response.data as AnalysisResult; // Use parsed data if valid, else raw
+      let result = validationResult.data;
       
       // THE ENTIRE FALLBACK BLOCK THAT USED THE DELETED FUNCTIONS IS REMOVED.
       // console.log("Sufficient visualization and metrics data received from backend or no text to parse for fallback.");
@@ -88,15 +91,18 @@ export const analysisApi = {
   async getAnalysis(analysisId: string): Promise<AnalysisResult> {
     console.log(`Fetching analysis with ID: ${analysisId}`);
     try {
-      const response = await apiService.get(`/analysis/${analysisId}`);
+      const response = await apiService.get<{ data: AnalysisResult }>(
+        `/analysis/${analysisId}`
+      );
       console.log('Raw getAnalysis response from backend:', response.data);
 
       const validationResult = AnalysisResultSchema.safeParse(response.data);
       if (!validationResult.success) {
         console.error('Backend getAnalysis response validation error:', validationResult.error.errors);
+        throw new Error('Invalid analysis result received from backend: ' + JSON.stringify(validationResult.error.errors));
       }
       
-      let result = validationResult.success ? validationResult.data : response.data as AnalysisResult;
+      let result: AnalysisResult = validationResult.data;
 
       console.log('Final processed getAnalysis result:', result);
       return result;
@@ -111,7 +117,9 @@ export const analysisApi = {
    */
   async getAvailableAnalysisTypes(): Promise<{ type: string; name: string; description: string }[]> {
     try {
-      const response = await apiService.get('/analysis/types');
+      const response = await apiService.get<{ data: { type: string; name: string; description: string }[] }>(
+        '/analysis/types'
+      );
       // Basic validation, could be enhanced with a Zod schema
       if (!Array.isArray(response.data)) {
         console.error('Invalid format for analysis types:', response.data);
@@ -136,7 +144,9 @@ export const analysisApi = {
    */
   async getConversationAnalysis(conversationId: string): Promise<ConversationAnalysisResponse> {
     try {
-      const response = await apiService.get(`/analysis/conversation/${conversationId}`);
+      const response = await apiService.get<{ data: ConversationAnalysisResponse }>(
+        `/analysis/conversation/${conversationId}`
+      );
       const validationResult = ConversationAnalysisResponseSchema.safeParse(response.data);
       if (!validationResult.success) {
         console.error('Conversation analysis validation error:', validationResult.error.errors);
@@ -157,7 +167,9 @@ export const analysisApi = {
     console.warn("analysisApi.getChartData may need review after client-side fallbacks removal.");
     try {
       // Assuming this endpoint returns data that doesn't rely on the removed fallbacks
-      const response = await apiService.get(`/analysis/${analysisId}/chart/${chartType}`);
+      const response = await apiService.get<{ data: ChartDataResponse }>(
+        `/analysis/${analysisId}/chart/${chartType}`
+      );
       return response.data as ChartDataResponse; 
     } catch (error: any) {
       return handleApiError(error);
@@ -168,7 +180,9 @@ export const analysisApi = {
     // This method might need review
     console.warn("analysisApi.getEnhancedAnalysis may need review after client-side fallbacks removal.");
     try {
-      const response = await apiService.get(`/analysis/${analysisId}/enhanced`);
+      const response = await apiService.get<{ data: EnhancedAnalysis }>(
+        `/analysis/${analysisId}/enhanced`
+      );
       // Assuming this structure is fine
       return response.data as EnhancedAnalysis;
     } catch (error: any) {

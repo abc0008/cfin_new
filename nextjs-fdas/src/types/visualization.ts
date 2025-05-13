@@ -3,6 +3,8 @@
  * These interfaces match the backend Pydantic models
  */
 
+import type { FinancialMetric } from './index';
+
 // Supported chart types
 export type ChartType = 'line' | 'bar' | 'area' | 'pie' | 'multiBar' | 'scatter';
 
@@ -55,10 +57,7 @@ export interface ChartData {
   config: ChartConfig;
   data: any[] | ChartSeries[];  // Support both direct data array and series format
   chartConfig?: {
-    [key: string]: {
-      label: string;
-      color?: string;
-    };
+    [key: string]: MetricConfig;
   };
   xAxisTitle?: string;
   yAxisTitle?: string;
@@ -106,17 +105,7 @@ export interface VisualizationData {
 }
 
 // Interface for financial metrics to be displayed in cards
-export interface FinancialMetric {
-  name: string;
-  value: number;
-  previousValue?: number;
-  percentChange?: number;
-  trend?: TrendDirection;
-  unit?: string;
-  category?: string;
-  description?: string;
-  highlight?: boolean;
-}
+// FinancialMetric is now defined in src/types/index.ts to match backend/Zod schema
 
 export interface AnalysisResult {
   id: string;
@@ -127,4 +116,6 @@ export interface AnalysisResult {
     tables?: TableData[];
   };
   timestamp: string;
-} 
+}
+
+export type { FinancialMetric } from './index'; 

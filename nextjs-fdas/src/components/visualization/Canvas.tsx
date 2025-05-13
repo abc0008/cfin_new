@@ -114,32 +114,29 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
       
       // Add safety check for latestResult
       if (latestResult) {
-        // First, check if we have the new tool-based visualization format
-        // Tool-based format has a visualizationData property directly in the result
+        // Tool-based visualization format
         if (latestResult.visualizationData && (
-          (Array.isArray(latestResult.visualizationData.charts) && latestResult.visualizationData.charts.length > 0) || 
+          (Array.isArray(latestResult.visualizationData.charts) && latestResult.visualizationData.charts.length > 0) ||
           (Array.isArray(latestResult.visualizationData.tables) && latestResult.visualizationData.tables.length > 0) ||
-          (Array.isArray(latestResult.visualizationData.metrics) && latestResult.visualizationData.metrics.length > 0)
+          (Array.isArray(latestResult.metrics) && latestResult.metrics.length > 0)
         )) {
           console.log('Using tool-based visualization format from analysis result');
           return {
             charts: latestResult.visualizationData.charts || [],
             tables: latestResult.visualizationData.tables || [],
-            metrics: latestResult.visualizationData.metrics || [], 
-            // Keep any legacy properties for backwards compatibility
+            metrics: latestResult.metrics || [],
             monetaryValues: latestResult.visualizationData.monetaryValues,
             percentages: latestResult.visualizationData.percentages,
             keywordFrequency: latestResult.visualizationData.keywordFrequency
           };
         }
-        
-        // Check if we have real visualization data from analysis results (legacy format)
-        if (latestResult.data && (latestResult.data.charts?.length || latestResult.data.tables?.length || latestResult.data.metrics?.length)) {
+        // Legacy format: metrics, charts, tables as top-level properties
+        if ((latestResult.metrics?.length || latestResult.visualizationData?.charts?.length || latestResult.visualizationData?.tables?.length)) {
           console.log('Using legacy visualization format from analysis result');
           return {
-            charts: latestResult.data.charts || [],
-            tables: latestResult.data.tables || [],
-            metrics: latestResult.data.metrics || []
+            charts: latestResult.visualizationData?.charts || [],
+            tables: latestResult.visualizationData?.tables || [],
+            metrics: latestResult.metrics || []
           };
         }
       }

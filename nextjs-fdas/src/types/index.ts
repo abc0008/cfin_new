@@ -1,4 +1,4 @@
-import { ChartData, TableData, FinancialMetric } from './visualization';
+import { ChartData, TableData } from './visualization';
 
 export interface DocumentMetadata {
   id: string;
@@ -89,21 +89,11 @@ export interface AnalysisResult {
   documentIds: string[];
   analysisType: string;
   timestamp: string;
-  analysisText?: string;
-  visualizationData?: {
-    charts: any[];
-    tables: any[];
-    metrics?: FinancialMetric[];
-    monetaryValues?: any;
-    percentages?: any;
-    keywordFrequency?: any;
-  };
-  data: {
-    metrics: FinancialMetric[];
-    charts?: ChartData[];
-    tables?: TableData[];
-  };
-  citationReferences?: Record<string, string>;
+  metrics: FinancialMetric[];
+  ratios: FinancialRatio[];
+  insights: string[];
+  visualizationData: Record<string, any>;
+  citationReferences?: Record<string, any>;
   query?: string;
 }
 
@@ -127,4 +117,13 @@ export interface ConversationMetadata {
   documentIds: string[];
   messageCount: number;
   session_id?: string; // For backward compatibility with backend response
+}
+
+export interface FinancialMetric {
+  category: string;
+  name: string;
+  period: string;
+  value: number;
+  unit: string;
+  isEstimated?: boolean;
 }
