@@ -137,6 +137,8 @@ class ApiService {
                 originalError: e
               });
             } catch (textError) {
+              // Log the original JSON parsing error before throwing
+              console.error('Error parsing response as JSON:', e);
               // If all else fails, create a generic API error
               throw new ApiError({
                 statusCode: response.status,

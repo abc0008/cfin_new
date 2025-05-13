@@ -157,24 +157,16 @@ class DocumentService:
                 )
                 return
             
-            # Update document content
-            document_type = DocumentType[processed_document.content_type.upper()] if processed_document.content_type else DocumentType.OTHER
-            
-            # Extract raw text from processed document
+            # --- Canonical raw_text handling ---
+            # Always extract raw_text from processed_document.extracted_data["raw_text"] if present
+            # and store it in Document.raw_text. Remove it from extracted_data before saving.
+            # After this, Document.raw_text is the only canonical source of full document text.
             raw_text = ""
             if processed_document.extracted_data and "raw_text" in processed_document.extracted_data:
                 raw_text = processed_document.extracted_data["raw_text"]
                 logger.info(f"Found {len(raw_text)} characters of raw text in processed document")
                 logger.info(f"Sample text: {raw_text[:200]}...")
-            
-            # Ensure we have some raw text
-            if not raw_text or len(raw_text.strip()) == 0:
-                logger.warning(f"No raw text found in processed document for {document_id} (Claude service returned empty/no text). PyPDF2 fallback has been removed.")
-                # raw_text will retain the value provided by claude_service (which might be an empty string
-                # or a specific message like 'No text content was returned by the AI...').
-                # No PyPDF2 extraction is performed here.
-            
-            # Prepare extracted_data for storage by removing redundant raw_text
+            # Remove raw_text from extracted_data before storing
             extracted_data_to_store = processed_document.extracted_data.copy() if processed_document.extracted_data else {}
             if "raw_text" in extracted_data_to_store:
                 del extracted_data_to_store["raw_text"]
@@ -183,7 +175,7 @@ class DocumentService:
             logger.info(f"Updating document {document_id} content in database")
             await self.document_repository.update_document_content(
                 document_id=document_id,
-                document_type=document_type,
+                document_type=DocumentType[processed_document.content_type.upper()] if processed_document.content_type else DocumentType.OTHER,
                 periods=processed_document.periods,
                 extracted_data=extracted_data_to_store, # Use the modified dict
                 raw_text=raw_text,
@@ -280,12 +272,14 @@ class DocumentService:
             result["financial_data"] = document.extracted_data["financial_data"]
         
         # Add raw_text if available
+        # Canonical source: document.raw_text is always the full document text after processing
         if document.raw_text:
             result["raw_text"] = document.raw_text
             logger.info(f"Found {len(document.raw_text)} characters of raw text in document {document_id}")
+        # Legacy fallback: only use extracted_data['raw_text'] if raw_text is missing (for old docs)
         elif document.extracted_data and isinstance(document.extracted_data, dict) and "raw_text" in document.extracted_data:
             result["raw_text"] = document.extracted_data["raw_text"]
-            logger.info(f"Found {len(document.extracted_data['raw_text'])} characters of raw text in extracted_data")
+            logger.info(f"[LEGACY] Found {len(document.extracted_data['raw_text'])} characters of raw text in extracted_data")
         
         # If we have any content, consider it valid
         if result:

@@ -257,3 +257,83 @@ export type MessageRequest = z.infer<typeof MessageRequestSchema>;
 
 // Add the ConversationCreateRequest type
 export type ConversationCreateRequest = z.infer<typeof ConversationCreateRequestSchema>;
+
+// Visualization schemas (strict, matching backend)
+export const MetricConfigSchema = z.object({
+  label: z.string(),
+  unit: z.string().optional(),
+  color: z.string().optional(),
+  formatter: z.string().optional(),
+  precision: z.number().optional(),
+});
+
+export const ChartConfigSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  subtitle: z.string().optional(),
+  xAxisLabel: z.string().optional(),
+  yAxisLabel: z.string().optional(),
+  xAxisKey: z.string().optional(),
+  trend: z.record(z.any()).optional(),
+  footer: z.string().optional(),
+  totalLabel: z.string().optional(),
+  showLegend: z.boolean().optional(),
+  legendPosition: z.enum(['top', 'bottom', 'left', 'right']).optional(),
+  showGrid: z.boolean().optional(),
+  height: z.number().optional(),
+  width: z.number().optional(),
+  stack: z.boolean().optional(),
+});
+
+export const ChartDataSchema = z.object({
+  chartType: z.enum(['bar', 'multiBar', 'line', 'pie', 'area', 'stackedArea']),
+  config: ChartConfigSchema,
+  data: z.array(z.record(z.any())),
+  chartConfig: z.record(MetricConfigSchema),
+});
+
+export const TableColumnSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  header: z.string().optional(),
+  format: z.enum(['number', 'currency', 'percentage', 'text']).optional(),
+  width: z.number().optional(),
+  align: z.enum(['left', 'center', 'right']).optional(),
+  formatter: z.string().optional(),
+});
+
+export const TableConfigSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  subtitle: z.string().optional(),
+  footer: z.string().optional(),
+  columns: z.array(TableColumnSchema),
+  showRowNumbers: z.boolean().optional(),
+  sortable: z.boolean().optional(),
+  pagination: z.boolean().optional(),
+  pageSize: z.number().optional(),
+  height: z.number().optional(),
+  width: z.number().optional(),
+});
+
+export const TableDataSchema = z.object({
+  tableType: z.enum(['simple', 'matrix', 'comparison']),
+  config: TableConfigSchema,
+  data: z.array(z.record(z.any())),
+});
+
+export const VisualizationDataSchema = z.object({
+  charts: z.array(ChartDataSchema).optional(),
+  tables: z.array(TableDataSchema).optional(),
+  monetaryValues: z.record(z.any()).optional(),
+  percentages: z.record(z.any()).optional(),
+  keywordFrequency: z.record(z.any()).optional(),
+});
+
+export type MetricConfig = z.infer<typeof MetricConfigSchema>;
+export type ChartConfig = z.infer<typeof ChartConfigSchema>;
+export type ChartData = z.infer<typeof ChartDataSchema>;
+export type TableColumn = z.infer<typeof TableColumnSchema>;
+export type TableConfig = z.infer<typeof TableConfigSchema>;
+export type TableData = z.infer<typeof TableDataSchema>;
+export type VisualizationData = z.infer<typeof VisualizationDataSchema>;

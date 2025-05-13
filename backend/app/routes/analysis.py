@@ -55,12 +55,11 @@ async def get_langchain_service():
 
 # --- Pydantic models for API response ---
 class VisualizationDataResponse(BaseModel):
-    charts: List[Any] = Field(default_factory=list)
-    tables: List[Any] = Field(default_factory=list)
-    # Include other potential keys from processing if needed
-    monetaryValues: Optional[Any] = None
-    percentages: Optional[Any] = None
-    keywordFrequency: Optional[Any] = None
+    charts: List[ChartData] = Field(default_factory=list)
+    tables: List[TableData] = Field(default_factory=list)
+    monetaryValues: Optional[Dict[str, Any]] = None
+    percentages: Optional[Dict[str, Any]] = None
+    keywordFrequency: Optional[Dict[str, Any]] = None
 
 class AnalysisApiResponse(BaseModel):
     id: str
@@ -108,8 +107,9 @@ async def run_analysis_endpoint(
         logger.debug(f"Raw result_data from service: {result_data}")
 
         # Validate and return the response using the Pydantic model
-        # The service now returns the correctly structured payload
-        # Make sure the keys match exactly (camelCase vs snake_case)
+        viz_data = result_data.get("visualizationData", {})
+        charts = [ChartData(**c) if not isinstance(c, ChartData) else c for c in viz_data.get("charts", [])]
+        tables = [TableData(**t) if not isinstance(t, TableData) else t for t in viz_data.get("tables", [])]
         api_response = AnalysisApiResponse(
             id=result_data.get("id", analysis_id),
             documentIds=result_data.get("documentIds", analysis_request.documentIds),
@@ -117,10 +117,11 @@ async def run_analysis_endpoint(
             timestamp=result_data.get("timestamp", datetime.now().isoformat()),
             analysisText=result_data.get("analysisText"),
             visualizationData=VisualizationDataResponse(
-                 charts=result_data.get("visualizationData", {}).get("charts", []),
-                 tables=result_data.get("visualizationData", {}).get("tables", []),
-                 # Pass through other keys if they exist
-                 **{k: v for k, v in result_data.get("visualizationData", {}).items() if k not in ['charts', 'tables']}
+                charts=charts,
+                tables=tables,
+                monetaryValues=viz_data.get("monetaryValues"),
+                percentages=viz_data.get("percentages"),
+                keywordFrequency=viz_data.get("keywordFrequency")
             ),
             metrics=result_data.get("metrics", []),
             ratios=result_data.get("ratios", []),
@@ -170,6 +171,9 @@ async def get_analysis_result(
         result_data = await analysis_service.get_analysis(analysis_id)
 
         # Validate and return the response using the Pydantic model
+        viz_data = result_data.get("visualizationData", {})
+        charts = [ChartData(**c) if not isinstance(c, ChartData) else c for c in viz_data.get("charts", [])]
+        tables = [TableData(**t) if not isinstance(t, TableData) else t for t in viz_data.get("tables", [])]
         api_response = AnalysisApiResponse(
             id=result_data.get("id", analysis_id),
             documentIds=result_data.get("documentIds", []),
@@ -177,10 +181,11 @@ async def get_analysis_result(
             timestamp=result_data.get("timestamp", datetime.now().isoformat()),
             analysisText=result_data.get("analysisText"),
             visualizationData=VisualizationDataResponse(
-                 charts=result_data.get("visualizationData", {}).get("charts", []),
-                 tables=result_data.get("visualizationData", {}).get("tables", []),
-                  # Pass through other keys if they exist
-                 **{k: v for k, v in result_data.get("visualizationData", {}).items() if k not in ['charts', 'tables']}
+                charts=charts,
+                tables=tables,
+                monetaryValues=viz_data.get("monetaryValues"),
+                percentages=viz_data.get("percentages"),
+                keywordFrequency=viz_data.get("keywordFrequency")
             ),
             metrics=result_data.get("metrics", []),
             ratios=result_data.get("ratios", []),
