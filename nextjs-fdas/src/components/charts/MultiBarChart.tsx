@@ -19,11 +19,6 @@ interface MultiBarChartProps {
   width?: number | string;
 }
 
-const DEFAULT_COLORS = [
-  '#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00c49f',
-  '#ffbb28', '#ff8042', '#a4de6c', '#d0ed57'
-];
-
 const MultiBarChart: React.FC<MultiBarChartProps> = ({ data, height = 400, width = '100%' }) => {
   const { config, data: chartData } = data;
   const dataKeys = chartData.length > 0 ? Object.keys(chartData[0]).filter(key => key !== 'name') : [];
@@ -128,7 +123,7 @@ const MultiBarChart: React.FC<MultiBarChartProps> = ({ data, height = 400, width
               <Bar
                 key={key}
                 dataKey={key}
-                fill={config.colors?.[index] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
+                fill={config.colors?.[index] || `hsl(var(--chart-${index + 1}))`}
                 radius={[4, 4, 0, 0]}
                 maxBarSize={60}
                 stackId={config.stacked ? 'stack' : undefined}

@@ -325,4 +325,79 @@ class TestAnalysisServiceEnhancements:
         assert result is not None
         assert "visualization_data" in result
         assert "visualizationData" in result
-        assert result["visualization_data"]["charts"][0]["chartType"] == "bar" 
+        assert result["visualization_data"]["charts"][0]["chartType"] == "bar"
+
+    @pytest.mark.asyncio
+    async def test_run_analysis_comprehensive_no_tools(self, mock_claude_service, mock_document_repo):
+        # Mock ClaudeService methods
+        mock_claude_service.get_document_content.return_value = {"text": "Sample document text", "raw_text": "Sample raw text for comprehensive"}
+        # Mock _extract_financial_data_with_citations for non-tool comprehensive
+        mock_claude_service._extract_financial_data_with_citations = AsyncMock(return_value=(
+            {"raw_text": "Extracted financial data without tools", "some_metric": 123},
+            [{"page": 1, "text": "citation1"}]
+        ))
+        
+        analysis_service = AnalysisService(mock_claude_service, mock_document_repo)
+        
+        # Execute
+        result = await analysis_service.run_analysis(
+            document_id="doc_comp",
+            analysis_type="comprehensive", # This type should trigger non-tool comprehensive analysis
+            user_query="Summarize this document.",
+            report_template_path=None 
+        )
+        
+        # Verify
+        mock_claude_service.get_document_content.assert_called_once_with("doc_comp")
+        mock_claude_service._extract_financial_data_with_citations.assert_called_once()
+        # Check arguments of _extract_financial_data_with_citations if necessary
+        
+        assert result is not None
+        assert result.analysis_type == "comprehensive"
+        assert "Extracted financial data without tools" in result.results_summary
+        assert result.visualization_data is None # No visualizations for this path
+        assert result.metrics is None # No separate metrics for this path currently
+        assert result.comparative_periods is None # No comparative periods for this path
+        assert result.status == ProcessingStatusEnum.COMPLETED
+        assert len(result.citations) == 1
+
+    @pytest.mark.asyncio
+    async def test_run_analysis_comprehensive_tools(self, mock_claude_service, mock_document_repo):
+        # Mock ClaudeService methods
+        mock_claude_service.get_document_content.return_value = {"text": "Sample document text", "raw_text": "Sample raw text"}
+        mock_claude_service.analyze_with_visualization_tools = AsyncMock(return_value={
+            "analysis_text": "Tool-based analysis complete.",
+            "visualizations": {
+                "charts": [{"type": "bar", "data": "chart_data"}],
+                "tables": [{"type": "simple", "data": "table_data"}]
+            },
+            "metrics": [{"name": "ROI", "value": "15%"}],
+            "comparative_periods": [{"metric": "Revenue", "change": "5%"}]
+        })
+        
+        analysis_service = AnalysisService(mock_claude_service, mock_document_repo)
+        
+        # Execute
+        result = await analysis_service.run_analysis(
+            document_id="doc1",
+            analysis_type="comprehensive_tools", # This type should trigger tool-based analysis
+            user_query="Analyze financial health.",
+            report_template_path=None 
+        )
+        
+        # Verify
+        mock_claude_service.get_document_content.assert_called_once_with("doc1")
+        mock_claude_service.analyze_with_visualization_tools.assert_called_once_with(
+            document_text="Sample raw text", # Ensure it uses raw_text
+            user_query="Analyze financial health.",
+            knowledge_base="" # Assuming knowledge base is empty for this test
+        )
+        
+        assert result is not None
+        assert result.analysis_type == "comprehensive_tools"
+        assert "Tool-based analysis complete." in result.results_summary
+        assert len(result.visualization_data["charts"]) == 1
+        assert len(result.visualization_data["tables"]) == 1
+        assert len(result.metrics) == 1
+        assert len(result.comparative_periods) == 1
+        assert result.status == ProcessingStatusEnum.COMPLETED 

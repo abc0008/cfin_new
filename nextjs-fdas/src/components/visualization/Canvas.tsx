@@ -132,16 +132,6 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             keywordFrequency: latestResult.visualizationData.keywordFrequency
           };
         }
-        
-        // Check if we have real visualization data from analysis results (legacy format)
-        if (latestResult.data && (latestResult.data.charts?.length || latestResult.data.tables?.length || latestResult.data.metrics?.length)) {
-          console.log('Using legacy visualization format from analysis result');
-          return {
-            charts: latestResult.data.charts || [],
-            tables: latestResult.data.tables || [],
-            metrics: latestResult.data.metrics || []
-          };
-        }
       }
     }
     

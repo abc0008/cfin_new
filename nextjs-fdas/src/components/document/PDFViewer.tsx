@@ -331,11 +331,18 @@ export function PDFViewer({
 
   // Use the error prop if provided, otherwise use the internal error state
   if (errorState) {
+    // Show a user-friendly error if the PDF cannot be loaded
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
-          <p className="mt-2 text-sm text-gray-500">{errorState}</p>
+          <h3 className="mt-2 text-lg font-semibold text-gray-900">Unable to load PDF</h3>
+          <p className="mt-2 text-sm text-gray-500">
+            The original PDF file could not be retrieved. Interactive highlighting and citation features are unavailable.
+          </p>
+          <p className="mt-2 text-sm text-gray-400">
+            If you need to view the document text, please contact support or try re-uploading the original PDF.
+          </p>
         </div>
       </div>
     );

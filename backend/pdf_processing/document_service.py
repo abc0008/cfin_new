@@ -1,25 +1,84 @@
-import os
-import uuid
+"""
+Document Service Module
+=======================
+
+This module provides the service layer for document operations in the CFIN financial
+analysis platform. It handles the processing of uploaded documents, extraction of
+financial data using Claude AI, and management of document content and citations.
+
+Primary responsibilities:
+- Process uploaded PDF documents using Claude AI
+- Extract structured financial data from PDFs
+- Store document content and citations in the database
+- Manage document metadata and processing status
+- Provide interfaces for retrieving document content for analysis
+
+Key Components:
+- DocumentService: Main service class for document processing operations
+- _process_document: Asynchronous method for background document processing
+- Methods for retrieving and analyzing document content
+
+Interactions with other files:
+-----------------------------
+1. cfin/backend/repositories/document_repository.py:
+   - Uses DocumentRepository for database operations on documents
+   - Methods used: create_document, update_document_status,
+     update_document_content, add_citation
+   - Handles persistence of document data and citations
+
+2. cfin/backend/pdf_processing/claude_service.py:
+   - Uses ClaudeService for PDF processing and AI analysis
+   - Methods used: process_pdf, extract_structured_financial_data
+   - Performs the actual AI-powered document analysis
+
+3. cfin/backend/pdf_processing/enhanced_pdf_service.py:
+   - Uses EnhancedPDFService for additional PDF processing capabilities
+   - Provides fallback mechanisms for PDF handling
+
+4. cfin/backend/pdf_processing/langgraph_service.py:
+   - Interacts indirectly via ClaudeService for document Q&A
+   - Used for citation-rich document analysis
+
+5. cfin/backend/models/document.py:
+   - Uses ProcessedDocument, DocumentMetadata, ProcessingStatus,
+     DocumentContentType, Citation models
+   - These Pydantic models define the API schemas for documents and citations
+
+6. cfin/backend/models/database_models.py:
+   - Uses DocumentType, ProcessingStatusEnum, Document, Citation database models
+   - These models define the database schema for documents
+
+7. cfin/backend/services/conversation_service.py:
+   - ConversationService uses this service via repositories to access document content
+   - Integrates document content into conversations
+
+This service acts as the orchestrator for document processing and analysis,
+coordinating between the repository layer (for persistence) and the AI services
+(for document understanding). It ensures documents are properly processed and
+stored with all the necessary metadata and content for downstream analysis.
+"""
+
+import asyncio
 import json
 import logging
+import os
+import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, BinaryIO, Any
 from pathlib import Path
-import asyncio
+from typing import Any, BinaryIO, Dict, List, Optional
 
 from models.document import (
-    ProcessedDocument, 
-    DocumentMetadata, 
-    ProcessingStatus,
-    DocumentContentType,
     Citation as CitationSchema,
-    DocumentUploadResponse
+    DocumentContentType,
+    DocumentMetadata,
+    DocumentUploadResponse,
+    ProcessedDocument,
+    ProcessingStatus,
 )
-from models.database_models import DocumentType, ProcessingStatusEnum, Document, Citation
+from models.database_models import Citation, Document, DocumentType, ProcessingStatusEnum
 from pdf_processing.claude_service import ClaudeService
 from pdf_processing.enhanced_pdf_service import EnhancedPDFService
 from repositories.document_repository import DocumentRepository
-
 
 logger = logging.getLogger(__name__)
 
@@ -90,38 +149,6 @@ class DocumentService:
             except Exception as e:
                 logger.error(f"Error using Claude service: {str(e)}", exc_info=True)
                 
-                # Attempt to extract raw text even if Claude processing fails
-                raw_text = ""
-                try:
-                    import io
-                    from PyPDF2 import PdfReader
-                    
-                    pdf_file = io.BytesIO(pdf_data)
-                    pdf_reader = PdfReader(pdf_file)
-                    
-                    # Extract text from each page
-                    page_texts = []
-                    for page_num in range(len(pdf_reader.pages)):
-                        page = pdf_reader.pages[page_num]
-                        page_text = page.extract_text()
-                        if page_text:
-                            page_texts.append(f"--- Page {page_num+1} ---\n{page_text}")
-                    
-                    raw_text = "\n\n".join(page_texts)
-                    logger.info(f"Extracted {len(raw_text)} characters of raw text as fallback for document {document_id}")
-                    
-                    # Store the extracted text in database even if processing failed
-                    await self.document_repository.update_document_content(
-                        document_id=document_id,
-                        document_type=DocumentType.OTHER,
-                        extracted_data={"raw_text": raw_text},
-                        raw_text=raw_text,
-                        confidence_score=0.0
-                    )
-                    
-                except Exception as extract_error:
-                    logger.error(f"Failed to extract fallback text: {extract_error}", exc_info=True)
-                
                 # Update status to failed with error message
                 await self.document_repository.update_document_status(
                     document_id=document_id,
@@ -130,59 +157,33 @@ class DocumentService:
                 )
                 return
             
-            # Update document content
-            document_type = DocumentType[processed_document.content_type.upper()] if processed_document.content_type else DocumentType.OTHER
-            
-            # Extract raw text from processed document
+            # --- Canonical raw_text handling ---
+            # Always extract raw_text from processed_document.extracted_data["raw_text"] if present
+            # and store it in Document.raw_text. Remove it from extracted_data before saving.
+            # After this, Document.raw_text is the only canonical source of full document text.
             raw_text = ""
             if processed_document.extracted_data and "raw_text" in processed_document.extracted_data:
                 raw_text = processed_document.extracted_data["raw_text"]
                 logger.info(f"Found {len(raw_text)} characters of raw text in processed document")
                 logger.info(f"Sample text: {raw_text[:200]}...")
-            
-            # Ensure we have some raw text
-            if not raw_text or len(raw_text.strip()) == 0:
-                logger.warning(f"No raw text found in processed document for {document_id} - attempting extraction")
-                try:
-                    import io
-                    from PyPDF2 import PdfReader
-                    
-                    pdf_file = io.BytesIO(pdf_data)
-                    pdf_reader = PdfReader(pdf_file)
-                    
-                    # Extract text from each page
-                    page_texts = []
-                    for page_num in range(len(pdf_reader.pages)):
-                        page = pdf_reader.pages[page_num]
-                        page_text = page.extract_text()
-                        if page_text:
-                            page_texts.append(f"--- Page {page_num+1} ---\n{page_text}")
-                    
-                    raw_text = "\n\n".join(page_texts)
-                    logger.info(f"Successfully extracted {len(raw_text)} characters as fallback raw text")
-                    
-                    # Update the extracted data with the raw text
-                    if not processed_document.extracted_data:
-                        processed_document.extracted_data = {}
-                    processed_document.extracted_data["raw_text"] = raw_text
-                    
-                except Exception as extract_error:
-                    logger.error(f"Failed to extract fallback text: {extract_error}", exc_info=True)
-                    raw_text = f"Failed to extract text content from {filename}. PDF may contain images or be protected."
-            
+            # Remove raw_text from extracted_data before storing
+            extracted_data_to_store = processed_document.extracted_data.copy() if processed_document.extracted_data else {}
+            if "raw_text" in extracted_data_to_store:
+                del extracted_data_to_store["raw_text"]
+
             # Update document with extracted content
             logger.info(f"Updating document {document_id} content in database")
             await self.document_repository.update_document_content(
                 document_id=document_id,
-                document_type=document_type,
+                document_type=DocumentType[processed_document.content_type.upper()] if processed_document.content_type else DocumentType.OTHER,
                 periods=processed_document.periods,
-                extracted_data=processed_document.extracted_data,
+                extracted_data=extracted_data_to_store, # Use the modified dict
                 raw_text=raw_text,
                 confidence_score=processed_document.confidence_score
             )
             
             # Log document processing details for debugging
-            logger.info(f"Document {document_id} processed. Status: COMPLETED, Has raw_text: {bool(raw_text)}, Raw text length: {len(raw_text)}, Extracted data keys: {list(processed_document.extracted_data.keys()) if processed_document.extracted_data else 'None'}")
+            logger.info(f"Document {document_id} processed. Status: COMPLETED, Has raw_text: {bool(raw_text)}, Raw text length: {len(raw_text)}, Extracted data keys: {list(extracted_data_to_store.keys()) if extracted_data_to_store else 'None'}")
             
             # Add citations to the database
             added_citations = []
@@ -271,12 +272,14 @@ class DocumentService:
             result["financial_data"] = document.extracted_data["financial_data"]
         
         # Add raw_text if available
+        # Canonical source: document.raw_text is always the full document text after processing
         if document.raw_text:
             result["raw_text"] = document.raw_text
             logger.info(f"Found {len(document.raw_text)} characters of raw text in document {document_id}")
+        # Legacy fallback: only use extracted_data['raw_text'] if raw_text is missing (for old docs)
         elif document.extracted_data and isinstance(document.extracted_data, dict) and "raw_text" in document.extracted_data:
             result["raw_text"] = document.extracted_data["raw_text"]
-            logger.info(f"Found {len(document.extracted_data['raw_text'])} characters of raw text in extracted_data")
+            logger.info(f"[LEGACY] Found {len(document.extracted_data['raw_text'])} characters of raw text in extracted_data")
         
         # If we have any content, consider it valid
         if result:

@@ -1,7 +1,39 @@
 #!/usr/bin/env python3
 """
-Script to create the database schema for FDAS.
-Run this script to initialize the database.
+Database Creation Script
+========================
+
+This script is responsible for initializing the database schema for the CFIN financial
+analysis platform. It creates all necessary tables based on the SQLAlchemy ORM models
+defined in `models.database_models.py` and can also populate initial data, such as a default user.
+
+It supports both asynchronous (for databases like PostgreSQL) and synchronous (for SQLite)
+initialization routines.
+
+Primary responsibilities:
+- Create all database tables defined by the ORM models.
+- Optionally drop existing tables before creation for a clean setup.
+- Create a default user if one does not already exist.
+- Select the appropriate database engine (async or sync) based on the DATABASE_URL.
+
+Key Components:
+- create_database(): Asynchronous function to initialize the database using an async engine.
+- create_database_sync(): Synchronous function to initialize the database using a sync engine (primarily for SQLite).
+- Main execution block (`if __name__ == "__main__"`): Determines which initialization function to call based on the DATABASE_URL.
+
+Interactions with other files:
+-----------------------------
+1. cfin/backend/models/database_models.py:
+   - Imports all SQLAlchemy ORM models (User, Document, Citation, Conversation, Message, AnalysisResult, AnalysisBlock, etc.) and the `Base` metadata object.
+   - Uses `Base.metadata.create_all()` and `Base.metadata.drop_all()` to manage the schema.
+
+2. cfin/backend/utils/database.py:
+   - Imports `get_db`, `SyncSessionLocal`, and `sync_engine` for database session and engine management.
+   - Uses the DATABASE_URL environment variable, which is also configured/used by `utils.database.py`.
+
+Usage:
+- This script is typically run once during application setup or when the database schema needs to be reset or updated.
+- It ensures that the database is correctly structured for the application to function.
 """
 
 import asyncio

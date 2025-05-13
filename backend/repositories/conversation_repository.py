@@ -1,3 +1,45 @@
+"""
+Conversation Repository Module
+==============================
+
+This module provides the repository layer for managing conversations, messages, and related
+entities in the CFIN financial analysis platform. It handles all database interactions for
+conversational data, including CRUD operations and associations between conversations,
+users, documents, messages, citations, and analysis blocks.
+
+Primary responsibilities:
+- Create, retrieve, update, and delete conversations.
+- Add, retrieve, and update messages within conversations.
+- Manage associations between conversations and documents.
+- Link messages to citations and analysis blocks.
+- Provide methods for listing and searching conversations and messages.
+
+Key Components:
+- ConversationRepository: Main class encapsulating all database operations for conversations.
+  - Methods for CRUD on Conversation, Message, AnalysisBlock entities.
+  - Methods for managing relationships (ConversationDocument, MessageCitation).
+
+Interactions with other files:
+-----------------------------
+1. cfin/backend/models/database_models.py:
+   - Uses Conversation, Message, User, Document, Citation, MessageCitation, ConversationDocument, AnalysisBlock SQLAlchemy ORM models.
+   - These models define the database schema for all conversational data.
+
+2. cfin/backend/models/document.py:
+   - Uses Citation (as CitationSchema) for potentially mapping database citation models to Pydantic schemas, though direct usage is minimal in this file itself.
+
+3. cfin/backend/services/conversation_service.py:
+   - ConversationService initializes and uses this repository for all its database needs related to conversations.
+   - Relies on this repository for fetching and persisting all conversation-related data.
+
+4. cfin/backend/utils/database.py:
+   - Implicitly uses the database session (AsyncSession) managed by utils.database for all operations.
+
+This repository centralizes the data access logic for all conversational features, ensuring
+that the ConversationService can operate on a clean abstraction without directly dealing
+with database queries or ORM complexities.
+"""
+
 import logging
 import uuid
 from typing import List, Optional, Dict, Any

@@ -46,7 +46,7 @@ const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%' 
               label
             >
               {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${index + 1}))`} />
               ))}
             </Pie>
             {config.showLegend && <Legend />}

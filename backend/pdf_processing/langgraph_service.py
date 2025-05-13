@@ -1,3 +1,49 @@
+"""
+LangGraph Service Module
+=======================
+
+This module provides a service for managing conversational workflows and document Q&A 
+using LangGraph and the Anthropic Claude API. It enables sophisticated document analysis,
+conversation management, and citation generation for financial documents.
+
+Primary responsibilities:
+- Creating and managing conversational state graphs
+- Processing documents for analysis 
+- Generating responses with accurate citations to source documents
+- Providing simple document Q&A functionality
+
+Key Components:
+- LangGraphService: Main service class that implements the LangGraph workflow
+- AgentState: TypedDict defining the state structure for the conversation agent
+- ConversationNodeType: Enum defining the types of nodes in the conversation graph
+
+Interactions with other files:
+-----------------------------
+1. cfin/backend/pdf_processing/claude_service.py:
+   - Uses LangGraphService.simple_document_qa for document-based Q&A with citations
+   - Calls this through claude_service.generate_response_with_langgraph
+
+2. cfin/backend/repositories/document_repository.py:
+   - LangGraphService fetches document binary content using DocumentRepository
+   - Used in simple_document_qa to retrieve PDF binary content for direct processing by Claude
+
+3. cfin/backend/services/conversation_service.py:
+   - Indirectly uses LangGraphService through ClaudeService
+   - For generating responses with citations to document content
+
+4. cfin/backend/models/document.py:
+   - Uses ProcessedDocument model to structure document data
+
+Workflow Graph Structure:
+- Router Node: Determines next action based on conversation state
+- Document Processor Node: Extracts information from documents
+- Response Generator Node: Creates responses based on document content
+- Citation Processor Node: Validates and formats citations
+
+The service implements both a full conversation graph (for complex interactions)
+and a simplified document Q&A method for direct question answering against documents.
+"""
+
 import os
 import json
 import gc
@@ -574,16 +620,15 @@ IMPORTANT INSTRUCTIONS:
                         raw_text = f"{chunks[0]}\n\n[...Document continues...]\n\n{chunks[len(chunks)//2]}\n\n[...Document continues...]\n\n{chunks[-1]}"
                     logger.info(f"Using chunked text for large document {doc_id} ({len(raw_text)} characters from {len(chunks)} chunks)")
             
-            # If we still don't have content, check other common fields
-            if not raw_text and "content" in doc and doc.get("content"):
-                raw_text = doc.get("content")
-                content_source = "content"
-                logger.info(f"Found content in content field for document {doc_id} ({len(raw_text)} characters)")
-                
+            # Fallback to "text" field if raw_text and extracted_data.raw_text are not found
             if not raw_text and "text" in doc and doc.get("text"):
-                raw_text = doc.get("text")
-                content_source = "text"
-                logger.info(f"Found content in text field for document {doc_id} ({len(raw_text)} characters)")
+                # Ensure this "text" field is not binary PDF content mistaken as text
+                if isinstance(doc.get("text"), str):
+                    raw_text = doc.get("text")
+                    content_source = "text_field"
+                    logger.info(f"Using 'text' field for document {doc_id} ({len(raw_text)} characters)")
+                else:
+                    logger.warning(f"'text' field for document {doc_id} is not a string, skipping.")
             
             if raw_text:
                 # Truncate very long documents to prevent context overflow
@@ -1010,16 +1055,12 @@ IMPORTANT INSTRUCTIONS:
                 has_raw_text = 'raw_text' in doc and bool(doc.get('raw_text'))
                 raw_text_len = len(doc.get('raw_text', '')) if has_raw_text else 0
                 
-                has_content = 'content' in doc and bool(doc.get('content'))
-                content_type = type(doc.get('content')).__name__ if has_content else "None"
-                content_len = len(doc.get('content', '')) if has_content and isinstance(doc.get('content'), (str, bytes)) else 0
-                
                 has_extracted_data = 'extracted_data' in doc and bool(doc.get('extracted_data'))
                 has_text = 'text' in doc and bool(doc.get('text'))
                 
                 # Log comprehensive document info
                 logger.info(f"Document {i+1}/{len(documents)} - ID: {doc_id}, Title: {doc_title}, Type: {doc_type}")
-                logger.info(f"Content availability: raw_text={has_raw_text}({raw_text_len} chars), content={has_content}({content_type}, {content_len}), extracted_data={has_extracted_data}, text={has_text}")
+                logger.info(f"Content availability: raw_text={has_raw_text}({raw_text_len} chars), extracted_data={has_extracted_data}, text={has_text}")
             
             logger.info(f"===== End document diagnostic information =====")
             
@@ -1049,6 +1090,7 @@ IMPORTANT INSTRUCTIONS:
             for i, doc in enumerate(documents):
                 doc_id = doc.get('id', f'doc_{i}')
                 doc_title = doc.get("title", doc.get("filename", f"Document {doc_id}"))
+                processed_pdf_successfully = False
                 
                 # Check if this is a PDF document
                 is_pdf = False
@@ -1067,12 +1109,17 @@ IMPORTANT INSTRUCTIONS:
                     # If not, try to get it from repository
                     elif repository:
                         try:
-                            pdf_content = await repository.get_document_content(doc_id)
-                            if pdf_content and "content" in pdf_content and isinstance(pdf_content["content"], bytes):
-                                pdf_binary = pdf_content["content"]
-                                logger.info(f"Retrieved binary PDF data ({len(pdf_binary)} bytes) for document {doc_id}")
+                            # Assuming get_document_content returns a dict with a 'content' key holding the binary
+                            pdf_doc_data = await repository.get_document_content(doc_id)
+                            if pdf_doc_data and "content" in pdf_doc_data and isinstance(pdf_doc_data["content"], bytes):
+                                pdf_binary = pdf_doc_data["content"]
+                                logger.info(f"Retrieved binary PDF data ({len(pdf_binary)} bytes) for document {doc_id} from repository")
+                            elif pdf_doc_data and "raw_text" in pdf_doc_data: # Check if repo returned text instead
+                                logger.info(f"Repository returned raw_text for PDF {doc_id} instead of binary. Will attempt text fallback if enabled.")
+                            else:
+                                logger.warning(f"Repository did not return usable binary content for PDF {doc_id}. Keys: {list(pdf_doc_data.keys()) if pdf_doc_data else 'None'}")
                         except Exception as e:
-                            logger.warning(f"Could not retrieve binary data for document {doc_id}: {str(e)}")
+                            logger.warning(f"Could not retrieve binary data for document {doc_id} via repository: {str(e)}")
                     
                     # If we have binary PDF data, encode it as base64 for Claude
                     if pdf_binary:
@@ -1081,7 +1128,7 @@ IMPORTANT INSTRUCTIONS:
                             base64_data = base64.b64encode(pdf_binary).decode('utf-8')
                             
                             # Create the document block in Claude's format
-                            pdf_doc = {
+                            pdf_doc_block = {
                                 "type": "document",
                                 "title": doc_title,
                                 "source": {
@@ -1091,55 +1138,53 @@ IMPORTANT INSTRUCTIONS:
                                 }
                             }
                             
-                            user_content.append(pdf_doc)
+                            user_content.append(pdf_doc_block)
                             logger.info(f"Added PDF document {doc_id} with base64 encoding to content")
-                            continue
+                            processed_pdf_successfully = True # Mark as processed
                         except Exception as e:
-                            logger.error(f"Error encoding PDF as base64: {str(e)}")
+                            logger.error(f"Error encoding PDF {doc_id} as base64: {str(e)}")
+                            # Do not set processed_pdf_successfully to true, will fall through if text fallback is allowed
+                    else:
+                        logger.warning(f"No binary data found for PDF {doc_id} after checking direct content and repository.")
                 
-                # For non-PDF documents or if PDF processing failed, fallback to text
-                # Try to find content in various possible locations
-                doc_content = None
-                
-                # Look for content in various fields with fallbacks
-                if "raw_text" in doc and doc["raw_text"]:
-                    doc_content = doc["raw_text"]
-                    logger.info(f"Using raw_text field for document {doc_id}")
-                elif "content" in doc and doc["content"] and isinstance(doc["content"], str):
-                    doc_content = doc["content"]
-                    logger.info(f"Using content field for document {doc_id}")
-                elif "extracted_data" in doc and isinstance(doc["extracted_data"], dict) and "raw_text" in doc["extracted_data"]:
-                    doc_content = doc["extracted_data"]["raw_text"]
-                    logger.info(f"Using extracted_data.raw_text for document {doc_id}")
-                elif "text" in doc and doc["text"]:
-                    doc_content = doc["text"]
-                    logger.info(f"Using text field for document {doc_id}")
-                
-                # If content was found, create a document block for Claude
-                if doc_content and len(str(doc_content).strip()) > 0:
-                    # Ensure content is a string
-                    if not isinstance(doc_content, str):
-                        try:
-                            doc_content = str(doc_content)
-                        except Exception as e:
-                            logger.warning(f"Could not convert content to string: {e}")
-                            continue
+                # If it was a PDF and binary processing failed, skip text fallback for this PDF in simple_document_qa
+                if is_pdf and not processed_pdf_successfully:
+                    logger.warning(f"Failed to process PDF {doc_id} as binary for simple_document_qa. Skipping text fallback for this PDF.")
+                    continue # Skip to the next document
+
+                # Fallback to text for non-PDF documents OR if PDF processing failed (and text fallback for PDF was not skipped above)
+                # This block is now primarily for non-PDFs given the continue above for failed PDFs.
+                if not processed_pdf_successfully: # This condition means it's either not a PDF, or it's a PDF whose binary processing failed (and we didn't skip it)
+                    doc_content_text = None
+                    source_field = "none"
                     
-                    # Create the document block
-                    text_doc = {
-                        "type": "document",
-                        "title": doc_title,
-                        "source": {
-                            "type": "text",
-                            "media_type": "text/plain",
-                            "data": doc_content
+                    if "raw_text" in doc and doc["raw_text"]:
+                        doc_content_text = doc["raw_text"]
+                        source_field = "raw_text"
+                    elif "extracted_data" in doc and isinstance(doc["extracted_data"], dict) and "raw_text" in doc["extracted_data"]:
+                        doc_content_text = doc["extracted_data"]["raw_text"]
+                        source_field = "extracted_data.raw_text"
+                    elif "text" in doc and isinstance(doc.get("text"), str):
+                        doc_content_text = doc["text"]
+                        source_field = "text_field (string)"
+                    # Explicitly do NOT fall back to doc.get("content") as text here, as it might be unhandled binary. 
+                    # If it was a PDF, binary should have been handled above.
+                    # If it's another binary type, it shouldn't be treated as text.
+
+                    if doc_content_text and len(str(doc_content_text).strip()) > 0:
+                        logger.info(f"Using text from '{source_field}' for document {doc_id} ({len(doc_content_text)} chars)")
+                        text_doc_block = {
+                            "type": "document",
+                            "title": doc_title,
+                            "source": {
+                                "type": "text",
+                                "media_type": "text/plain",
+                                "data": str(doc_content_text) # Ensure it's a string
+                            }
                         }
-                    }
-                    
-                    user_content.append(text_doc)
-                    logger.info(f"Added text document {doc_id} with {len(doc_content)} chars to content")
-                else:
-                    logger.warning(f"Could not find any content for document {doc_id}, skipping")
+                        user_content.append(text_doc_block)
+                    else:
+                        logger.warning(f"Could not find any usable text content for document {doc_id} (type: {'PDF' if is_pdf else 'non-PDF'}), skipping.")
             
             # If no documents were prepared, return an error message
             if not any(item.get("type") == "document" for item in user_content):

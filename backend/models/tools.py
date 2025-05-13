@@ -4,108 +4,123 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Utility for camelCase aliasing
+def to_camel(string: str) -> str:
+    parts = string.split('_')
+    return parts[0] + ''.join(word.capitalize() for word in parts[1:]) if len(parts) > 1 else string
+
 # Base Tool Schema
 class ToolSchema(BaseModel):
     """Base model for tool definitions to be used with Claude API."""
     name: str
     description: str
     input_schema: Dict[str, Any]
-    cache_control: Optional[Dict[str, str]] = Field(default=None, description="Optional cache control settings")
+    cache_control: Optional[Dict[str, str]] = Field(default=None, alias="cacheControl", description="Optional cache control settings")
 
-    model_config = ConfigDict(
-        populate_by_name=True,
-        alias_generator=None,
-        validate_assignment=True,
-        protected_namespaces=()
-    )
+    class Config:
+        alias_generator = to_camel
+        allow_population_by_field_name = True
 
 # --- Chart Generation Tool ---
 
 class ChartMetricConfig(BaseModel):
     """Configuration for a single metric/series in a chart."""
-    label: str = Field(description="Display label for the metric/series")
-    color: Optional[str] = Field(default=None, description="Hex color code for the series (e.g., '#8884d8')")
-    unit: Optional[str] = Field(default=None, description="Unit for the metric (e.g., '$', '%')")
-    formatter: Optional[str] = Field(default=None, description="Formatting type (e.g., 'currency', 'percent', 'compact')")
-    precision: Optional[int] = Field(default=None, description="Number of decimal places for formatting")
+    label: str
+    color: Optional[str] = None
+    unit: Optional[str] = None
+    formatter: Optional[str] = None
+    precision: Optional[int] = None
+
+    class Config:
+        alias_generator = to_camel
+        allow_population_by_field_name = True
 
 class ChartConfig(BaseModel):
-    """Configuration for the overall chart appearance and axes."""
-    title: str = Field(description="Main title of the chart")
-    description: Optional[str] = Field(default=None, description="Subtitle or description below the title")
-    xAxisKey: Optional[str] = Field(default="name", description="The key in the 'data' array objects representing the x-axis category/label (e.g., 'period', 'category', 'name')")
-    yAxisKey: Optional[str] = Field(default=None, description="The key for y-axis values if only one series (used less often with chartConfig)")
-    xAxisLabel: Optional[str] = Field(default=None, description="Label for the x-axis")
-    yAxisLabel: Optional[str] = Field(default=None, description="Label for the y-axis")
-    showLegend: bool = Field(default=True, description="Whether to display the chart legend")
-    legendPosition: Optional[Literal["top", "bottom", "left", "right"]] = Field(default="bottom", description="Position of the legend")
-    showGrid: Optional[bool] = Field(default=True, description="Whether to show the chart grid lines")
-    stack: Optional[bool] = Field(default=False, description="Whether bars/areas should be stacked")
-    colors: Optional[List[str]] = Field(default=None, description="Optional list of hex colors for chart series")
-    footer: Optional[str] = Field(default=None, description="Optional text to display below the chart")
-    totalLabel: Optional[str] = Field(default=None, description="Optional label for displaying a total (e.g., for pie charts)")
+    title: str
+    description: Optional[str] = None
+    x_axis_key: Optional[str] = Field(default="name", alias="xAxisKey")
+    y_axis_key: Optional[str] = Field(default=None, alias="yAxisKey")
+    x_axis_label: Optional[str] = Field(default=None, alias="xAxisLabel")
+    y_axis_label: Optional[str] = Field(default=None, alias="yAxisLabel")
+    show_legend: bool = Field(default=True, alias="showLegend")
+    legend_position: Optional[Literal["top", "bottom", "left", "right"]] = Field(default="bottom", alias="legendPosition")
+    show_grid: Optional[bool] = Field(default=True, alias="showGrid")
+    stack: Optional[bool] = Field(default=False)
+    colors: Optional[List[str]] = None
+    footer: Optional[str] = None
+    total_label: Optional[str] = Field(default=None, alias="totalLabel")
+
+    class Config:
+        alias_generator = to_camel
+        allow_population_by_field_name = True
 
 class ChartDataItem(RootModel):
-    """Represents a single data point or category in the chart data array."""
-    # Example structure: { "name": "Q1 2023", "revenue": 120000, "profit": 35000 }
-    # The specific keys (like 'revenue', 'profit') are defined dynamically
-    # and should match the keys in chartConfig.
-    # The key used for the x-axis label must match ChartConfig.xAxisKey.
-    root: Dict[str, Union[str, float, int, None]] = Field(description="A flexible dictionary for chart data points")
+    root: Dict[str, Union[str, float, int, None]]
 
 class ChartGenerationInputSchema(BaseModel):
-    """Input schema for the generate_graph_data tool."""
-    chartType: Literal["bar", "multiBar", "line", "pie", "area", "stackedArea", "scatter"] = Field(description="The type of chart to generate")
-    config: ChartConfig = Field(description="Overall configuration for the chart")
-    data: List[Dict[str, Any]] = Field(description="The array of data points for the chart. Each object represents a category/period. Keys should match xAxisKey and keys in chartConfig.")
-    chartConfig: Dict[str, ChartMetricConfig] = Field(description="Configuration for each metric/series being plotted. Keys must match the metric keys in the 'data' objects.")
+    chart_type: Literal["bar", "multiBar", "line", "pie", "area", "stackedArea", "scatter"] = Field(..., alias="chartType")
+    config: ChartConfig
+    data: List[Dict[str, Any]]
+    chart_config: Dict[str, ChartMetricConfig] = Field(..., alias="chartConfig")
+
+    class Config:
+        alias_generator = to_camel
+        allow_population_by_field_name = True
 
 class ChartGenerationTool(ToolSchema):
-    """Tool for generating chart data in a format consumable by the frontend ChartRenderer."""
     name: str = "generate_graph_data"
-    description: str = """Use this tool to generate structured JSON data for financial charts and graphs (bar, line, pie, area, scatter).
-    Specify the chartType, provide general config (title, axis labels), the data array, and chartConfig for each series/metric.
-    The 'data' array objects must contain a key matching 'config.xAxisKey' and keys matching the keys used in 'chartConfig'.
-    For pie charts, 'data' objects typically have 'name' and 'value' keys.
-    """
+    description: str = """Use this tool to generate structured JSON data for financial charts and graphs (bar, line, pie, area, scatter).\nSpecify the chartType, provide general config (title, axis labels), the data array, and chartConfig for each series/metric.\nThe 'data' array objects must contain a key matching 'config.xAxisKey' and keys matching the keys used in 'chartConfig'.\nFor pie charts, 'data' objects typically have 'name' and 'value' keys."""
     input_schema: Dict[str, Any] = ChartGenerationInputSchema.model_json_schema()
+
+    class Config:
+        alias_generator = to_camel
+        allow_population_by_field_name = True
 
 # --- Table Generation Tool ---
 
 class TableColumnConfig(BaseModel):
-    """Configuration for a single table column."""
-    key: str = Field(description="The key in the 'data' array objects for this column")
-    label: str = Field(description="The display label for the column header")
-    header: Optional[str] = Field(default=None, description="Alternative header text (if label is different)")
-    format: Optional[Literal["number", "currency", "percentage", "text", "date"]] = Field(default="text", description="How to format the data in this column")
-    width: Optional[int] = Field(default=None, description="Optional fixed width for the column in pixels")
-    align: Optional[Literal["left", "center", "right"]] = Field(default="left", description="Text alignment for the column")
+    key: str
+    label: str
+    header: Optional[str] = None
+    format: Optional[Literal["number", "currency", "percentage", "text", "date"]] = "text"
+    width: Optional[int] = None
+    align: Optional[Literal["left", "center", "right"]] = "left"
+
+    class Config:
+        alias_generator = to_camel
+        allow_population_by_field_name = True
 
 class TableConfig(BaseModel):
-    """Configuration for the overall table appearance and behavior."""
-    title: str = Field(description="Main title of the table")
-    description: Optional[str] = Field(default=None, description="Subtitle or description below the title")
-    footer: Optional[str] = Field(default=None, description="Optional text to display below the table")
-    columns: List[TableColumnConfig] = Field(description="Array defining the columns of the table")
-    showRowNumbers: Optional[bool] = Field(default=False, description="Whether to display row numbers")
-    sortable: Optional[bool] = Field(default=True, description="Whether columns should be sortable")
-    pagination: Optional[bool] = Field(default=True, description="Whether to enable pagination")
-    pageSize: Optional[int] = Field(default=10, description="Number of rows per page if pagination is enabled")
+    title: str
+    description: Optional[str] = None
+    footer: Optional[str] = None
+    columns: List[TableColumnConfig]
+    show_row_numbers: Optional[bool] = Field(default=False, alias="showRowNumbers")
+    sortable: Optional[bool] = True
+    pagination: Optional[bool] = True
+    page_size: Optional[int] = Field(default=10, alias="pageSize")
+
+    class Config:
+        alias_generator = to_camel
+        allow_population_by_field_name = True
 
 class TableGenerationInputSchema(BaseModel):
-    """Input schema for the generate_table_data tool."""
-    tableType: Literal["simple", "matrix", "comparison", "detailed"] = Field(default="simple", description="The general type or purpose of the table")
-    config: TableConfig = Field(description="Configuration for the table structure and appearance")
-    data: List[Dict[str, Any]] = Field(description="The array of data objects representing table rows. Keys in objects must match 'config.columns.key'.")
+    table_type: Literal["simple", "matrix", "comparison", "detailed"] = Field(default="simple", alias="tableType")
+    config: TableConfig
+    data: List[Dict[str, Any]]
+
+    class Config:
+        alias_generator = to_camel
+        allow_population_by_field_name = True
 
 class TableGenerationTool(ToolSchema):
-    """Tool for generating structured tabular data for financial information."""
     name: str = "generate_table_data"
-    description: str = """Use this tool to generate structured JSON data for creating financial data tables.
-    Specify the tableType (e.g., 'comparison', 'detailed'), provide config (title, column definitions), and the data array.
-    The 'data' objects' keys must match the 'key' values defined in 'config.columns'.
-    Use appropriate 'format' values in column definitions (number, currency, percentage, text, date)."""
+    description: str = """Use this tool to generate structured JSON data for creating financial data tables.\nSpecify the tableType (e.g., 'comparison', 'detailed'), provide config (title, column definitions), and the data array.\nThe 'data' objects' keys must match the 'key' values defined in 'config.columns'.\nUse appropriate 'format' values in column definitions (number, currency, percentage, text, date)."""
     input_schema: Dict[str, Any] = TableGenerationInputSchema.model_json_schema()
+
+    class Config:
+        alias_generator = to_camel
+        allow_population_by_field_name = True
 
 # Keep the existing FinancialMetricGenerationTool and ComparativePeriodGenerationTool
 class FinancialMetricGenerationTool(ToolSchema):
