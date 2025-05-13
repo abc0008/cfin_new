@@ -213,17 +213,21 @@ class Message(Base):
 
 
 class AnalysisResult(Base):
-    """Analysis result model for storing document analysis results."""
+    """Analysis result model for storing document analysis results.
+    
+    Note: We store document IDs as a JSON array (document_ids) to support multi-document analysis without a join table.
+    This design avoids extra schema complexity and aligns with the API contract, but requires application-level integrity checks.
+    """
     __tablename__ = "analysis_results"
     
     id = Column(String, primary_key=True, default=generate_uuid)
-    document_id = Column(String, ForeignKey("documents.id"), nullable=False)
+    document_ids = Column(JSON, nullable=False)  # List of document IDs analyzed
     analysis_type = Column(String, nullable=False)  # e.g., "financial_ratios", "sentiment", etc.
     result_data = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # Relationships
-    document = relationship("Document", back_populates="analysis_results")
+    # Removed: document_id = Column(String, ForeignKey("documents.id"), nullable=False)
+    # Removed: document = relationship("Document", back_populates="analysis_results")
 
 
 class AnalysisBlock(Base):

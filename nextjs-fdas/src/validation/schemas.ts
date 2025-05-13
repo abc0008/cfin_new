@@ -151,6 +151,20 @@ export const AnalysisBlockSchema = z.object({
   tableData: z.array(z.record(z.any())).optional()
 });
 
+export const ComparativePeriodSchema = z.object({
+  metric: z.string(),
+  currentPeriod: z.string(),
+  previousPeriod: z.string(),
+  currentValue: z.number(),
+  previousValue: z.number(),
+  change: z.number(),
+  percentChange: z.number(),
+  trend: z.enum(["positive", "negative", "neutral"])
+});
+
+// AnalysisResultSchema: This schema is not .strict() because the frontend may receive extra fields from the backend.
+// If validation fails, the code falls back to using the raw response, so all fields are still available.
+// This is a deliberate choice to avoid runtime errors and ensure forward compatibility.
 export const AnalysisResultSchema = z.object({
   id: z.string().refine(
     (val) => {
@@ -186,7 +200,11 @@ export const AnalysisResultSchema = z.object({
   ratios: z.array(FinancialRatioSchema),
   insights: z.array(z.string()),
   visualizationData: z.record(z.any()),
-  citationReferences: z.record(z.any()).optional()
+  citationReferences: z.record(z.any()).optional(),
+  analysisText: z.string().optional(),
+  comparativePeriods: z.array(ComparativePeriodSchema).optional().default([]),
+  documentType: z.string().optional(),
+  periods: z.array(z.string()).optional().default([])
 });
 
 export const EnhancedAnalysisResultSchema = AnalysisResultSchema.extend({

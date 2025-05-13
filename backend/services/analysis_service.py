@@ -118,6 +118,41 @@ Suggested Next Actions:
 class AnalysisService:
     """Service for managing financial analysis."""
     
+    SUPPORTED_ANALYSIS_TYPES = [
+        {
+            "type": "comprehensive_tools",
+            "display_name": "Comprehensive Analysis",
+            "description": "Performs a comprehensive financial analysis, generating relevant charts and tables using advanced tools."
+        },
+        {
+            "type": "financial_ratios",
+            "display_name": "Financial Ratios",
+            "description": "Calculates and interprets key financial ratios from the provided documents."
+        },
+        {
+            "type": "trend_analysis",
+            "display_name": "Trend Analysis",
+            "description": "Analyzes trends across financial periods and highlights significant changes."
+        },
+        {
+            "type": "benchmarking",
+            "display_name": "Benchmarking",
+            "description": "Compares financial performance against benchmarks or peer groups."
+        },
+        {
+            "type": "sentiment_analysis",
+            "display_name": "Sentiment Analysis",
+            "description": "Assesses sentiment in financial documents or management commentary."
+        }
+    ]
+
+    @staticmethod
+    def get_supported_analysis_types() -> list:
+        """
+        Return the list of supported analysis types with display names and descriptions.
+        """
+        return AnalysisService.SUPPORTED_ANALYSIS_TYPES
+
     def __init__(
         self,
         analysis_repository: AnalysisRepository,
@@ -139,7 +174,9 @@ class AnalysisService:
         self,
         document_ids: List[str],
         analysis_type: str,
-        parameters: Optional[Dict[str, Any]] = None
+        parameters: Optional[Dict[str, Any]] = None,
+        custom_knowledge_base: Optional[str] = None,
+        query: Optional[str] = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Run financial analysis on one or more documents.
@@ -149,6 +186,8 @@ class AnalysisService:
             document_ids: List of document IDs to analyze
             analysis_type: Type of analysis to run
             parameters: Optional parameters for the analysis
+            custom_knowledge_base: Optional knowledge base ID to use for context
+            query: Optional user query for the analysis
 
         Returns:
             Tuple of (analysis_id, result_data_with_metadata)
@@ -156,75 +195,112 @@ class AnalysisService:
         if parameters is None:
             parameters = {}
 
+        if custom_knowledge_base:
+            parameters["knowledge_base"] = custom_knowledge_base
+
+        if query:
+            parameters["query"] = query
+
+        # --- Multi-Document Input Validation ---
+        # Remove duplicates
+        document_ids = list(dict.fromkeys(document_ids))
         if not document_ids:
             raise ValueError("No documents provided for analysis")
 
-        # For now, handle single document analysis primarily
+        # Validate all document IDs exist (ownership check can be added if user context is available)
+        valid_documents = []
+        for doc_id in document_ids:
+            doc = await self.document_repository.get_document(doc_id)
+            if not doc:
+                raise ValueError(f"Document {doc_id} not found or inaccessible")
+            valid_documents.append(doc)
+        # (Future: Check doc.user_id == current_user_id for security)
+
         document_id = document_ids[0]
         document = await self.document_repository.get_document(document_id)
         if not document:
             raise ValueError(f"Document {document_id} not found")
 
+        # --- Multi-Document Content Aggregation ---
+        # Aggregate content from all valid documents (concatenate raw_text or extracted text)
+        combined_document_texts = []
+        for doc in valid_documents:
+            text = doc.raw_text
+            if not text and doc.extracted_data and isinstance(doc.extracted_data, dict):
+                text = doc.extracted_data.get("raw_text", "")
+            if not text:
+                text = f"Document ID: {doc.id}, Filename: {doc.filename}. No text content could be extracted."
+            combined_document_texts.append(text)
+        aggregate_text = "\n\n".join(combined_document_texts)
+
         try:
-            # --- ROUTING LOGIC ---
             if analysis_type == "comprehensive" or analysis_type == "comprehensive_tools":
-                logger.info(f"Routing to comprehensive tool-based analysis for document {document_id}")
-                result_data = await self._run_tool_based_comprehensive_analysis(document, parameters)
-                # Ensure the analysis type reflects tool usage if requested directly
-                if analysis_type == "comprehensive_tools":
-                    analysis_type = "comprehensive_tools"
-                else:
-                    # If comprehensive was called, mark it as tool-based if successful
-                    # This might need adjustment based on how you distinguish
-                    analysis_type = "comprehensive_tools"
-
+                logger.info(f"Routing to comprehensive tool-based analysis for documents {document_ids}")
+                # Pass the aggregate text to the analysis engine
+                result_data = await self.claude_service.analyze_with_visualization_tools(
+                    document_text=aggregate_text,
+                    user_query=parameters.get("query", "Provide a comprehensive financial analysis of these documents, generating relevant charts and tables using the provided tools."),
+                    knowledge_base=parameters.get("knowledge_base", "")
+                )
+                analysis_type = "comprehensive_tools"
             elif analysis_type == "financial_ratios":
-                 # If you keep other analysis types, implement their calls here
-                 # result_data = await self._run_financial_ratio_analysis(document, parameters)
-                 logger.warning(f"Analysis type '{analysis_type}' might not be fully migrated to tool-based flow yet.")
-                 # Fallback to comprehensive for now, or raise error
-                 result_data = await self._run_tool_based_comprehensive_analysis(document, parameters)
-                 analysis_type = "comprehensive_tools" # Mark as tool-based for consistency
-
-            # Keep existing analysis type routing
+                logger.warning(f"Analysis type '{analysis_type}' might not be fully migrated to tool-based flow yet.")
+                result_data = await self.claude_service.analyze_with_visualization_tools(
+                    document_text=aggregate_text,
+                    user_query=parameters.get("query", "Provide a comprehensive financial analysis of these documents, generating relevant charts and tables using the provided tools."),
+                    knowledge_base=parameters.get("knowledge_base", "")
+                )
+                analysis_type = "comprehensive_tools"
             elif analysis_type == "trend_analysis":
-                result_data = await self._run_trend_analysis(document, parameters)
+                # For now, aggregate analysis; future: per-document breakdown
+                result_data = await self.claude_service.analyze_with_visualization_tools(
+                    document_text=aggregate_text,
+                    user_query=parameters.get("query", "Provide a trend analysis of these documents."),
+                    knowledge_base=parameters.get("knowledge_base", "")
+                )
             elif analysis_type == "benchmarking":
-                result_data = await self._run_benchmark_analysis(document, parameters)
+                result_data = await self.claude_service.analyze_with_visualization_tools(
+                    document_text=aggregate_text,
+                    user_query=parameters.get("query", "Provide a benchmarking analysis of these documents."),
+                    knowledge_base=parameters.get("knowledge_base", "")
+                )
             elif analysis_type == "sentiment_analysis":
-                result_data = await self._run_sentiment_analysis(document, parameters)
+                result_data = await self.claude_service.analyze_with_visualization_tools(
+                    document_text=aggregate_text,
+                    user_query=parameters.get("query", "Provide a sentiment analysis of these documents."),
+                    knowledge_base=parameters.get("knowledge_base", "")
+                )
             else:
-                # Default to comprehensive tool-based analysis if type is unknown or not specifically handled
                 logger.warning(f"Unknown or unhandled analysis type '{analysis_type}'. Defaulting to comprehensive tool-based analysis.")
-                result_data = await self._run_tool_based_comprehensive_analysis(document, parameters)
-                analysis_type = "comprehensive_tools" # Mark as tool-based
+                result_data = await self.claude_service.analyze_with_visualization_tools(
+                    document_text=aggregate_text,
+                    user_query=parameters.get("query", "Provide a comprehensive financial analysis of these documents, generating relevant charts and tables using the provided tools."),
+                    knowledge_base=parameters.get("knowledge_base", "")
+                )
+                analysis_type = "comprehensive_tools"
 
-            # --- End Routing Logic ---
-
-            # Save the analysis result
-            # Ensure result_data structure matches what the DB expects (e.g., needs metrics, ratios, insights keys)
             db_result_data = {
                 "analysis_text": result_data.get("analysis_text", ""),
-                "metrics": result_data.get("metrics", []), # Extract metrics if returned by Claude
-                "ratios": result_data.get("ratios", []), # Extract ratios if returned
-                "insights": result_data.get("insights", []), # Extract insights if returned
+                "metrics": result_data.get("metrics", []),
+                "ratios": result_data.get("ratios", []),
+                "insights": result_data.get("insights", []),
                 "visualization_data": result_data.get("visualization_data", {"charts": [], "tables": []}),
                 "citation_references": result_data.get("citation_references", {}),
-                "comparative_periods": result_data.get("comparative_periods", []) # Extract comparisons if returned
-                # Add other fields expected by the DB model if necessary
+                "comparative_periods": result_data.get("comparative_periods", []),
+                "query": parameters.get("query", ""),
+                "documentType": result_data.get("documentType") or result_data.get("document_type"),
+                "periods": result_data.get("periods", [])
             }
 
+            # Store all analyzed document IDs in the analysis result
             analysis = await self.analysis_repository.create_analysis(
-                document_id=document_id,
+                document_ids=document_ids,
                 analysis_type=analysis_type,
-                result_data=db_result_data # Pass the structured data for DB
+                result_data=db_result_data
             )
 
-            # Create an ID for the analysis response (can be different from DB ID if needed)
             analysis_response_id = f"analysis-{analysis.id}"
 
-            # Structure the final response payload for the API
-            # This structure should match the frontend expectations closely
             response_payload = {
                 "id": analysis_response_id,
                 "documentIds": document_ids,
@@ -232,19 +308,18 @@ class AnalysisService:
                 "timestamp": analysis.created_at.isoformat(),
                 "analysisText": result_data.get("analysis_text", ""),
                 "visualizationData": result_data.get("visualization_data", {"charts": [], "tables": []}),
-                "metrics": result_data.get("metrics", []), # Include metrics in the response
-                "ratios": result_data.get("ratios", []), # Include ratios if available
-                "comparativePeriods": result_data.get("comparative_periods", []), # Include comparisons
-                "insights": result_data.get("insights", []), # Include insights if available
+                "metrics": result_data.get("metrics", []),
+                "ratios": result_data.get("ratios", []),
+                "comparativePeriods": result_data.get("comparative_periods", []),
+                "insights": result_data.get("insights", []),
                 "citationReferences": result_data.get("citation_references", {}),
-                # Add other relevant metadata
-                "document_type": document.document_type.value if document.document_type else "other",
-                "periods": document.periods or [],
+                "documentType": result_data.get("documentType") or result_data.get("document_type"),
+                "periods": result_data.get("periods", []),
                 "query": parameters.get("query", "")
             }
 
             # ---> ADD DETAILED LOGGING HERE <---
-            logger.info(f"Constructed response_payload for analysis {analysis_response_id}:")
+            logger.info(f"Constructed response_payload for analysis {analysis_response_id} (multi-document):")
             logger.info(f"Payload keys: {list(response_payload.keys())}")
             try:
                 logger.info(f"  - id type: {type(response_payload.get('id'))}")
@@ -276,8 +351,7 @@ class AnalysisService:
             return analysis_response_id, response_payload
 
         except Exception as e:
-            logger.error(f"Error running analysis for document {document_id}: {str(e)}", exc_info=True)
-            # Re-raise the exception to be handled by the API layer
+            logger.error(f"Error running analysis for documents {document_ids}: {str(e)}", exc_info=True)
             raise
 
     async def _run_tool_based_comprehensive_analysis(
@@ -299,7 +373,6 @@ class AnalysisService:
         try:
             logger.info(f"Running comprehensive tool-based analysis for document: {document.id}")
 
-            # Get document text - prioritize raw_text if available
             document_text = document.raw_text
             if not document_text and document.extracted_data and isinstance(document.extracted_data, dict):
                 document_text = document.extracted_data.get("raw_text", "")
@@ -308,14 +381,11 @@ class AnalysisService:
                 logger.warning(f"No text content found for document {document.id}, attempting fallback.")
                 document_text = f"Document ID: {document.id}, Filename: {document.filename}. No text content could be extracted."
 
-            # Get user query from parameters or use default
             user_query = parameters.get("query", "Provide a comprehensive financial analysis of this document, generating relevant charts and tables using the provided tools.")
             logger.info(f"User query: {user_query}")
 
-            # Get knowledge base if available
             knowledge_base = parameters.get("knowledge_base", "")
 
-            # Call the Claude service method that uses tools
             analysis_result = await self.claude_service.analyze_with_visualization_tools(
                 document_text=document_text,
                 user_query=user_query,
