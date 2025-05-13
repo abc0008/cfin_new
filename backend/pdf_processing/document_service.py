@@ -438,3 +438,18 @@ class DocumentService:
         except Exception as e:
             logger.exception(f"Error in structured financial data extraction: {e}")
             return {"error": str(e)}
+
+    async def delete_document(self, document_id: str, analysis_repository) -> bool:
+        """
+        Delete a document, enforcing integrity: prevent deletion if referenced in any analysis result.
+        Args:
+            document_id: ID of the document to delete
+            analysis_repository: AnalysisRepository instance for reference check
+        Returns:
+            True if deleted, False otherwise
+        Raises:
+            ValueError if the document is referenced in any analysis result
+        """
+        if await analysis_repository.is_document_referenced(document_id):
+            raise ValueError("Cannot delete document: it is referenced in one or more analysis results.")
+        return await self.document_repository.delete_document(document_id)
