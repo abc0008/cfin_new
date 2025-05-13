@@ -34,15 +34,16 @@ export default function BarChart({ data, height = 400, width = '100%' }: BarChar
   const metricKeys = Object.keys(chartConfig).filter(key => key !== categoryKey);
   
   // Generate bars for each metric with their respective colors
-  const bars = metricKeys.map((key) => {
+  // Use CSS variables for color theming: --chart-1, --chart-2, etc.
+  const bars = metricKeys.map((key, index) => {
     const metricConfig: MetricConfig = chartConfig[key];
     return (
       <Bar
         key={key}
         dataKey={key}
         name={metricConfig.label}
-        fill={metricConfig.color || '#8884d8'}
-        stroke={metricConfig.color ? undefined : '#7066bb'}
+        fill={metricConfig.color || `hsl(var(--chart-${index + 1}))`}
+        stroke={undefined}
         strokeWidth={1}
         radius={[4, 4, 0, 0]}
       />

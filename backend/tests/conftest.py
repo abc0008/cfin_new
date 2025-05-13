@@ -74,36 +74,10 @@ def mock_claude_service():
         # Mock the process_pdf method
         service.process_pdf.return_value = (MagicMock(), [])
         
-        # Mock the generate_response_with_citations method with a response
-        # using the updated Claude model
-        service.generate_response_with_citations.return_value = {
-            "id": "msg_01XxYDJEG8jAJBcCUy538mUL",
-            "type": "message",
-            "role": "assistant",
-            "content": [
-                {
-                    "type": "text",
-                    "text": "This is a test response from Claude with a citation.",
-                    "citations": [
-                        {
-                            "type": "char_location",
-                            "id": "citation-1",
-                            "start_char_offset": 10,
-                            "end_char_offset": 20,
-                            "content": {"quote": "test data"},
-                            "document": {"title": "Test Document", "url": ""}
-                        }
-                    ]
-                }
-            ],
-            "model": "claude-3-5-sonnet-latest",  # Updated model name
-            "stop_reason": "end_turn",
-            "stop_sequence": None,
-            "usage": {
-                "input_tokens": 150,
-                "output_tokens": 50
-            }
-        }
+        # generate_response_with_citations has been removed from ClaudeService,
+        # so its mock is removed here.
+        # Tests should mock specific methods like generate_response_with_langgraph
+        # or generate_response directly if needed.
         
         mock.return_value = service
         yield service
