@@ -98,11 +98,6 @@ export interface AnalysisResult {
     percentages?: any;
     keywordFrequency?: any;
   };
-  data: {
-    metrics: FinancialMetric[];
-    charts?: ChartData[];
-    tables?: TableData[];
-  };
   citationReferences?: Record<string, string>;
   query?: string;
 }

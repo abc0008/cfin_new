@@ -291,61 +291,25 @@ export const documentsApi = {
    */
   async getDocumentUrl(documentId: string): Promise<string> {
     try {
-      // Instead of using a sample PDF URL which causes CORS issues,
-      // fetch the actual document content as binary data and create a blob URL
-      
-      // Fetch the document content as a blob
+      // Fetch the actual document content as binary data and create a blob URL
       const response = await fetch(`${API_BASE_URL}/api/documents/${documentId}/file`, {
         method: 'GET',
         headers: {
           'Accept': 'application/pdf',
         },
       });
-      
-      // Check if the endpoint exists and returns proper data
       if (!response.ok) {
-        // If the /file endpoint doesn't exist, we'll try an alternative approach
-        console.warn(`Document file endpoint returned ${response.status}, trying alternative approach`);
-        
-        // Alternative approach: Use the backend API to fetch the document directly
-        // This assumes the backend serves the document content at this endpoint
-        const documentResponse = await apiService.get(`/api/documents/${documentId}`, undefined, {
-          maxAttempts: 1 // Only try once, don't retry
-        });
-        
-        // If the document has raw_text, we can create a simple PDF from it
-        if (documentResponse.raw_text || (documentResponse.extractedData && documentResponse.extractedData.raw_text)) {
-          const text = documentResponse.raw_text || documentResponse.extractedData.raw_text;
-          
-          // Create a simple PDF from the text using a data URL
-          // Note: This is a very basic approach for testing
-          const pdfBlob = new Blob([text], { type: 'application/pdf' });
-          const url = URL.createObjectURL(pdfBlob);
-          createdBlobUrls.push(url);
-          return url;
-        }
-        
-        // If we get here, we couldn't fetch a proper document - show error
+        // If the /file endpoint doesn't exist or fails, throw an error
         throw new Error(`Could not retrieve document file. Backend returned ${response.status}`);
       }
-      
       // Get the PDF data as a blob
       const blob = await response.blob();
-      
-      // Create a URL for the blob
       const url = URL.createObjectURL(blob);
       createdBlobUrls.push(url);
       return url;
     } catch (error) {
       console.error("Error creating document URL:", error);
-      
-      // Fallback to a simple text-based PDF for now
-      // Create a small placeholder PDF with an error message
-      const errorText = `Error loading document: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      const pdfBlob = new Blob([errorText], { type: 'application/pdf' });
-      const url = URL.createObjectURL(pdfBlob);
-      createdBlobUrls.push(url);
-      return url;
+      throw error;
     }
   },
   

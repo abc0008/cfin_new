@@ -27,9 +27,20 @@ export interface MetricConfig {
 // Configuration for charts
 export interface ChartConfig {
   title: string;
-  description?: string;
-  xAxisKey: string;
-  yAxisKey?: string;
+  description: string;
+  subtitle?: string;
+  xAxisLabel?: string;
+  yAxisLabel?: string;
+  xAxisKey?: string;
+  trend?: Record<string, any>;
+  footer?: string;
+  totalLabel?: string;
+  showLegend?: boolean;
+  legendPosition?: 'top' | 'bottom' | 'left' | 'right';
+  showGrid?: boolean;
+  height?: number;
+  width?: number;
+  stack?: boolean;
   [key: string]: any;
 }
 
@@ -51,58 +62,52 @@ export interface ChartSeries {
 
 // Chart data structure
 export interface ChartData {
-  chartType: ChartType;
+  chartType: 'bar' | 'multiBar' | 'line' | 'pie' | 'area' | 'stackedArea';
   config: ChartConfig;
-  data: any[] | ChartSeries[];  // Support both direct data array and series format
-  chartConfig?: {
-    [key: string]: {
-      label: string;
-      color?: string;
-    };
-  };
-  xAxisTitle?: string;
-  yAxisTitle?: string;
-  legendPosition?: 'top' | 'right' | 'bottom' | 'left';
+  data: Record<string, any>[];
+  chartConfig: Record<string, MetricConfig>;
 }
 
 // Table column configuration
 export interface TableColumn {
   key: string;
-  header: string;
-  label?: string;
+  label: string;
+  header?: string;
+  format?: 'number' | 'currency' | 'percentage' | 'text';
   width?: number;
   align?: 'left' | 'center' | 'right';
   formatter?: string;
-  format?: FormatType;
 }
 
 // Table configuration
 export interface TableConfig {
   title: string;
-  description?: string;
-  columns: {
-    key: string;
-    label: string;
-    format?: 'text' | 'number' | 'currency' | 'percentage' | 'date';
-  }[];
+  description: string;
+  subtitle?: string;
+  footer?: string;
+  columns: TableColumn[];
+  showRowNumbers?: boolean;
+  sortable?: boolean;
+  pagination?: boolean;
+  pageSize?: number;
+  height?: number;
+  width?: number;
 }
 
 // Table data structure
 export interface TableData {
-  tableType: TableType;
+  tableType: 'simple' | 'matrix' | 'comparison';
   config: TableConfig;
-  data: any[];
+  data: Record<string, any>[];
 }
 
 // Combined visualization data that can contain both charts and tables
 export interface VisualizationData {
-  charts: ChartData[];
-  tables: TableData[];
-  metrics?: FinancialMetric[];
-  // Legacy format fields - keep for backward compatibility
-  monetaryValues?: any;
-  percentages?: any;
-  keywordFrequency?: any;
+  charts?: ChartData[];
+  tables?: TableData[];
+  monetaryValues?: Record<string, any>;
+  percentages?: Record<string, any>;
+  keywordFrequency?: Record<string, any>;
 }
 
 // Interface for financial metrics to be displayed in cards
