@@ -26,6 +26,7 @@ import { ExternalLink } from 'lucide-react';
 import { FinancialInsight, TrendAnalysis } from '@/types/enhanced';
 import { ChartType, ChartSeries } from '@/types/visualization';
 import { useRouter } from 'next/navigation';
+import { CHART_COLORS } from '../charts/chartColors';
 
 interface EnhancedChartProps {
   data: any[] | ChartSeries[];
@@ -82,18 +83,6 @@ export const CitationTooltip = ({ active, payload, label, onCitationClick }: any
   
   return null;
 };
-
-// Colors for the charts
-export const CHART_COLORS = [
-  'hsl(var(--chart-1))', // Primary
-  'hsl(var(--chart-2))', // Red/Orange
-  'hsl(var(--chart-3))', // Green
-  'hsl(var(--chart-4))', // Purple
-  'hsl(var(--chart-5))', // Yellow
-  'hsl(var(--chart-6))', // Blue
-  'hsl(var(--chart-7))', // Pink
-  'hsl(var(--chart-8))'  // Teal
-];
 
 // Enhanced chart component for financial data with citation support
 export const EnhancedChart: React.FC<EnhancedChartProps> = ({ 

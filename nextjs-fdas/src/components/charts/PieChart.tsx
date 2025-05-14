@@ -1,8 +1,7 @@
 import React from 'react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { ChartData } from '@/types/visualization';
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+import { CHART_COLORS } from './chartColors';
 
 interface PieChartProps {
   data: ChartData;
@@ -46,7 +45,7 @@ const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%' 
               label
             >
               {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
               ))}
             </Pie>
             {config.showLegend && <Legend />}

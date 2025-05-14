@@ -5,7 +5,7 @@ from datetime import datetime
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.message import Message, MessageRole, MessageRequest, ConversationState, ConversationCreateRequest
+from models.message import Message, MessageRole, MessageRequest, ConversationState, ConversationCreateRequest, MessageResponse
 from models.document import ProcessedDocument, Citation
 from pdf_processing.document_service import DocumentService
 from repositories.document_repository import DocumentRepository
@@ -82,7 +82,7 @@ async def create_conversation(
             detail=f"Error creating conversation: {str(e)}"
         )
 
-@router.post("/{session_id}/message")
+@router.post("/{session_id}/message", response_model=MessageResponse)
 async def send_message(
     session_id: str,
     message: MessageRequest,
@@ -90,14 +90,11 @@ async def send_message(
 ):
     """
     Send a message to a conversation and get an AI response using Claude API.
-    
     The message will be processed and a response generated based on the conversation context.
     If documents are attached to the conversation, they will be used for context.
-    
     Args:
         session_id: The ID of the conversation session
         message: The message content and optional citation IDs
-        
     Returns:
         The AI response message
     """
@@ -106,21 +103,24 @@ async def send_message(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Session ID in path must match session ID in request body"
         )
-    
     try:
         result = await conversation_service.process_user_message(
             conversation_id=session_id,
             content=message.content,
             citation_ids=message.citation_links
         )
-        
         if not result.get("success", True):
-            # Return the error message but with a 200 status code
-            # This allows the client to handle the error gracefully
             logger.warning(f"Error processing message: {result.get('error', 'Unknown error')}")
-            return result.get("message")
-        
-        return result.get("message")
+            # If error, return the assistant message as MessageResponse
+            assistant_message = result.get("message")
+            if isinstance(assistant_message, dict):
+                return MessageResponse(**assistant_message)
+            return assistant_message
+        # Ensure the returned message is a MessageResponse
+        message_data = result.get("message")
+        if isinstance(message_data, dict):
+            return MessageResponse(**message_data)
+        return message_data
     except ValueError as e:
         logger.error(f"Bad request while processing message: {str(e)}")
         raise HTTPException(

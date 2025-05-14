@@ -204,7 +204,7 @@ export const analysisApi = {
       const values = data.map(d => d.value || d.y || d.count).filter(v => typeof v === 'number');
       if (values.length > 1) {
         const trend = values[values.length - 1] - values[0];
-        return [{ name: `Trend for ${firstChart.title || 'chart'}`, value: trend > 0 ? 'Upward' : trend < 0 ? 'Downward' : 'Stable' }];
+        return [{ name: `Trend for ${firstChart.config.title || 'chart'}`, value: trend > 0 ? 'Upward' : trend < 0 ? 'Downward' : 'Stable' }];
       }
     }
     return [];
@@ -215,7 +215,7 @@ export const analysisApi = {
     console.warn("analysisApi.generateEnhancedInsightsFromAnalysis may behave differently after client-side fallbacks removal.");
     const insights = analysis.insights || [];
     if (analysis.visualizationData?.metrics && analysis.visualizationData.metrics.length > 0) {
-      insights.push(`Key metrics identified: ${analysis.visualizationData.metrics.map(m => m.label).join(', ')}.`);
+      insights.push(`Key metrics identified: ${analysis.visualizationData.metrics.map(m => m.name).join(', ')}.`);
     }
     return insights.map(insight => ({ text: insight, type: 'auto' }));
   },
