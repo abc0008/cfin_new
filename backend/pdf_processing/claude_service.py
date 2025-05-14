@@ -81,6 +81,8 @@ import httpx
 from models.document import ProcessedDocument, Citation as DocumentCitation, DocumentContentType, DocumentMetadata, ProcessingStatus
 from models.citation import Citation, CitationType, CharLocationCitation, PageLocationCitation, ContentBlockLocationCitation
 from pdf_processing.langchain_service import LangChainService
+from utils.database import get_db
+from models.visualization import ChartData, TableData
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -113,6 +115,7 @@ Analysis Steps:
 3. If the query requires a chart or graph visualization, use the 'generate_graph_data' tool. Ensure the chartType, config, data, and chartConfig match the tool's input schema precisely.
 4. If the query requires presenting detailed data in a table, use the 'generate_table_data' tool. Ensure the tableType, config, columns, and data match the tool's input schema precisely.
 5. Provide a concise textual analysis summarizing key findings and directly answering the user's query, referencing the generated visualizations/tables where appropriate (e.g., "As shown in the Revenue Trend chart...").
+6. **If you determine that the document(s) do not contain any financial data, or if extraction fails, clearly state this in your response with a warning such as: '⚠️ Warning: The document appears to be processed but may not contain proper financial data. This could be due to incomplete extraction or an unsupported document format.'**
 """
 
 @contextlib.asynccontextmanager
@@ -774,7 +777,7 @@ Follow these guidelines:
                     "mime_type": "application/pdf"
                 }
                 
-                prepared_document = self._prepare_document_for_citation(document)
+                prepared_document = await self._prepare_document_for_citation(document)
                 if not prepared_document:
                     logger.warning("Failed to prepare document for financial data extraction, falling back to text")
                 else:
@@ -1115,7 +1118,13 @@ Follow these guidelines:
                                 }
             
             # Return the processed chart data
-            return processed_chart
+            # --- Strict validation with Pydantic ---
+            try:
+                validated_chart = ChartData(**processed_chart)
+                return validated_chart.model_dump()
+            except Exception as e:
+                logger.error(f"ChartData validation failed: {e}")
+                return None
             
         except Exception as e:
             logger.error(f"Error processing chart data: {e}")
@@ -1180,7 +1189,13 @@ Follow these guidelines:
                             column["format"] = "text"
             
             # Return the processed table data
-            return processed_table
+            # --- Strict validation with Pydantic ---
+            try:
+                validated_table = TableData(**processed_table)
+                return validated_table.model_dump()
+            except Exception as e:
+                logger.error(f"TableData validation failed: {e}")
+                return None
             
         except Exception as e:
             logger.error(f"Error processing table data: {e}")
@@ -1189,10 +1204,8 @@ Follow these guidelines:
     async def _prepare_document_for_citation(self, document: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Prepare a document object for citation by Claude.
-        
         Args:
             document: Document information dictionary
-            
         Returns:
             Formatted document object for Claude API or None if invalid
         """
@@ -1201,92 +1214,58 @@ Follow these guidelines:
             doc_type = document.get("mime_type", "").lower()
             doc_id = document.get("id", "")
             doc_title = document.get("title", document.get("filename", f"Document {doc_id}"))
-            
-            # Try multiple sources for document content
             doc_content = None
             content_source = None
-            
-            # Log all available fields for debugging
             logger.info(f"Document fields: {list(document.keys())}")
-            
-            # First priority: "content" field
             if document.get("content"):
                 doc_content = document.get("content")
                 content_source = "content field"
-            
-            # Second priority: "raw_text" field
             elif document.get("raw_text"):
                 doc_content = document.get("raw_text")
                 content_source = "raw_text field"
-                # For raw_text content, use text document type
                 doc_type = "text/plain"
-            
-            # Third priority: "extracted_data.raw_text" field
             elif document.get("extracted_data") and isinstance(document.get("extracted_data"), dict) and document.get("extracted_data").get("raw_text"):
                 doc_content = document.get("extracted_data").get("raw_text")
                 content_source = "extracted_data.raw_text field"
-                # For extracted text, use text document type
                 doc_type = "text/plain"
-            
-            # Fourth priority: "text" field
             elif document.get("text"):
                 doc_content = document.get("text")
                 content_source = "text field"
-                # For text content, use text document type
                 doc_type = "text/plain"
-                
-            # Fifth priority: Try to get the raw PDF content from storage
             elif document.get("id"):
                 try:
-                    # Attempt to get the PDF data directly - this is a fallback mechanism
                     from repositories.document_repository import DocumentRepository
-                    from repositories.database import get_database_session
-                    
-                    # Get session and repository
-                    db_session = get_database_session()
-                    document_repository = DocumentRepository(db_session)
-                    
-                    # Get document content directly
-                    doc_content = asyncio.run(document_repository.get_document_file_content(document.get('id')))
-                    
-                    if doc_content and len(doc_content) > 0:
-                        content_source = "direct PDF from storage"
-                        doc_type = "application/pdf"
-                        logger.info(f"Retrieved PDF content directly from storage for document {doc_id}")
+                    async for db in get_db():
+                        document_repository = DocumentRepository(db)
+                        doc_content = await document_repository.get_document_file_content(document.get('id'))
+                        if doc_content and len(doc_content) > 0:
+                            content_source = "direct PDF from storage"
+                            doc_type = "application/pdf"
+                            logger.info(f"Retrieved PDF content directly from storage for document {doc_id}")
                 except Exception as storage_e:
                     logger.warning(f"Failed to get PDF directly from storage for document {doc_id}: {storage_e}")
-                    
-            # If all attempts to get content failed, create a minimal document with placeholder text
             if not doc_content:
                 logger.warning(f"No document content found for {doc_id} - using fallback placeholder")
                 doc_content = f"Document content unavailable for {doc_title}. Please try re-uploading the document."
                 content_source = "fallback placeholder"
                 doc_type = "text/plain"
-            
             if content_source:
                 logger.info(f"Using {content_source} for document {doc_id}")
-            
-            # Handle PDF documents
             if "pdf" in doc_type or doc_type == "application/pdf":
-                # Ensure PDF content is bytes
                 if not isinstance(doc_content, bytes):
                     if isinstance(doc_content, str) and doc_content.startswith(('data:application/pdf;base64,', 'data:;base64,')):
-                        # Handle base64 encoded PDF data URLs
                         base64_content = doc_content.split('base64,')[1]
                         doc_content = base64.b64decode(base64_content)
                     elif isinstance(doc_content, str) and len(doc_content) > 0:
                         try:
-                            # Check if it might be base64 encoded
                             if all(c in string.ascii_letters + string.digits + '+/=' for c in doc_content):
                                 try:
                                     doc_content = base64.b64decode(doc_content)
                                     logger.info(f"Successfully decoded base64 content for document {doc_id}")
                                 except:
-                                    # Not valid base64, treat as text
                                     logger.warning(f"Content for {doc_id} looks like base64 but couldn't be decoded")
                                     doc_content = doc_content.encode('utf-8')
                             else:
-                                # Regular text, encode to bytes
                                 doc_content = doc_content.encode('utf-8')
                         except Exception as e:
                             logger.warning(f"Failed to convert string content to bytes for {doc_id}: {e}")
@@ -1294,23 +1273,14 @@ Follow these guidelines:
                     else:
                         logger.warning(f"Invalid PDF content for {doc_id} - not bytes or base64 string")
                         return None
-                
-                # Validate PDF content
-                if len(doc_content) < 10:  # Arbitrary small size check
+                if len(doc_content) < 10:
                     logger.warning(f"PDF content for {doc_id} is too small ({len(doc_content)} bytes)")
                     return None
-                
-                # Check if content starts with PDF signature
                 if not doc_content.startswith(b'%PDF'):
                     logger.warning(f"Content for {doc_id} doesn't start with PDF signature")
-                    # We'll still try to use it, as it might be a valid PDF despite missing the signature
-                
-                # Create PDF document object for Claude API
                 try:
                     base64_data = base64.b64encode(doc_content).decode()
                     logger.info(f"Successfully encoded PDF content for document {doc_id} ({len(doc_content)} bytes)")
-                    
-                    # Format according to Anthropic's Citations documentation
                     return {
                         "type": "document",
                         "source": {
@@ -1324,9 +1294,6 @@ Follow these guidelines:
                 except Exception as e:
                     logger.exception(f"Error encoding PDF content for {doc_id}: {e}")
                     return None
-            
-            # At this point, treat as text document (either originally or after conversion)
-            # Ensure we have valid string content
             text_content = ""
             if isinstance(doc_content, str):
                 text_content = doc_content
@@ -1337,18 +1304,11 @@ Follow these guidelines:
                     text_content = f"Binary content for {doc_title} (could not convert to text)"
             else:
                 text_content = f"Content for {doc_title} in unsupported format: {type(doc_content)}"
-            
-            # Ensure we have some minimal content
             if not text_content.strip():
                 text_content = f"Empty document content for {doc_title}"
-            
-            # Truncate very long text to avoid token limits (30,000 chars ~ 7,500 tokens)
             if len(text_content) > 30000:
                 text_content = text_content[:30000] + f"\n\n[Document truncated due to length. Original size: {len(text_content)} characters]"
-            
             logger.info(f"Prepared text document for Claude API: {doc_id}, length: {len(text_content)} chars")
-            
-            # Create proper text document format for Claude API
             return {
                 "type": "document",
                 "source": {
@@ -1359,10 +1319,8 @@ Follow these guidelines:
                 "title": doc_title,
                 "citations": {"enabled": True}
             }
-                
         except Exception as e:
             logger.exception(f"Error preparing document for citation: {e}")
-            # Return a minimal valid document to prevent API errors
             return {
                 "type": "document",
                 "source": {

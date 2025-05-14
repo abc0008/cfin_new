@@ -194,14 +194,6 @@ export const conversationsApi = {
         citations: response.citations || []
       };
       
-      // If we detected missing document data but the AI didn't mention it, append a note
-      if (documentDataMissing && 
-          !frontendMessage.content.includes("don't see any") && 
-          !frontendMessage.content.toLowerCase().includes("missing") &&
-          !frontendMessage.content.toLowerCase().includes("no financial data")) {
-        frontendMessage.content += "\n\n⚠️ Note: The document appears to be processed but may not contain proper financial data. This could be due to incomplete extraction or an unsupported document format.";
-      }
-      
       return frontendMessage;
     } catch (error) {
       console.error('Error sending message:', error);
@@ -311,14 +303,6 @@ export const conversationsApi = {
             referencedAnalyses: fullResponse.referencedAnalyses || fullResponse.referenced_analyses || [],
             citations: messageCitations.length > 0 ? messageCitations : (fullResponse.citations || [])
           };
-          
-          // Add missing document data warning if needed
-          if (documentDataMissing && 
-              !frontendMessage.content.includes("don't see any") && 
-              !frontendMessage.content.toLowerCase().includes("missing") &&
-              !frontendMessage.content.toLowerCase().includes("no financial data")) {
-            frontendMessage.content += "\n\n⚠️ Note: The document appears to be processed but may not contain proper financial data. This could be due to incomplete extraction or an unsupported document format.";
-          }
           
           callbacks.onComplete(frontendMessage);
         },
