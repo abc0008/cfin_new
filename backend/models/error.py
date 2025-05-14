@@ -20,7 +20,7 @@ class ValidationErrorDetail(BaseModel):
 
     class Config:
         alias_generator = to_camel
-        allow_population_by_field_name = True
+        populate_by_name = True
 
 class ErrorResponse(BaseModel):
     """Standard error response model for all API endpoints."""
@@ -37,7 +37,7 @@ class ErrorResponse(BaseModel):
     
     class Config:
         alias_generator = to_camel
-        allow_population_by_field_name = True
+        populate_by_name = True
         schema_extra = {
             "example": {
                 "statusCode": 404,
@@ -67,4 +67,4 @@ def create_error_response(
         status_code=status_code,
         detail=detail,
         error_type=error_type
-    ).dict()
+    ).model_dump(by_alias=True)

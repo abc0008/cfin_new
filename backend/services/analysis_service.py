@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 import asyncio
+import base64 # Added for PDF content encoding
 
 from repositories.analysis_repository import AnalysisRepository
 from repositories.document_repository import DocumentRepository
@@ -143,6 +144,11 @@ class AnalysisService:
             "type": "sentiment_analysis",
             "display_name": "Sentiment Analysis",
             "description": "Assesses sentiment in financial documents or management commentary."
+        },
+        {
+            "type": "basic_financial",
+            "display_name": "Basic Financial Analysis",
+            "description": "Provides a concise textual summary of the key financial highlights, extracts key financial metrics, and presents a summary table of important figures."
         }
     ]
 
@@ -233,99 +239,108 @@ class AnalysisService:
             combined_document_texts.append(text)
         aggregate_text = "\n\n".join(combined_document_texts)
 
+        primary_doc_base64: Optional[str] = None
+        primary_doc_filename: Optional[str] = None
+        if valid_documents: # Attempt to get full PDF content for the primary document
+            primary_document_obj = valid_documents[0]
+            primary_doc_filename = primary_document_obj.filename
+            try:
+                pdf_bytes = await self.document_repository.get_document_binary(str(primary_document_obj.id))
+                if pdf_bytes:
+                    primary_doc_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+                    logger.info(f"Fetched and encoded PDF content for {primary_doc_filename} for tool-based analysis.")
+                else:
+                    logger.warning(f"No PDF file content found for {primary_doc_filename} via repository.")
+            except Exception as e:
+                logger.error(f"Error fetching/encoding PDF for {primary_doc_filename}: {str(e)}")
+
         try:
             if analysis_type == "comprehensive" or analysis_type == "comprehensive_tools":
                 logger.info(f"Routing to comprehensive tool-based analysis for documents {document_ids}")
-                # Pass the aggregate text to the analysis engine
+                result_data = await self.claude_service.analyze_with_visualization_tools(
+                    document_text=aggregate_text, 
+                    user_query=parameters.get("query", "Provide a comprehensive financial analysis of these documents, generating relevant charts and tables using the provided tools."),
+                    knowledge_base=parameters.get("knowledge_base", ""),
+                    document_base64=primary_doc_base64, 
+                    document_filename=primary_doc_filename
+                )
+                analysis_type = "comprehensive_tools"
+            elif analysis_type in ["financial_ratios", "trend_analysis", "benchmarking", "sentiment_analysis", "basic_financial"]:
+                logger.info(f"Routing analysis type '{analysis_type}' to comprehensive tool-based flow with PDF if available.")
+                query_for_type = parameters.get("query")
+                if not query_for_type:
+                    # Create a more specific default query based on the analysis type
+                    if analysis_type == "financial_ratios":
+                        query_for_type = "Calculate and present key financial ratios from this document, using tools for tables or charts where appropriate."
+                    elif analysis_type == "trend_analysis":
+                        query_for_type = "Analyze financial trends in this document, using tools for tables or charts where appropriate."
+                    elif analysis_type == "benchmarking":
+                        query_for_type = "Perform a benchmarking analysis on this document, using tools for tables or charts where appropriate."
+                    elif analysis_type == "sentiment_analysis":
+                        query_for_type = "Perform a sentiment analysis on this document, summarizing findings and using tools if applicable."
+                    elif analysis_type == "basic_financial":
+                        query_for_type = "Provide a concise textual summary of the key financial highlights, extract at least two key financial metrics using the 'generate_financial_metric' tool, and present a summary table of important figures from this document using the 'generate_table_data' tool."
+                    else: # Should not be reached if analysis_type is in the list above
+                        query_for_type = f"Perform a {analysis_type.replace('_', ' ')} on this document, using appropriate tools."
+                
+                result_data = await self.claude_service.analyze_with_visualization_tools(
+                    document_text=aggregate_text,
+                    user_query=query_for_type,
+                    knowledge_base=parameters.get("knowledge_base", ""),
+                    document_base64=primary_doc_base64,
+                    document_filename=primary_doc_filename
+                )
+                # Retain the original analysis_type for storage, but Claude used comprehensive tools
+            else: # Fallback for any other unknown analysis_type
+                logger.warning(f"Unknown or unhandled analysis type '{analysis_type}'. Defaulting to comprehensive tool-based analysis with PDF if available.")
                 result_data = await self.claude_service.analyze_with_visualization_tools(
                     document_text=aggregate_text,
                     user_query=parameters.get("query", "Provide a comprehensive financial analysis of these documents, generating relevant charts and tables using the provided tools."),
-                    knowledge_base=parameters.get("knowledge_base", "")
+                    knowledge_base=parameters.get("knowledge_base", ""),
+                    document_base64=primary_doc_base64,
+                    document_filename=primary_doc_filename
                 )
-                analysis_type = "comprehensive_tools"
-            elif analysis_type == "financial_ratios":
-                logger.warning(f"Analysis type '{analysis_type}' might not be fully migrated to tool-based flow yet.")
-                result_data = await self.claude_service.analyze_with_visualization_tools(
-                    document_text=aggregate_text,
-                    user_query=parameters.get("query", "Provide a comprehensive financial analysis of these documents, generating relevant charts and tables using the provided tools."),
-                    knowledge_base=parameters.get("knowledge_base", "")
-                )
-                analysis_type = "comprehensive_tools"
-            elif analysis_type == "trend_analysis":
-                # For now, aggregate analysis; future: per-document breakdown
-                result_data = await self.claude_service.analyze_with_visualization_tools(
-                    document_text=aggregate_text,
-                    user_query=parameters.get("query", "Provide a trend analysis of these documents."),
-                    knowledge_base=parameters.get("knowledge_base", "")
-                )
-            elif analysis_type == "benchmarking":
-                result_data = await self.claude_service.analyze_with_visualization_tools(
-                    document_text=aggregate_text,
-                    user_query=parameters.get("query", "Provide a benchmarking analysis of these documents."),
-                    knowledge_base=parameters.get("knowledge_base", "")
-                )
-            elif analysis_type == "sentiment_analysis":
-                result_data = await self.claude_service.analyze_with_visualization_tools(
-                    document_text=aggregate_text,
-                    user_query=parameters.get("query", "Provide a sentiment analysis of these documents."),
-                    knowledge_base=parameters.get("knowledge_base", "")
-                )
-            else:
-                logger.warning(f"Unknown or unhandled analysis type '{analysis_type}'. Defaulting to comprehensive tool-based analysis.")
-                result_data = await self.claude_service.analyze_with_visualization_tools(
-                    document_text=aggregate_text,
-                    user_query=parameters.get("query", "Provide a comprehensive financial analysis of these documents, generating relevant charts and tables using the provided tools."),
-                    knowledge_base=parameters.get("knowledge_base", "")
-                )
-                analysis_type = "comprehensive_tools"
+                analysis_type = "comprehensive_tools" # Update analysis_type to what was actually run
 
-            db_result_data = {
-                "analysis_text": result_data.get("analysis_text", ""),
+            analysis_id = str(uuid.uuid4())
+            
+            # Log the raw result_data from ClaudeService
+            logger.info(f"--- Raw result_data from ClaudeService for analysis {analysis_id} ---")
+            logger.info(json.dumps(result_data, indent=2, default=str)) # Use default=str for any non-serializable items
+            logger.info(f"--- End raw result_data from ClaudeService ---")
+
+            current_doc_for_meta = valid_documents[0] if valid_documents else None
+
+            result_data_with_metadata = {
+                "id": analysis_id,
+                "document_ids": [str(doc.id) for doc in valid_documents],
+                "analysis_type": analysis_type, # Use the potentially updated analysis_type
+                "timestamp": datetime.now().isoformat(),
+                "query": parameters.get("query"),
+                "analysis_text": result_data.get("analysis_text"),
+                "visualization_data": result_data.get("visualizations", {"charts": [], "tables": []}),
                 "metrics": result_data.get("metrics", []),
-                "ratios": result_data.get("ratios", []),
-                "insights": result_data.get("insights", []),
-                "visualization_data": result_data.get("visualization_data", {"charts": [], "tables": []}),
-                "citation_references": result_data.get("citation_references", {}),
-                "comparative_periods": result_data.get("comparative_periods", []),
-                "query": parameters.get("query", ""),
-                "documentType": result_data.get("documentType") or result_data.get("document_type"),
-                "periods": result_data.get("periods", [])
+                "document_type": current_doc_for_meta.document_type.value if current_doc_for_meta and current_doc_for_meta.document_type else None,
+                "periods": current_doc_for_meta.periods if current_doc_for_meta else [],
+                "ratios": [], 
+                "comparative_periods": [],
+                "insights": [],
+                "citation_references": {},
             }
 
-            # Store all analyzed document IDs in the analysis result
-            analysis = await self.analysis_repository.create_analysis(
-                document_ids=document_ids,
-                analysis_type=analysis_type,
-                result_data=db_result_data
-            )
-
-            analysis_response_id = f"analysis-{analysis.id}"
-
-            response_payload = {
-                "id": analysis_response_id,
-                "documentIds": document_ids,
-                "analysisType": analysis_type,
-                "timestamp": analysis.created_at.isoformat(),
-                "analysisText": result_data.get("analysis_text", ""),
-                "visualizationData": result_data.get("visualization_data", {"charts": [], "tables": []}),
-                "metrics": result_data.get("metrics", []),
-                "ratios": result_data.get("ratios", []),
-                "comparativePeriods": result_data.get("comparative_periods", []),
-                "insights": result_data.get("insights", []),
-                "citationReferences": result_data.get("citation_references", {}),
-                "documentType": result_data.get("documentType") or result_data.get("document_type"),
-                "periods": result_data.get("periods", []),
-                "query": parameters.get("query", "")
-            }
-
-            # ---> ADD DETAILED LOGGING HERE <---
-            logger.info(f"Constructed response_payload for analysis {analysis_response_id} (multi-document):")
-            logger.info(f"Payload keys: {list(response_payload.keys())}")
+            # Log the constructed result_data_with_metadata before saving and returning
+            logger.info(f"--- Constructed result_data_with_metadata for analysis {analysis_id} ---")
+            logger.info(json.dumps(result_data_with_metadata, indent=2, default=str))
+            logger.info(f"--- End result_data_with_metadata ---")
+            
+            # Log the structure for debugging (already present, but ensure it reflects the above)
+            logger.info(f"Constructed response_payload (result_data_with_metadata) for analysis {analysis_id} (multi-document):")
+            logger.info(f"Payload keys: {list(result_data_with_metadata.keys())}")
             try:
-                logger.info(f"  - id type: {type(response_payload.get('id'))}")
-                logger.info(f"  - documentIds type: {type(response_payload.get('documentIds'))}")
-                logger.info(f"  - timestamp type: {type(response_payload.get('timestamp'))}")
-                viz_data = response_payload.get('visualizationData')
+                logger.info(f"  - id type: {type(result_data_with_metadata.get('id'))}")
+                logger.info(f"  - documentIds type: {type(result_data_with_metadata.get('document_ids'))}")
+                logger.info(f"  - timestamp type: {type(result_data_with_metadata.get('timestamp'))}")
+                viz_data = result_data_with_metadata.get('visualization_data')
                 logger.info(f"  - visualizationData type: {type(viz_data)}")
                 if isinstance(viz_data, dict):
                     logger.info(f"    - charts type: {type(viz_data.get('charts'))}")
@@ -335,20 +350,29 @@ class AnalysisService:
                         logger.info(f"      - First chart type: {type(viz_data['charts'][0])}")
                     if isinstance(viz_data.get('tables'), list) and viz_data.get('tables'):
                         logger.info(f"      - First table type: {type(viz_data['tables'][0])}")
-                metrics_data = response_payload.get('metrics')
+                metrics_data = result_data_with_metadata.get('metrics')
                 logger.info(f"  - metrics type: {type(metrics_data)}")
                 if isinstance(metrics_data, list) and metrics_data:
                     logger.info(f"    - first metric type: {type(metrics_data[0])}")
                 # Add logging for other potentially complex fields
-                logger.info(f"  - ratios type: {type(response_payload.get('ratios'))}")
-                logger.info(f"  - comparativePeriods type: {type(response_payload.get('comparativePeriods'))}")
-                logger.info(f"  - insights type: {type(response_payload.get('insights'))}")
-                logger.info(f"  - citationReferences type: {type(response_payload.get('citationReferences'))}")
+                logger.info(f"  - document_type type: {type(result_data_with_metadata.get('document_type'))}")
+                logger.info(f"  - periods type: {type(result_data_with_metadata.get('periods'))}")
+                logger.info(f"  - query type: {type(result_data_with_metadata.get('query'))}")
             except Exception as log_e:
-                logger.error(f"Error during detailed logging of response_payload: {log_e}")
-            # <--- END DETAILED LOGGING --->
+                logger.error(f"Error during detailed logging of result_data_with_metadata: {log_e}")
 
-            return analysis_response_id, response_payload
+            # Call the correct repository method with the correct arguments
+            # The create_analysis method will generate its own ID and timestamp.
+            await self.analysis_repository.create_analysis(
+                document_ids=[str(doc.id) for doc in valid_documents],
+                analysis_type=analysis_type, # Use the potentially updated analysis_type from logic above
+                result_data=result_data_with_metadata
+            )
+            # The analysis_id used earlier (from uuid.uuid4()) is what we expect the object to have,
+            # and it's included in result_data_with_metadata which is saved.
+            # The create_analysis might return the saved object, which could be used for confirmation if needed.
+
+            return analysis_id, result_data_with_metadata
 
         except Exception as e:
             logger.error(f"Error running analysis for documents {document_ids}: {str(e)}", exc_info=True)

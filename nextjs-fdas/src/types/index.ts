@@ -93,6 +93,7 @@ export interface AnalysisResult {
   ratios: FinancialRatio[];
   insights: string[];
   visualizationData: Record<string, any>;
+  analysisText?: string;
   citationReferences?: Record<string, any>;
   query?: string;
 }

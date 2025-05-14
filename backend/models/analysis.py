@@ -3,6 +3,11 @@ from datetime import datetime
 import uuid
 from pydantic import BaseModel, Field, UUID4, ConfigDict
 
+# Assuming ChartData and TableData will be imported or defined if not already
+# For now, let's use Any as a placeholder if they are not in the current context of this file.
+# If they are in models.visualization, they should be imported:
+from models.visualization import ChartData, TableData
+
 # Utility for camelCase aliasing
 def to_camel(string: str) -> str:
     parts = string.split('_')
@@ -15,9 +20,7 @@ class FinancialRatio(BaseModel):
     benchmark: Optional[float] = None
     trend: Optional[float] = None
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class FinancialMetric(BaseModel):
     category: str
@@ -27,9 +30,7 @@ class FinancialMetric(BaseModel):
     unit: str
     is_estimated: bool = Field(default=False, alias="isEstimated")
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class ComparativePeriod(BaseModel):
     metric: str
@@ -41,11 +42,11 @@ class ComparativePeriod(BaseModel):
     percent_change: float = Field(alias="percentChange")
     trend: Literal["positive", "negative", "neutral"] = "neutral"
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class AnalysisResult(BaseModel):
+    # This model seems to be for internal service an_d repository use,
+    # and its fields are already snake_case with camelCase aliases. This is good.
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     document_ids: List[str] = Field(alias="documentIds")
     analysis_type: str = Field(alias="analysisType")
@@ -57,10 +58,13 @@ class AnalysisResult(BaseModel):
     citation_references: Dict[str, str] = Field(default_factory=dict, alias="citationReferences")
     comparative_periods: List[ComparativePeriod] = Field(default_factory=list, alias="comparativePeriods")
     analysis_text: Optional[str] = Field(default=None, alias="analysisText")
+    # Adding fields that might be in result_data from service, to be used by AnalysisApiResponse
+    document_type: Optional[str] = Field(default=None, alias="documentType") 
+    periods: List[str] = Field(default_factory=list)
+    query: Optional[str] = None
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class AnalysisRequest(BaseModel):
     analysis_type: str = Field(alias="analysisType")
@@ -69,6 +73,35 @@ class AnalysisRequest(BaseModel):
     query: Optional[str] = None
     custom_knowledge_base: Optional[str] = Field(default=None, alias="customKnowledgeBase")
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+# --- Moved and Refactored API Response Models ---
+
+class VisualizationDataResponse(BaseModel):
+    charts: List[ChartData] = Field(default_factory=list)
+    tables: List[TableData] = Field(default_factory=list)
+    # Using snake_case for Python attributes, will be aliased to camelCase
+    monetary_values: Optional[Dict[str, Any]] = Field(default=None, alias="monetaryValues")
+    percentages: Optional[Dict[str, Any]] = None
+    keyword_frequency: Optional[Dict[str, Any]] = Field(default=None, alias="keywordFrequency")
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+class AnalysisApiResponse(BaseModel):
+    id: str
+    document_ids: List[str] = Field(alias="documentIds")
+    analysis_type: str = Field(alias="analysisType")
+    timestamp: str # Keep as string for ISO format from routes
+    analysis_text: Optional[str] = Field(default=None, alias="analysisText")
+    visualization_data: VisualizationDataResponse = Field(alias="visualizationData")
+    metrics: List[FinancialMetric] = Field(default_factory=list)
+    ratios: List[FinancialRatio] = Field(default_factory=list)
+    comparative_periods: List[ComparativePeriod] = Field(default_factory=list, alias="comparativePeriods")
+    insights: List[str] = Field(default_factory=list)
+    citation_references: Dict[str, str] = Field(default_factory=dict, alias="citationReferences")
+    document_type: Optional[str] = Field(default=None, alias="documentType")
+    periods: List[str] = Field(default_factory=list)
+    query: Optional[str] = None
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)

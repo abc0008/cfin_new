@@ -257,9 +257,12 @@ export const AnalysisResultSchema = z.object({
   ),
   metrics: z.array(FinancialMetricSchema),
   ratios: z.array(FinancialRatioSchema),
-  insights: z.array(z.string()),
+  insights: z.array(z.string()).optional(),
   visualizationData: VisualizationDataSchema,
-  citationReferences: z.record(z.any()).optional()
+  analysisText: z.string().optional(),
+  citationReferences: z.record(z.string(), CitationSchema).optional(),
+  query: z.string().nullable().optional(),
+  // Allow any other keys to pass through, but they won't be strictly typed
 });
 
 export const EnhancedAnalysisResultSchema = AnalysisResultSchema.extend({

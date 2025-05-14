@@ -340,14 +340,18 @@ class DocumentRepository:
             document_type: Type of financial document
             periods: List of time periods in the document
             extracted_data: Extracted structured data
-            raw_text: Optional raw text of the document
+            raw_text: Optional raw text of the document (potentially from LLM post-processing)
             confidence_score: Confidence score of the extraction
             update_existing: If True, merge with existing extracted_data instead of replacing
             
         Returns:
             Updated document if found, None otherwise
         """
-        # Build the update data with only provided fields
+        current_doc = await self.get_document(document_id)
+        if not current_doc:
+            logger.error(f"Document {document_id} not found for update_document_content.")
+            return None
+
         update_data = {"extraction_timestamp": datetime.utcnow()}
         
         if document_type is not None:
@@ -358,23 +362,45 @@ class DocumentRepository:
             
         if confidence_score is not None:
             update_data["confidence_score"] = confidence_score
-            
-        if raw_text is not None:
-            update_data["raw_text"] = raw_text
         
-        # Handle extracted_data separately if update_existing is True
-        if extracted_data is not None:
-            if update_existing:
-                # Get current document to merge extracted_data
-                current_doc = await self.get_document(document_id)
-                if current_doc and current_doc.extracted_data:
-                    # Deep merge the extracted data
-                    merged_data = self._merge_dicts(current_doc.extracted_data, extracted_data)
-                    update_data["extracted_data"] = merged_data
-                else:
-                    update_data["extracted_data"] = extracted_data
+        # Preserve existing full raw_text if the incoming one is significantly shorter
+        if raw_text is not None:
+            if current_doc.raw_text and len(current_doc.raw_text) > (len(raw_text) + 500): # Heuristic: existing is much longer
+                logger.warning(
+                    f"Document {document_id}: Preserving existing DB raw_text ({len(current_doc.raw_text)} chars) "
+                    f"over shorter incoming raw_text ({len(raw_text)} chars)."
+                )
+                # The incoming raw_text (e.g., from Claude) will be placed into extracted_data if not already present
             else:
-                update_data["extracted_data"] = extracted_data
+                update_data["raw_text"] = raw_text
+        
+        # Handle extracted_data
+        final_extracted_data = {}
+        if extracted_data is not None:
+            if update_existing and current_doc.extracted_data:
+                final_extracted_data = self._merge_dicts(current_doc.extracted_data, extracted_data)
+            else:
+                final_extracted_data = extracted_data
+        elif update_existing and current_doc.extracted_data: # No new extracted_data, but update_existing is true
+             final_extracted_data = current_doc.extracted_data
+
+
+        # If incoming raw_text was from LLM and we decided to preserve the original document.raw_text,
+        # ensure this LLM-generated raw_text is captured in extracted_data.
+        if raw_text is not None and \
+           (not current_doc.raw_text or len(current_doc.raw_text) <= (len(raw_text) + 500)) and \
+           "raw_text" not in final_extracted_data:
+            # This case means raw_text was updated in update_data or was shorter/non-existent in current_doc.raw_text
+            # No need to add to final_extracted_data if it's going to be the main raw_text
+            pass
+        elif raw_text is not None and \
+             current_doc.raw_text and len(current_doc.raw_text) > (len(raw_text) + 500) and \
+             "claude_raw_text_snippet" not in final_extracted_data: # Use a different key
+            logger.info(f"Document {document_id}: Storing incoming (shorter) raw_text ({len(raw_text)} chars) into extracted_data.claude_raw_text_snippet")
+            final_extracted_data["claude_raw_text_snippet"] = raw_text
+
+        if final_extracted_data: # Only update if there's something to put there
+            update_data["extracted_data"] = final_extracted_data
         
         return await self.update_document(document_id, update_data)
     

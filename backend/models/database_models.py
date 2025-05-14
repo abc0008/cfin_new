@@ -54,9 +54,8 @@ Interactions with other files:
 
 These models are the backbone of the backend application, ensuring consistent data structure and relationships across all services and repositories.
 """
-
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, JSON, Boolean, Enum as SQLAlchemyEnum
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, JSON, Boolean, Enum as SQLAlchemyEnum, cast, and_, func, select, literal_column
+from sqlalchemy.orm import relationship, foreign, remote
 import uuid
 from datetime import datetime
 import enum
@@ -127,7 +126,15 @@ class Document(Base):
     # Relationships
     user = relationship("User", back_populates="documents")
     citations = relationship("Citation", back_populates="document", cascade="all, delete-orphan")
-    analysis_results = relationship("AnalysisResult", back_populates="document")
+    # analysis_results = relationship(
+    #     "AnalysisResult",
+    #     primaryjoin=lambda: select(literal_column('1'))
+    #         .select_from(func.json_each(foreign(AnalysisResult.document_ids)).alias("doc_id_item"))
+    #         .where(literal_column("doc_id_item.value") == remote(Document.id))
+    #         .correlate_except(AnalysisResult.__table__)
+    #         .exists(),
+    #     viewonly=True
+    # ) # Commenting out due to persistent issues with SQLite custom JSON join
     conversations = relationship(
         "Conversation", 
         secondary="conversation_documents",

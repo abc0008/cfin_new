@@ -9,7 +9,8 @@ import json
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
 
-from models.analysis import AnalysisRequest, AnalysisResult as AnalysisResultResponse
+from models.analysis import AnalysisRequest, AnalysisResult
+from models.analysis import AnalysisApiResponse, VisualizationDataResponse
 from models.analysis import FinancialMetric, FinancialRatio, ComparativePeriod
 from models.visualization import VisualizationData, ChartData, TableData
 from models.document import ProcessedDocument
@@ -54,28 +55,7 @@ async def get_langchain_service():
     return LangChainService()
 
 # --- Pydantic models for API response ---
-class VisualizationDataResponse(BaseModel):
-    charts: List[ChartData] = Field(default_factory=list)
-    tables: List[TableData] = Field(default_factory=list)
-    monetaryValues: Optional[Dict[str, Any]] = None
-    percentages: Optional[Dict[str, Any]] = None
-    keywordFrequency: Optional[Dict[str, Any]] = None
-
-class AnalysisApiResponse(BaseModel):
-    id: str
-    documentIds: List[str]
-    analysisType: str
-    timestamp: str # Use string for ISO format
-    analysisText: Optional[str] = None
-    visualizationData: VisualizationDataResponse
-    metrics: List[FinancialMetric] = Field(default_factory=list)
-    ratios: List[FinancialRatio] = Field(default_factory=list)
-    comparativePeriods: List[ComparativePeriod] = Field(default_factory=list)
-    insights: List[str] = Field(default_factory=list)
-    citationReferences: Dict[str, str] = Field(default_factory=dict)
-    documentType: Optional[str] = None  # <-- camelCase
-    periods: List[str] = Field(default_factory=list)
-    query: Optional[str] = None
+# Definitions are now in models/analysis.py and imported above
 
 @router.post("/run", response_model=AnalysisApiResponse)
 async def run_analysis_endpoint(
@@ -87,56 +67,79 @@ async def run_analysis_endpoint(
     appropriate analysis logic, primarily the tool-based comprehensive analysis.
     """
     try:
-        logger.info(f"API Request - Run Analysis: Type='{analysis_request.analysisType}', Docs='{analysis_request.documentIds}', Query='{analysis_request.query}'")
+        # Log the incoming request details correctly
+        logger.info(
+            f"API Request - Run Analysis: Type='{analysis_request.analysis_type}', "
+            f"Docs='{analysis_request.document_ids}', "
+            f"Query='{analysis_request.query}', "
+            f"Params='{analysis_request.parameters}'"
+        )
 
-        parameters = analysis_request.parameters or {}
+        # Instantiate the AnalysisService
+        # analysis_service = get_analysis_service() # This will be injected by Depends
+
+        # Prepare parameters for the service call
+        parameters = analysis_request.parameters.copy()
         custom_knowledge_base = analysis_request.custom_knowledge_base
         query = analysis_request.query
 
-        analysis_id, result_data = await analysis_service.run_analysis(
-            document_ids=[str(doc_id) for doc_id in analysis_request.documentIds],
-            analysis_type=analysis_request.analysisType,
+        analysis_id, analysis_result_dict = await analysis_service.run_analysis(
+            document_ids=[str(doc_id) for doc_id in analysis_request.document_ids],
+            analysis_type=analysis_request.analysis_type,
             parameters=parameters,
             custom_knowledge_base=custom_knowledge_base,
-            query=query  # <-- pass query explicitly
+            query=query
         )
 
-        # Log the structure of the result_data before validation
-        logger.debug(f"Raw result_data from service: {result_data}")
+        # Log the dictionary received from the service
+        logger.info(f"--- analysis_result_dict from AnalysisService for analysis {analysis_id} ---")
+        logger.info(json.dumps(analysis_result_dict, indent=2, default=str)) # Use default=str for any non-serializable items
+        logger.info(f"--- End analysis_result_dict from AnalysisService ---")
 
-        # Validate and return the response using the Pydantic model
-        viz_data = result_data.get("visualizationData", {})
-        charts = [ChartData(**c) if not isinstance(c, ChartData) else c for c in viz_data.get("charts", [])]
-        tables = [TableData(**t) if not isinstance(t, TableData) else t for t in viz_data.get("tables", [])]
+        # Ensure visualization_data is properly structured for VisualizationDataResponse
+        viz_data_input = analysis_result_dict.get("visualization_data") or {}
+        
+        # Ensure charts and tables are lists even if missing from viz_data_input
+        charts_list = viz_data_input.get("charts", [])
+        tables_list = viz_data_input.get("tables", [])
+
+        viz_response_data = VisualizationDataResponse(
+            charts=[ChartData(**c) if isinstance(c, dict) else c for c in charts_list],
+            tables=[TableData(**t) if isinstance(t, dict) else t for t in tables_list],
+            monetary_values=viz_data_input.get("monetary_values"), # Use snake_case key here
+            percentages=viz_data_input.get("percentages"),
+            keyword_frequency=viz_data_input.get("keyword_frequency") # Use snake_case key here
+        )
+
         api_response = AnalysisApiResponse(
-            id=result_data.get("id", analysis_id),
-            documentIds=result_data.get("documentIds", analysis_request.documentIds),
-            analysisType=result_data.get("analysisType", analysis_request.analysisType),
-            timestamp=result_data.get("timestamp", datetime.now().isoformat()),
-            analysisText=result_data.get("analysisText"),
-            visualizationData=VisualizationDataResponse(
-                charts=charts,
-                tables=tables,
-                monetaryValues=viz_data.get("monetaryValues"),
-                percentages=viz_data.get("percentages"),
-                keywordFrequency=viz_data.get("keywordFrequency")
-            ),
-            metrics=result_data.get("metrics", []),
-            ratios=result_data.get("ratios", []),
-            comparativePeriods=result_data.get("comparativePeriods", []),
-            insights=result_data.get("insights", []),
-            citationReferences=result_data.get("citationReferences", {}),
-            documentType=result_data.get("documentType"),  # <-- camelCase
-            periods=result_data.get("periods", []),
-            query=result_data.get("query")
+            id=analysis_id,  # Use the unpacked analysis_id
+            document_ids=analysis_result_dict.get("document_ids", []),
+            analysis_type=analysis_result_dict.get("analysis_type", analysis_request.analysis_type),
+            timestamp=analysis_result_dict.get("timestamp", datetime.now().isoformat()),
+            analysis_text=analysis_result_dict.get("analysis_text"),
+            visualization_data=viz_response_data,
+            metrics=analysis_result_dict.get("metrics", []),
+            ratios=analysis_result_dict.get("ratios", []),
+            comparative_periods=analysis_result_dict.get("comparative_periods", []),
+            insights=analysis_result_dict.get("insights", []),
+            citation_references=analysis_result_dict.get("citation_references", {}),
+            document_type=analysis_result_dict.get("document_type"), 
+            periods=analysis_result_dict.get("periods", []),
+            query=analysis_result_dict.get("query")
         )
 
         logger.info(f"API Response - Analysis successful: ID='{api_response.id}'")
         # Log counts for verification
-        logger.info(f"Charts: {len(api_response.visualizationData.charts)}, Tables: {len(api_response.visualizationData.tables)}")
-        logger.info(f"Metrics: {len(api_response.metrics)}, Ratios: {len(api_response.ratios)}, Comparisons: {len(api_response.comparativePeriods)}")
+        logger.info(f"Charts: {len(api_response.visualization_data.charts)}, Tables: {len(api_response.visualization_data.tables)}")
+        logger.info(f"Metrics: {len(api_response.metrics)}, Ratios: {len(api_response.ratios)}, Comparisons: {len(api_response.comparative_periods)}")
 
-        return api_response.dict(by_alias=True)
+        # Temporarily log the exact response being sent to the frontend
+        response_to_send = api_response.model_dump(by_alias=True)
+        logger.info(f"--- JSON Response to Frontend ---")
+        logger.info(json.dumps(response_to_send, indent=2))
+        logger.info(f"--- End JSON Response to Frontend ---")
+
+        return response_to_send
 
     except ValueError as ve:
         logger.warning(f"Value error during analysis run: {ve}")
@@ -166,35 +169,42 @@ async def get_analysis_result(
     Retrieve analysis results along with linked citation references.
     """
     try:
-        result_data = await analysis_service.get_analysis(analysis_id)
+        # Assuming analysis_service.get_analysis returns an AnalysisResult model instance
+        # or a dict that largely conforms to AnalysisResult structure (snake_case keys)
+        analysis_result_obj: AnalysisResult = await analysis_service.get_analysis(analysis_id)
 
-        # Validate and return the response using the Pydantic model
-        viz_data = result_data.get("visualizationData", {})
-        charts = [ChartData(**c) if not isinstance(c, ChartData) else c for c in viz_data.get("charts", [])]
-        tables = [TableData(**t) if not isinstance(t, TableData) else t for t in viz_data.get("tables", [])]
-        api_response = AnalysisApiResponse(
-            id=result_data.get("id", analysis_id),
-            documentIds=result_data.get("documentIds", []),
-            analysisType=result_data.get("analysisType", "unknown"),
-            timestamp=result_data.get("timestamp", datetime.now().isoformat()),
-            analysisText=result_data.get("analysisText"),
-            visualizationData=VisualizationDataResponse(
-                charts=charts,
-                tables=tables,
-                monetaryValues=viz_data.get("monetaryValues"),
-                percentages=viz_data.get("percentages"),
-                keywordFrequency=viz_data.get("keywordFrequency")
-            ),
-            metrics=result_data.get("metrics", []),
-            ratios=result_data.get("ratios", []),
-            comparativePeriods=result_data.get("comparativePeriods", []),
-            insights=result_data.get("insights", []),
-            citationReferences=result_data.get("citationReferences", {}),
-            documentType=result_data.get("documentType"),  # <-- camelCase
-            periods=result_data.get("periods", []),
-            query=result_data.get("query")
+        if not analysis_result_obj:
+            raise ValueError(f"Analysis {analysis_id} not found") # Or handle as per service contract
+
+        viz_data_dict = analysis_result_obj.visualization_data or {}
+        charts_list = viz_data_dict.get("charts", [])
+        tables_list = viz_data_dict.get("tables", [])
+
+        viz_response_data = VisualizationDataResponse(
+            charts=[ChartData(**c) if isinstance(c, dict) else c for c in charts_list],
+            tables=[TableData(**t) if isinstance(t, dict) else t for t in tables_list],
+            monetary_values=viz_data_dict.get("monetary_values"),
+            percentages=viz_data_dict.get("percentages"),
+            keyword_frequency=viz_data_dict.get("keyword_frequency")
         )
-        return api_response.dict(by_alias=True)
+
+        api_response = AnalysisApiResponse(
+            id=analysis_result_obj.id,
+            document_ids=analysis_result_obj.document_ids,
+            analysis_type=analysis_result_obj.analysis_type,
+            timestamp=analysis_result_obj.timestamp.isoformat() if isinstance(analysis_result_obj.timestamp, datetime) else datetime.now().isoformat(),
+            analysis_text=analysis_result_obj.analysis_text,
+            visualization_data=viz_response_data,
+            metrics=analysis_result_obj.metrics,
+            ratios=analysis_result_obj.ratios,
+            comparative_periods=analysis_result_obj.comparative_periods,
+            insights=analysis_result_obj.insights,
+            citation_references=analysis_result_obj.citation_references,
+            document_type=analysis_result_obj.document_type,
+            periods=analysis_result_obj.periods,
+            query=analysis_result_obj.query
+        )
+        return api_response.model_dump(by_alias=True) # Use model_dump for Pydantic V2
 
     except ValueError as ve:
         logger.warning(f"Analysis not found: {ve}")
