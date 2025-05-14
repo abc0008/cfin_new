@@ -12,23 +12,13 @@ import {
   ReferenceLine
 } from 'recharts';
 import { ChartData } from '@/types/visualization';
+import { CHART_COLORS_STROKE_FILL } from './chartColors';
 
 interface AreaChartProps {
   data: ChartData;
   height?: number | string;
   width?: number | string;
 }
-
-const DEFAULT_COLORS = [
-  { stroke: '#8884d8', fill: '#8884d8' },
-  { stroke: '#82ca9d', fill: '#82ca9d' },
-  { stroke: '#ffc658', fill: '#ffc658' },
-  { stroke: '#ff7300', fill: '#ff7300' },
-  { stroke: '#0088fe', fill: '#0088fe' },
-  { stroke: '#00c49f', fill: '#00c49f' },
-  { stroke: '#ffbb28', fill: '#ffbb28' },
-  { stroke: '#ff8042', fill: '#ff8042' }
-];
 
 const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%' }) => {
   const { config, data: chartData } = data;
@@ -79,7 +69,7 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
           >
             <defs>
               {dataKeys.map((key, index) => {
-                const color = config.colors?.[index] || DEFAULT_COLORS[index % DEFAULT_COLORS.length].fill;
+                const color = config.colors?.[index] || CHART_COLORS_STROKE_FILL[index % CHART_COLORS_STROKE_FILL.length].fill;
                 return (
                   <linearGradient key={key} id={`color${key}`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={color} stopOpacity={0.8}/>
@@ -143,7 +133,7 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
 
             {/* Dynamically render areas based on data structure */}
             {dataKeys.map((key, index) => {
-              const color = config.colors?.[index] || DEFAULT_COLORS[index % DEFAULT_COLORS.length];
+              const color = config.colors?.[index] || CHART_COLORS_STROKE_FILL[index % CHART_COLORS_STROKE_FILL.length];
               return (
                 <Area
                   key={key}

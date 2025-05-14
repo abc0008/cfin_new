@@ -16,7 +16,9 @@ export const DocumentUploadResponseSchema = z.object({
   document_id: z.string().uuid(),
   filename: z.string(),
   status: z.enum(['pending', 'processing', 'completed', 'failed']),
-  message: z.string().optional()
+  message: z.string().optional(),
+  contentType: z.string(),
+  fileSize: z.number().int().positive()
 });
 
 export const ProcessedDocumentSchema = z.object({
@@ -74,8 +76,7 @@ export const MessageSchema = z.object({
   id: z.string(),
   sessionId: z.string().optional(),
   conversationId: z.string().optional(),
-  timestamp: z.string().datetime().optional(),
-  createdAt: z.string().datetime().optional(),
+  timestamp: z.string().datetime(),
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string(),
   referencedDocuments: z.array(z.string()).optional().default([]),
@@ -110,8 +111,7 @@ export const BackendMessageSchema = z.object({
   id: z.string(),
   session_id: z.string().optional(),
   conversation_id: z.string().optional(),
-  timestamp: z.string().optional(),
-  created_at: z.string().optional(),
+  timestamp: z.string(),
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string(),
   referenced_documents: z.array(z.string()).optional().default([]),
@@ -151,6 +151,79 @@ export const AnalysisBlockSchema = z.object({
   tableData: z.array(z.record(z.any())).optional()
 });
 
+// Chart and Table Zod schemas for visualizationData validation
+
+export const MetricConfigSchema = z.object({
+  label: z.string(),
+  unit: z.string().optional(),
+  color: z.string().optional(),
+  formatter: z.string().optional(),
+  precision: z.number().optional()
+});
+
+export const ChartConfigSchema = z.object({
+  title: z.string(),
+  description: z.string().optional(),
+  xAxisKey: z.string(),
+  yAxisKey: z.string().optional(),
+  // Accept additional keys for flexibility
+}).catchall(z.any());
+
+export const ChartDataItemSchema = z.object({
+  x: z.union([z.string(), z.number()]),
+  y: z.number(),
+  label: z.string().optional(),
+  category: z.string().optional()
+}).catchall(z.any());
+
+export const ChartSeriesSchema = z.object({
+  name: z.string(),
+  data: z.array(ChartDataItemSchema),
+  color: z.string().optional()
+});
+
+export const ChartDataSchema = z.object({
+  chartType: z.enum(['line', 'bar', 'area', 'pie', 'multiBar', 'scatter']),
+  config: ChartConfigSchema,
+  data: z.union([z.array(ChartDataItemSchema), z.array(ChartSeriesSchema)]),
+  chartConfig: z.record(MetricConfigSchema).optional(),
+  xAxisTitle: z.string().optional(),
+  yAxisTitle: z.string().optional(),
+  legendPosition: z.enum(['top', 'right', 'bottom', 'left']).optional()
+});
+
+export const TableColumnSchema = z.object({
+  key: z.string(),
+  header: z.string().optional(),
+  label: z.string().optional(),
+  width: z.number().optional(),
+  align: z.enum(['left', 'center', 'right']).optional(),
+  formatter: z.string().optional(),
+  format: z.enum(['number', 'currency', 'percentage', 'text', 'date']).optional()
+});
+
+export const TableConfigSchema = z.object({
+  title: z.string(),
+  description: z.string().optional(),
+  columns: z.array(TableColumnSchema)
+});
+
+export const TableDataSchema = z.object({
+  tableType: z.enum(['comparison', 'summary', 'detailed']),
+  config: TableConfigSchema,
+  data: z.array(z.any())
+});
+
+export const VisualizationDataSchema = z.object({
+  charts: z.array(ChartDataSchema),
+  tables: z.array(TableDataSchema),
+  metrics: z.array(FinancialMetricSchema).optional(),
+  monetaryValues: z.any().optional(),
+  percentages: z.any().optional(),
+  keywordFrequency: z.any().optional()
+});
+
+// Update AnalysisResultSchema to use VisualizationDataSchema
 export const AnalysisResultSchema = z.object({
   id: z.string().refine(
     (val) => {
@@ -185,7 +258,7 @@ export const AnalysisResultSchema = z.object({
   metrics: z.array(FinancialMetricSchema),
   ratios: z.array(FinancialRatioSchema),
   insights: z.array(z.string()),
-  visualizationData: z.record(z.any()),
+  visualizationData: VisualizationDataSchema,
   citationReferences: z.record(z.any()).optional()
 });
 

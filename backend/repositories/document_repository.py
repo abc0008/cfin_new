@@ -576,7 +576,9 @@ class DocumentRepository:
             document_id=document.id,
             filename=document.filename,
             status=document.processing_status.value if document.processing_status else "pending",
-            message=f"Document uploaded and processing has {'started' if document.processing_status == ProcessingStatusEnum.PENDING else 'completed'}"
+            message=f"Document uploaded and processing has {'started' if document.processing_status == ProcessingStatusEnum.PENDING else 'completed'}",
+            contentType=document.mime_type,
+            fileSize=document.file_size
         )
     
     def citation_to_api_schema(self, citation: Citation) -> CitationSchema:

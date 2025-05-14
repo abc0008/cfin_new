@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { ChartData } from '@/types/visualization';
 import { formatValue } from '@/utils/formatters';
+import { CHART_COLORS } from './chartColors';
 
 interface ScatterChartProps {
   data: ChartData;
@@ -104,7 +105,7 @@ export default function ScatterChart({ data, height = 400, width = '100%' }: Sca
             <Scatter 
               name={config.title || "Data"} 
               data={chartData} 
-              fill="#4F46E5"
+              fill={CHART_COLORS[0]}
               aria-label={`Scatter plot points for ${config.title || 'data'}`}
             />
           </RechartsScatterChart>

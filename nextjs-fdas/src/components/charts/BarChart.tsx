@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { ChartData, MetricConfig } from '@/types/visualization';
 import { formatValue } from '@/utils/formatters';
+import { CHART_COLORS } from './chartColors';
 
 interface BarChartProps {
   data: ChartData;
@@ -34,14 +35,14 @@ export default function BarChart({ data, height = 400, width = '100%' }: BarChar
   const metricKeys = Object.keys(chartConfig).filter(key => key !== categoryKey);
   
   // Generate bars for each metric with their respective colors
-  const bars = metricKeys.map((key) => {
+  const bars = metricKeys.map((key, index) => {
     const metricConfig: MetricConfig = chartConfig[key];
     return (
       <Bar
         key={key}
         dataKey={key}
         name={metricConfig.label}
-        fill={metricConfig.color || '#8884d8'}
+        fill={CHART_COLORS[index % CHART_COLORS.length] || '#8884d8'}
         stroke={metricConfig.color ? undefined : '#7066bb'}
         strokeWidth={1}
         radius={[4, 4, 0, 0]}

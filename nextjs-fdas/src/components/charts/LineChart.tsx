@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { ChartData, MetricConfig } from '@/types/visualization';
 import { formatValue } from '@/utils/formatters';
+import { CHART_COLORS } from './chartColors';
 
 interface LineChartProps {
   data: ChartData;
@@ -31,7 +32,7 @@ export default function LineChart({ data, height = 400, width = '100%' }: LineCh
   const metricKeys = Object.keys(chartConfig).filter(key => key !== categoryKey);
   
   // Generate lines for each metric with their respective colors
-  const lines = metricKeys.map((key) => {
+  const lines = metricKeys.map((key, index) => {
     const metricConfig: MetricConfig = chartConfig[key];
     return (
       <Line
@@ -39,7 +40,7 @@ export default function LineChart({ data, height = 400, width = '100%' }: LineCh
         type="monotone"
         dataKey={key}
         name={metricConfig.label}
-        stroke={metricConfig.color || '#8884d8'}
+        stroke={CHART_COLORS[index % CHART_COLORS.length] || '#8884d8'}
         strokeWidth={2}
         dot={{ r: 3, strokeWidth: 1 }}
         activeDot={{ r: 5, strokeWidth: 1 }}

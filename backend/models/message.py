@@ -16,7 +16,7 @@ class MessageRole(str, Enum):
 class Message(BaseModel):
     id: UUID4 = Field(default_factory=uuid.uuid4)
     session_id: str
-    timestamp: datetime = Field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=datetime.now, alias="created_at")
     role: MessageRole
     content: str
     referenced_documents: List[str] = Field(default_factory=list)
@@ -25,6 +25,9 @@ class Message(BaseModel):
     citations: Optional[List[Citation]] = Field(default_factory=list)
     content_blocks: Optional[List[ContentBlock]] = None
     analysis_blocks: Optional[List[Dict[str, Any]]] = None
+
+    class Config:
+        allow_population_by_field_name = True
 
 
 class ConversationState(BaseModel):

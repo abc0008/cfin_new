@@ -114,12 +114,11 @@ export const conversationsApi = {
       const response = await apiService.get<any[]>(
         `/conversation/${sessionId}/history?limit=${limit}`
       );
-      
       // Convert backend format to frontend format if necessary
       return response.map(msg => ({
         id: msg.id,
         sessionId: msg.sessionId || msg.session_id || msg.conversation_id || sessionId,
-        timestamp: msg.timestamp || msg.created_at || new Date().toISOString(),
+        timestamp: msg.timestamp,
         role: msg.role,
         content: msg.content,
         referencedDocuments: msg.referencedDocuments || msg.referenced_documents || [],
@@ -188,7 +187,7 @@ export const conversationsApi = {
         id: response.id,
         role: response.role,
         content: response.content,
-        timestamp: response.timestamp || response.created_at || new Date().toISOString(),
+        timestamp: response.timestamp,
         sessionId: response.sessionId || response.conversation_id || sessionId,
         referencedDocuments: response.referencedDocuments || response.referenced_documents || documentIds,
         referencedAnalyses: response.referencedAnalyses || response.referenced_analyses || [],
@@ -306,7 +305,7 @@ export const conversationsApi = {
             id: messageId || fullResponse.id || `msg-${Date.now()}`,
             role: 'assistant',
             content: accumulatedContent || fullResponse.content || '',
-            timestamp: fullResponse.timestamp || fullResponse.created_at || new Date().toISOString(),
+            timestamp: fullResponse.timestamp,
             sessionId: fullResponse.sessionId || fullResponse.conversation_id || sessionId,
             referencedDocuments: fullResponse.referencedDocuments || fullResponse.referenced_documents || documentIds,
             referencedAnalyses: fullResponse.referencedAnalyses || fullResponse.referenced_analyses || [],

@@ -103,3 +103,5 @@ class DocumentUploadResponse(BaseModel):
     filename: str
     status: ProcessingStatus
     message: str
+    contentType: str
+    fileSize: int
