@@ -57,7 +57,7 @@ class AnalysisRepository:
     
     async def create_analysis(
         self,
-        document_id: str,
+        document_ids: List[str],
         analysis_type: str,
         result_data: Dict[str, Any]
     ) -> AnalysisResult:
@@ -65,17 +65,17 @@ class AnalysisRepository:
         Create a new analysis result.
         
         Args:
-            document_id: ID of the document being analyzed
+            document_ids: List of document IDs being analyzed (multi-document support)
             analysis_type: Type of analysis (e.g., "financial_ratios", "sentiment", etc.)
             result_data: JSON data containing analysis results
-            
+        
         Returns:
             Created analysis result
         """
         # Create the analysis record
         analysis = AnalysisResult(
             id=str(uuid.uuid4()),
-            document_id=document_id,
+            document_ids=document_ids,  # Store as JSON array
             analysis_type=analysis_type,
             result_data=result_data,
             created_at=datetime.utcnow()
@@ -118,19 +118,20 @@ class AnalysisRepository:
             analysis_type: Optional analysis type to filter by
             limit: Maximum number of results to return
             offset: Starting index
-            
+        
         Returns:
             List of analysis results
         """
-        query = select(AnalysisResult).where(AnalysisResult.document_id == document_id)
-        
-        if analysis_type:
-            query = query.where(AnalysisResult.analysis_type == analysis_type)
-        
-        query = query.order_by(desc(AnalysisResult.created_at)).limit(limit).offset(offset)
-        
-        result = await self.db.execute(query)
-        return result.scalars().all()
+        # For SQLite, fetch all and filter in Python since document_ids is a JSON array
+        result = await self.db.execute(select(AnalysisResult))
+        all_analyses = result.scalars().all()
+        filtered = []
+        for analysis in all_analyses:
+            if document_id in (analysis.document_ids or []):
+                if not analysis_type or analysis.analysis_type == analysis_type:
+                    filtered.append(analysis)
+        filtered.sort(key=lambda x: x.created_at, reverse=True)
+        return filtered[offset:offset+limit]
     
     async def list_latest_analyses(
         self,
@@ -145,42 +146,25 @@ class AnalysisRepository:
             document_ids: List of document IDs
             analysis_type: Optional analysis type to filter by
             limit: Maximum number of results to return per document
-            
+        
         Returns:
             List of analysis results
         """
-        query = (
-            select(AnalysisResult)
-            .where(AnalysisResult.document_id.in_(document_ids))
-        )
-        
-        if analysis_type:
-            query = query.where(AnalysisResult.analysis_type == analysis_type)
-        
-        query = query.order_by(desc(AnalysisResult.created_at))
-        
-        # Use a window function to get the latest N analyses per document
-        # This is a bit complex with SQLAlchemy, so we'll just get all and filter
-        result = await self.db.execute(query)
+        # For SQLite, fetch all and filter in Python
+        result = await self.db.execute(select(AnalysisResult))
         all_analyses = result.scalars().all()
-        
-        # Group by document_id
-        analyses_by_document = {}
+        analyses_by_document = {doc_id: [] for doc_id in document_ids}
         for analysis in all_analyses:
-            if analysis.document_id not in analyses_by_document:
-                analyses_by_document[analysis.document_id] = []
-            
-            if len(analyses_by_document[analysis.document_id]) < limit:
-                analyses_by_document[analysis.document_id].append(analysis)
-        
-        # Flatten the dictionary into a list
+            for doc_id in document_ids:
+                if doc_id in (analysis.document_ids or []):
+                    if not analysis_type or analysis.analysis_type == analysis_type:
+                        if len(analyses_by_document[doc_id]) < limit:
+                            analyses_by_document[doc_id].append(analysis)
+        # Flatten and sort
         latest_analyses = []
         for doc_analyses in analyses_by_document.values():
             latest_analyses.extend(doc_analyses)
-        
-        # Sort by created_at (newest first)
         latest_analyses.sort(key=lambda x: x.created_at, reverse=True)
-        
         return latest_analyses
     
     async def update_analysis(
@@ -236,17 +220,19 @@ class AnalysisRepository:
         Args:
             document_id: ID of the document
             analysis_type: Optional analysis type to filter by
-            
+        
         Returns:
             Number of analysis results
         """
-        query = select(func.count()).select_from(AnalysisResult).where(AnalysisResult.document_id == document_id)
-        
-        if analysis_type:
-            query = query.where(AnalysisResult.analysis_type == analysis_type)
-        
-        result = await self.db.execute(query)
-        return result.scalar()
+        # For SQLite, fetch all and filter in Python
+        result = await self.db.execute(select(AnalysisResult))
+        all_analyses = result.scalars().all()
+        count = 0
+        for analysis in all_analyses:
+            if document_id in (analysis.document_ids or []):
+                if not analysis_type or analysis.analysis_type == analysis_type:
+                    count += 1
+        return count
     
     async def search_analyses(
         self,
@@ -265,39 +251,34 @@ class AnalysisRepository:
             analysis_type: Optional analysis type to filter by
             limit: Maximum number of results to return
             offset: Starting index
-            
+        
         Returns:
             List of matching analysis results
         """
-        # We need to search in the JSON result_data, which is more complex
-        # For simplicity, we'll convert the JSON to a string and search in that
-        # In a real implementation, you might want to use the database's JSON search capabilities
-        
-        # Get all analyses for the documents
-        base_query = (
-            select(AnalysisResult)
-            .where(AnalysisResult.document_id.in_(document_ids))
-        )
-        
-        if analysis_type:
-            base_query = base_query.where(AnalysisResult.analysis_type == analysis_type)
-        
-        # For PostgreSQL you would use something like:
-        # base_query = base_query.where(
-        #     func.json_to_string(AnalysisResult.result_data).ilike(f"%{query}%")
-        # )
-        
-        # Since we're using SQLite for development, we'll fetch all and filter in Python
-        result = await self.db.execute(base_query)
+        # For SQLite, fetch all and filter in Python
+        result = await self.db.execute(select(AnalysisResult))
         all_analyses = result.scalars().all()
-        
-        # Filter by query
         matching_analyses = []
         for analysis in all_analyses:
-            result_data_str = str(analysis.result_data)
-            if query.lower() in result_data_str.lower():
-                matching_analyses.append(analysis)
-        
-        # Sort by created_at (newest first) and apply limit/offset
+            if any(doc_id in (analysis.document_ids or []) for doc_id in document_ids):
+                if not analysis_type or analysis.analysis_type == analysis_type:
+                    result_data_str = str(analysis.result_data)
+                    if query.lower() in result_data_str.lower():
+                        matching_analyses.append(analysis)
         matching_analyses.sort(key=lambda x: x.created_at, reverse=True)
         return matching_analyses[offset:offset + limit]
+    
+    async def is_document_referenced(self, document_id: str) -> bool:
+        """
+        Check if a document is referenced in any analysis result.
+        Args:
+            document_id: ID of the document
+        Returns:
+            True if the document is referenced, False otherwise
+        """
+        result = await self.db.execute(select(AnalysisResult))
+        all_analyses = result.scalars().all()
+        for analysis in all_analyses:
+            if document_id in (analysis.document_ids or []):
+                return True
+        return False
