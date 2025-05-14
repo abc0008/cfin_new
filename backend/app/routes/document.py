@@ -13,7 +13,7 @@ from repositories.document_repository import DocumentRepository
 from pdf_processing.document_service import DocumentService
 from utils.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils.dependencies import get_document_service, get_document_repository
+from utils.dependencies import get_document_service, get_document_repository, get_analysis_repository
 from repositories.analysis_repository import AnalysisRepository
 
 logger = logging.getLogger(__name__)

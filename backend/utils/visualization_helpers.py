@@ -138,3 +138,17 @@ def generate_keyword_frequency_data(insights: List[str]) -> Optional[List[Dict[s
         return [{"name": insight_text[:20] + "...", "value": 1, "description": insight_text[:100]} for insight_text in insights[:5]]
 
     return frequency_data[:5] if frequency_data else None 
+
+def get_data_for_visualization_type(visualization_type: str, metrics: List[FinancialMetric], insights: List[str]) -> Optional[List[Dict[str, Any]]]:
+    """
+    Dispatches to the correct data generation function based on visualization type.
+    """
+    if visualization_type == "monetary_values":
+        return generate_monetary_values_data(metrics, insights)
+    elif visualization_type == "percentage":
+        return generate_percentage_data(metrics, insights)
+    elif visualization_type == "keyword_frequency":
+        return generate_keyword_frequency_data(insights)
+    else:
+        logger.warning(f"Unknown visualization type: {visualization_type}")
+        return None 

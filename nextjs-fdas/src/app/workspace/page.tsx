@@ -1,16 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, BarChart2, Upload, FileUp, Zap, ChevronRight, FileSearch } from 'lucide-react'
 import { ChatInterface } from '../../components/chat/ChatInterface'
 import { UploadForm } from '../../components/document/UploadForm'
 import dynamic from 'next/dynamic'
-import { ProcessedDocument, AnalysisResult } from '@/types'
+import { ProcessedDocument, AnalysisResult, Message } from '@/types'
 import { conversationApi } from '@/lib/api/conversation'
 import { analysisApi } from '@/lib/api/analysis'
 import Canvas from '@/components/visualization/Canvas'
 import { AnalysisControls } from '@/components/analysis/AnalysisControls'
+import { AnalysisResultSchema } from '@/validation/schemas'
 
 // Import PDFViewer component with dynamic import to avoid SSR issues
 const PDFViewer = dynamic(
@@ -29,6 +30,7 @@ export default function Workspace() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState<boolean>(false);
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [showReflectionsDialog, setShowReflectionsDialog] = useState(false);
 
   // Initialize conversation session when component mounts
   useEffect(() => {
@@ -76,14 +78,149 @@ export default function Workspace() {
     };
   }, []); // Remove sessionId dependency to prevent multiple initializations
 
+  // Define handleAnalysisResult first, potentially wrap with useCallback if needed later
+  const handleAnalysisResult = (
+    result: any, // Start with any, then validate
+    documentId: string,
+    analysisType: string,
+    userQuery?: string
+  ) => {
+    // Log the raw result received by the handler
+    console.log("[handleAnalysisResult] Raw result received:", JSON.parse(JSON.stringify(result)));
+
+    // Validate the result structure, especially the ID
+    const validation = AnalysisResultSchema.safeParse(result);
+    if (!validation.success || typeof validation.data.id !== 'string') {
+      console.error(
+        "Invalid analysis result structure or missing/invalid ID:", 
+        result,
+        validation.success ? '' : validation.error.flatten()
+      );
+      setAnalysisError(
+        validation.success 
+        ? "Analysis result ID is invalid."
+        : "Received invalid analysis result structure from backend."
+      );
+      setMessages(prev => {
+        const newSystemMessage: Message = {
+          id: `msg-${Date.now()}`,
+          sessionId: sessionId,
+          role: 'system',
+          content: validation.success 
+            ? `Error: Analysis result for "${selectedDocument?.metadata?.filename || documentId}" has an invalid ID.`
+            : `Error: Received invalid analysis result for "${selectedDocument?.metadata?.filename || documentId}".`,
+          timestamp: new Date().toISOString(),
+          referencedDocuments: [selectedDocument?.metadata?.id || documentId],
+          referencedAnalyses: [],
+        };
+        return [...prev, newSystemMessage];
+      });
+      return; 
+    }
+
+    const typedResult = validation.data as AnalysisResult; 
+
+    setAnalysisResults(prevResults => {
+      let updatedResults: AnalysisResult[];
+
+      const newResultEntry: AnalysisResult = {
+        id: typedResult.id, 
+        documentIds: typedResult.documentIds || [],
+        analysisType: typedResult.analysisType || 'unknown',
+        timestamp: typedResult.timestamp || new Date().toISOString(),
+        metrics: typedResult.metrics || [],
+        ratios: typedResult.ratios || [],
+        insights: typedResult.insights || [],
+        visualizationData: typedResult.visualizationData || {},
+        analysisText: typedResult.analysisText,
+        citationReferences: typedResult.citationReferences,
+        query: typedResult.query,
+      };
+
+      const existingIndex = prevResults.findIndex(r => 
+        r.documentIds.includes(documentId) && r.analysisType === analysisType
+      );
+      
+      if (existingIndex >= 0) {
+        updatedResults = [...prevResults];
+        updatedResults[existingIndex] = newResultEntry;
+      } else {
+        updatedResults = [...prevResults, newResultEntry];
+      }
+      return updatedResults; 
+    });
+
+    const isFailedAnalysis = (typedResult.id.startsWith('analysis-') || typedResult.id.startsWith('local-')) && 
+                            (!typedResult.metrics || typedResult.metrics.length === 0) &&
+                            (typedResult.insights && typedResult.insights.some(insight => 
+                              typeof insight === 'string' && (insight.includes('Unable to perform financial analysis') || 
+                              insight.includes('document does not contain structured financial data'))
+                            ));
+                                    
+    if (isFailedAnalysis) {
+      const failureInsight = typedResult.insights?.find(insight => typeof insight === 'string' && (insight.includes('Unable to perform financial analysis') || insight.includes('document does not contain structured financial data'))) || "detailed information was not found.";
+      const analysisMessage = `I attempted to analyze the financial data in "${selectedDocument?.metadata?.filename || documentId}" but ${failureInsight.toLowerCase()}`;
+      setMessages(prev => {
+        const newSystemMessage: Message = {
+          id: `msg-${Date.now()}`,
+          sessionId: sessionId,
+          role: 'system',
+          content: analysisMessage,
+          timestamp: new Date().toISOString(),
+          referencedDocuments: [selectedDocument?.metadata?.id || documentId],
+          referencedAnalyses: [],
+        };
+        return [...prev, newSystemMessage];
+      });
+    } else {
+      // SUCCESSFUL ANALYSIS: Use result.analysisText for an assistant message
+      const currentAnalysisResult = typedResult; // No need for another `as AnalysisResult` if typedResult is already correctly typed
+      
+      // Log the values to understand why the fallback might be hit
+      console.log("[handleAnalysisResult] Inspecting analysisText:");
+      console.log("[handleAnalysisResult] typedResult.analysisText:", typedResult.analysisText);
+      
+      const detailedAnalysisContent = currentAnalysisResult.analysisText?.trim();
+      console.log("[handleAnalysisResult] detailedAnalysisContent (after trim):", detailedAnalysisContent);
+
+      if (detailedAnalysisContent) {
+        setMessages(prev => {
+          const newAssistantMessage: Message = {
+            id: `msg-${Date.now()}`,
+            sessionId: sessionId,
+            role: 'assistant',
+            content: detailedAnalysisContent,
+            timestamp: new Date().toISOString(),
+            referencedDocuments: [selectedDocument?.metadata?.id || documentId],
+            referencedAnalyses: [currentAnalysisResult.id],
+          };
+          return [...prev, newAssistantMessage];
+        });
+      } else {
+        const fallbackMessage = `Financial analysis for "${selectedDocument?.metadata?.filename || documentId}" is complete. Key findings are available in the Analysis tab, though a textual summary was not explicitly provided in the chat.`;
+        setMessages(prev => {
+          const newSystemMessage: Message = {
+            id: `msg-${Date.now()}`,
+            sessionId: sessionId,
+            role: 'system',
+            content: fallbackMessage,
+            timestamp: new Date().toISOString(),
+            referencedDocuments: [selectedDocument?.metadata?.id || documentId],
+            referencedAnalyses: [currentAnalysisResult.id],
+          };
+          return [...prev, newSystemMessage];
+        });
+      }
+    }
+  };
+
   // Run financial analysis when a document is selected
   useEffect(() => {
     const runAnalysis = async () => {
       if (!selectedDocument) return;
       
-      // Check if we've already analyzed this document
-      if (analysisResults.some(result => result.documentIds.includes(selectedDocument.metadata.id))) {
-        console.log('Document already analyzed');
+      if (analysisResults.some(result => result.documentIds.includes(selectedDocument.metadata.id) && result.analysisType === 'basic_financial')) {
+        console.log('Basic financial analysis already performed for this document');
         return;
       }
       
@@ -93,69 +230,38 @@ export default function Workspace() {
         const result = await analysisApi.runAnalysis(
           [selectedDocument.metadata.id],
           'basic_financial',
-          {}
+          {} // No specific parameters for basic_financial, but pass empty object
         );
+        // Call the centralized handler
+        handleAnalysisResult(result, selectedDocument.metadata.id, 'basic_financial');
         
-        setAnalysisResults(prev => [...prev, result]);
-        
-        let analysisMessage = '';
-        // Check if this is a failed analysis (local ID, no metrics, has error insights)
-        const isFailedAnalysis = (result.id.startsWith('analysis-') || result.id.startsWith('local-')) && 
-                                (!result.metrics || result.metrics.length === 0) &&
-                                result.insights.some(insight => 
-                                  insight.includes('Unable to perform financial analysis') || 
-                                  insight.includes('document does not contain structured financial data')
-                                );
-                                    
-        if (isFailedAnalysis) {
-          analysisMessage = `I attempted to analyze the financial data in "${selectedDocument.filename}" but ${result.insights[0].toLowerCase()}`;
-        } else {
-          analysisMessage = `I've completed the financial analysis for "${selectedDocument.filename}". You can see the results in the Analysis tab.`;
-        }
-        
-        // Add system message about analysis completion
-        setMessages(prev => {
-          const newSystemMessage: Message = {
-            id: `msg-${Date.now()}`,
-            role: 'system',
-            content: analysisMessage,
-            timestamp: new Date().toISOString(),
-            metadata: {
-              referencedDocuments: [selectedDocument.metadata.id],
-              // Only reference the analysis if it's not a failed analysis
-              referencedAnalyses: isFailedAnalysis ? [] : [result.id],
-            }
-          };
-          return [...prev, newSystemMessage];
-        });
       } catch (error) {
-        console.error('Error running analysis:', error);
-        
-        // Add error message to chat
-        const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+        console.error('Error running initial analysis in useEffect:', error);
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred during initial analysis.';
         setMessages(prev => {
           const newSystemMessage: Message = {
             id: `msg-${Date.now()}`,
+            sessionId: sessionId,
             role: 'system',
-            content: `Error performing analysis: ${errorMsg}`,
+            content: `Error performing initial analysis for "${selectedDocument?.metadata?.filename || 'the selected document'}": ${errorMsg}`,
             timestamp: new Date().toISOString(),
-            metadata: {
-              referencedDocuments: [selectedDocument.metadata.id],
-              referencedAnalyses: [],
-            }
+            referencedDocuments: [selectedDocument.metadata.id], // selectedDocument is defined here
+            referencedAnalyses: [],
           };
           return [...prev, newSystemMessage];
         });
+        setAnalysisError(errorMsg); 
       } finally {
         setAnalysisLoading(false);
       }
     };
     
-    if (selectedDocument && !analysisResults.some(result => 
-      result.documentIds.includes(selectedDocument.metadata.id)
-    )) {
+    if (selectedDocument && sessionId) { // Ensure sessionId is also available
       runAnalysis();
     }
+  // Add handleAnalysisResult to dependencies if it's stable (e.g., memoized with useCallback)
+  // For now, omitting it to prevent potential infinite loops if it's redefined on every render
+  // and uses state that changes frequently. If issues arise, wrap handleAnalysisResult with useCallback.
   }, [selectedDocument, sessionId, analysisResults]);
 
   const handleSendMessage = async (messageText: string) => {
@@ -284,37 +390,71 @@ export default function Workspace() {
       );
       
       // Add the new result and update messages
-      setAnalysisResults(prev => {
-        // If we already have a result for this analysis type and document,
-        // replace it instead of adding a new one
-        const existingIndex = prev.findIndex(r => 
+      setAnalysisResults(prevResults => {
+        const analysisResultToUpdate = result as AnalysisResult;
+        
+        if (typeof analysisResultToUpdate.id !== 'string') {
+          console.error("Analysis result ID is missing or not a string, cannot update state:", analysisResultToUpdate);
+          return prevResults; 
+        }
+
+        const newResultEntry: AnalysisResult = {
+          id: analysisResultToUpdate.id,
+          documentIds: analysisResultToUpdate.documentIds || [],
+          analysisType: analysisResultToUpdate.analysisType || 'unknown',
+          timestamp: analysisResultToUpdate.timestamp || new Date().toISOString(),
+          metrics: analysisResultToUpdate.metrics || [],
+          ratios: analysisResultToUpdate.ratios || [],
+          insights: analysisResultToUpdate.insights || [],
+          visualizationData: analysisResultToUpdate.visualizationData || {},
+          analysisText: analysisResultToUpdate.analysisText,
+          citationReferences: analysisResultToUpdate.citationReferences,
+          query: analysisResultToUpdate.query,
+        };
+
+        const existingIndex = prevResults.findIndex(r => 
           r.documentIds.includes(documentId) && r.analysisType === analysisType
         );
         
         if (existingIndex >= 0) {
-          const newResults = [...prev];
-          newResults[existingIndex] = result;
-          return newResults;
+          const updatedResults = [...prevResults];
+          updatedResults[existingIndex] = newResultEntry;
+          return updatedResults;
         }
-        
-        // Otherwise add the new result
-        return [...prev, result];
+        return [...prevResults, newResultEntry];
       });
       
-      // Add system message about analysis completion
-      setMessages(prev => {
-        const newSystemMessage = {
-          id: `msg-${Date.now()}`,
-          role: 'system',
-          content: `I've completed the ${analysisType} analysis${userQuery ? ' for: "' + userQuery + '"' : ''}. You can see the results in the Analysis tab.`,
-          timestamp: new Date().toISOString(),
-          metadata: {
+      // Display analysisText in chat for manual analysis too
+      const currentManualAnalysisResult = result as AnalysisResult; // Type assertion
+      const detailedManualAnalysisContent = currentManualAnalysisResult.analysisText?.trim();
+      if (detailedManualAnalysisContent) {
+        setMessages(prev => {
+          const newAssistantMessage: Message = {
+            id: `msg-${Date.now()}`,
+            sessionId: sessionId,
+            role: 'assistant',
+            content: detailedManualAnalysisContent,
+            timestamp: new Date().toISOString(),
             referencedDocuments: [documentId],
-            referencedAnalyses: [result.id],
-          }
-        };
-        return [...prev, newSystemMessage];
-      });
+            referencedAnalyses: [currentManualAnalysisResult.id],
+          };
+          return [...prev, newAssistantMessage];
+        });
+      } else {
+        // Fallback system message if no analysisText
+        setMessages(prev => {
+          const newSystemMessage: Message = {
+            id: `msg-${Date.now()}`,
+            sessionId: sessionId,
+            role: 'system',
+            content: `I've completed the ${analysisType} analysis${userQuery ? ' for: "' + userQuery + '"' : ''}. You can see the results in the Analysis tab. A textual summary was not generated for direct chat display.`,
+            timestamp: new Date().toISOString(),
+            referencedDocuments: [documentId],
+            referencedAnalyses: [currentManualAnalysisResult.id],
+          };
+          return [...prev, newSystemMessage];
+        });
+      }
       
       // Switch to analysis tab to show results
       setActiveTab('analysis');
@@ -325,15 +465,14 @@ export default function Workspace() {
       // Add error message to chat
       const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
       setMessages(prev => {
-        const newSystemMessage = {
+        const newSystemMessage: Message = {
           id: `msg-${Date.now()}`,
+          sessionId: sessionId,
           role: 'system',
           content: `Error performing analysis: ${errorMsg}`,
           timestamp: new Date().toISOString(),
-          metadata: {
-            referencedDocuments: [documentId],
-            referencedAnalyses: [],
-          }
+          referencedDocuments: [documentId],
+          referencedAnalyses: [],
         };
         return [...prev, newSystemMessage];
       });

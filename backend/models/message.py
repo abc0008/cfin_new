@@ -2,9 +2,12 @@ from enum import Enum
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 import uuid
-from pydantic import BaseModel, Field, UUID4
+from pydantic import BaseModel, Field, UUID4, field_serializer, AliasChoices
+import logging
 
 from models.citation import Citation, ContentBlock
+
+logger = logging.getLogger(__name__)
 
 
 class MessageRole(str, Enum):
@@ -59,16 +62,36 @@ class ConversationCreateRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     id: str
-    session_id: str
-    timestamp: datetime
+    session_id: str = Field(validation_alias=AliasChoices('session_id', 'conversation_id'))
+    timestamp: datetime = Field(validation_alias=AliasChoices('timestamp', 'created_at'))
     role: MessageRole
     content: str
     referenced_documents: List[str] = Field(default_factory=list)
     referenced_analyses: List[str] = Field(default_factory=list)
     citation_links: List[str] = Field(default_factory=list)
-    citations: Optional[List[Citation]] = None
+    citations_data: List[Any] = Field(default_factory=list, alias="citations")
     content_blocks: Optional[List[ContentBlock]] = None
     analysis_blocks: Optional[List[Dict[str, Any]]] = None
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True
+    }
+
+    @field_serializer('citations_data', when_used='always')
+    def serialize_citations_data(self, v: Optional[List[Any]]) -> List[Citation]:
+        if not v:
+            return []
+        processed_citations = []
+        for message_citation_orm in v:
+            if hasattr(message_citation_orm, 'citation') and message_citation_orm.citation:
+                try:
+                    citation_pydantic = Citation.model_validate(message_citation_orm.citation, from_attributes=True)
+                    processed_citations.append(citation_pydantic)
+                except Exception as e:
+                    logger.warning(f"Error validating citation: {e} for {getattr(message_citation_orm.citation, 'id', 'unknown ID')}")
+                    pass
+        return processed_citations
 
 
 class ConversationHistoryResponse(BaseModel):

@@ -46,8 +46,8 @@ export const analysisApi = {
     console.log(`Running analysis: ${analysisType} for documents ${documentIds.join(', ')}`, parameters);
     try {
       const payload: Record<string, any> = {
-        document_ids: documentIds,
-        analysis_type: analysisType,
+        documentIds: documentIds,
+        analysisType: analysisType,
         parameters: parameters,
       };
       if (customKnowledgeBase) {
@@ -57,14 +57,14 @@ export const analysisApi = {
         payload.custom_user_query = customUserQuery;
       }
 
-      const response = await apiService.post<{ data: AnalysisResult }>(
-        '/analysis/run',
+      const response = await apiService.post<AnalysisResult>(
+        '/api/analysis/run',
         payload
       );
-      console.log('Raw analysis response from backend:', response.data);
+      console.log('Raw analysis response from backend:', response);
 
       // Validate the response against the Pydantic model schema
-      const validationResult = AnalysisResultSchema.safeParse(response.data);
+      const validationResult = AnalysisResultSchema.safeParse(response);
       if (!validationResult.success) {
         console.error('Backend response validation error:', validationResult.error.errors);
         throw new Error('Invalid analysis result received from backend: ' + JSON.stringify(validationResult.error.errors));

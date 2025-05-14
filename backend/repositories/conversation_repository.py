@@ -47,6 +47,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete, func, and_, desc, or_
+from sqlalchemy.orm import selectinload
 
 from models.database_models import Conversation, Message, User, Document, Citation, MessageCitation, ConversationDocument, AnalysisBlock
 from models.document import Citation as CitationSchema
@@ -242,9 +243,21 @@ class ConversationRepository:
                 self.db.add(message_citation)
         
         await self.db.commit()
-        await self.db.refresh(message)
+        # await self.db.refresh(message) # We will re-fetch with eager loading
+
+        # Re-fetch the message with relationships eagerly loaded
+        stmt = (
+            select(Message)
+            .where(Message.id == message.id)
+            .options(
+                selectinload(Message.citations).selectinload(MessageCitation.citation),
+                selectinload(Message.analysis_blocks)
+            )
+        )
+        result = await self.db.execute(stmt)
+        loaded_message = result.scalars().first()
         
-        return message
+        return loaded_message
     
     async def get_message(self, message_id: str) -> Optional[Message]:
         """
@@ -275,11 +288,27 @@ class ConversationRepository:
             # Just merge the message object with the database
             self.db.add(message)
             await self.db.commit()
-            await self.db.refresh(message)
+            # await self.db.refresh(message) # We will re-fetch with eager loading
+
+            # Re-fetch the message with relationships eagerly loaded
+            # This assumes 'message.id' is accessible on the input 'message' object
+            stmt = (
+                select(Message)
+                .where(Message.id == message.id) 
+                .options(
+                    selectinload(Message.citations).selectinload(MessageCitation.citation),
+                    selectinload(Message.analysis_blocks)
+                )
+            )
+            result = await self.db.execute(stmt)
+            loaded_message = result.scalars().first()
+
+            if loaded_message:
+                logger.info(f"Updated and re-fetched message {loaded_message.id}")
+            else:
+                logger.warning(f"Failed to re-fetch message {message.id} after update")
             
-            logger.info(f"Updated message {message.id} - attributes: {dir(message)}")
-            
-            return message
+            return loaded_message
         except Exception as e:
             logger.error(f"Error updating message: {e}")
             await self.db.rollback()

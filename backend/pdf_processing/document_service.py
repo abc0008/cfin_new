@@ -80,47 +80,44 @@ class DocumentService:
             logger.info(f"Starting processing of document {document_id} ({filename}) with Claude API")
             
             # Process with Claude service directly for PDF processing and citation extraction
+            true_full_raw_text: str = ""
+            processed_document_model: Optional[ProcessedDocument] = None
+            citations_list: List[CitationSchema] = []
+
             try:
-                logger.info(f"Processing document {document_id} with Claude service")
-                processed_document, citations = await self.claude_service.process_pdf(pdf_data, filename)
-                logger.info(f"Successfully processed document {document_id} with Claude service")
-                logger.info(f"Extracted {len(citations)} citations from document")
-            except Exception as e:
-                logger.error(f"Error using Claude service: {str(e)}", exc_info=True)
+                logger.info(f"Processing document {document_id} with Claude service for full text, structured data, and citations")
+                # ClaudeService.process_pdf now returns: (true_full_raw_text, processed_document_model, citations_list)
+                true_full_raw_text, processed_document_model, citations_list = await self.claude_service.process_pdf(pdf_data, filename)
                 
-                # Attempt to extract raw text even if Claude processing fails
-                raw_text = ""
+                logger.info(f"Successfully initiated processing for document {document_id} with Claude service.")
+                logger.info(f"Full text received (length: {len(true_full_raw_text)}), {len(citations_list)} citations candidate.")
+
+                if not processed_document_model:
+                    raise ValueError("Claude service returned None for processed_document_model")
+
+            except Exception as e:
+                logger.error(f"Error using Claude service for document {document_id}: {str(e)}", exc_info=True)
+                # Fallback text extraction if Claude service fails entirely
+                current_raw_text_fallback = ""
                 try:
                     import io
                     from PyPDF2 import PdfReader
-                    
                     pdf_file = io.BytesIO(pdf_data)
                     pdf_reader = PdfReader(pdf_file)
-                    
-                    # Extract text from each page
-                    page_texts = []
-                    for page_num in range(len(pdf_reader.pages)):
-                        page = pdf_reader.pages[page_num]
-                        page_text = page.extract_text()
-                        if page_text:
-                            page_texts.append(f"--- Page {page_num+1} ---\n{page_text}")
-                    
-                    raw_text = "\n\n".join(page_texts)
-                    logger.info(f"Extracted {len(raw_text)} characters of raw text as fallback for document {document_id}")
-                    
-                    # Store the extracted text in database even if processing failed
-                    await self.document_repository.update_document_content(
-                        document_id=document_id,
-                        document_type=DocumentType.OTHER,
-                        extracted_data={"raw_text": raw_text},
-                        raw_text=raw_text,
-                        confidence_score=0.0
-                    )
-                    
+                    page_texts = [f"--- Page {i+1} ---\n{pdf_reader.pages[i].extract_text() or ''}" for i in range(len(pdf_reader.pages))]
+                    current_raw_text_fallback = "\n\n".join(page_texts)
+                    logger.info(f"Extracted {len(current_raw_text_fallback)} characters of raw text as Claude service error fallback for document {document_id}")
                 except Exception as extract_error:
-                    logger.error(f"Failed to extract fallback text: {extract_error}", exc_info=True)
+                    logger.error(f"Failed to extract fallback text after Claude service error: {extract_error}", exc_info=True)
+                    current_raw_text_fallback = f"Failed to process document {filename} with Claude and fallback text extraction also failed: {extract_error}"
                 
-                # Update status to failed with error message
+                await self.document_repository.update_document_content(
+                    document_id=document_id,
+                    document_type=DocumentType.OTHER,
+                    extracted_data={"error": f"Claude API processing error: {str(e)}", "claude_textual_output_accompanying_json": f"Claude API processing error: {str(e)}"},
+                    raw_text=current_raw_text_fallback, # Use fallback text
+                    confidence_score=0.0
+                )
                 await self.document_repository.update_document_status(
                     document_id=document_id,
                     status=ProcessingStatusEnum.FAILED,
@@ -128,111 +125,81 @@ class DocumentService:
                 )
                 return
             
-            # Update document content
-            document_type = DocumentType[processed_document.content_type.upper()] if processed_document.content_type else DocumentType.OTHER
+            # Determine document type from the processed model
+            document_type_enum = DocumentType[processed_document_model.content_type.upper()] if processed_document_model.content_type else DocumentType.OTHER
             
-            # Extract raw text from processed document
-            raw_text = ""
-            if processed_document.extracted_data and "raw_text" in processed_document.extracted_data:
-                raw_text = processed_document.extracted_data["raw_text"]
-                logger.info(f"Found {len(raw_text)} characters of raw text in processed document")
-                logger.info(f"Sample text: {raw_text[:200]}...")
-            
-            # Ensure we have some raw text
-            if not raw_text or len(raw_text.strip()) == 0:
-                logger.warning(f"No raw text found in processed document for {document_id} - attempting extraction")
+            # Primary raw_text is now true_full_raw_text from Claude's dedicated extraction
+            # Fallback to PyPDF2 if Claude's full text extraction failed or returned minimal content
+            final_raw_text_to_store = true_full_raw_text
+            if not true_full_raw_text or len(true_full_raw_text.strip()) < 50 or "Error:" in true_full_raw_text or "Warning:" in true_full_raw_text:
+                logger.warning(f"Claude full text extraction for {document_id} was problematic (Text: '...'{true_full_raw_text[:100]}...'). Attempting PyPDF2 fallback.")
                 try:
                     import io
                     from PyPDF2 import PdfReader
-                    
                     pdf_file = io.BytesIO(pdf_data)
                     pdf_reader = PdfReader(pdf_file)
-                    
-                    # Extract text from each page
-                    page_texts = []
-                    for page_num in range(len(pdf_reader.pages)):
-                        page = pdf_reader.pages[page_num]
-                        page_text = page.extract_text()
-                        if page_text:
-                            page_texts.append(f"--- Page {page_num+1} ---\n{page_text}")
-                    
-                    raw_text = "\n\n".join(page_texts)
-                    logger.info(f"Successfully extracted {len(raw_text)} characters as fallback raw text")
-                    
-                    # Update the extracted data with the raw text
-                    if not processed_document.extracted_data:
-                        processed_document.extracted_data = {}
-                    processed_document.extracted_data["raw_text"] = raw_text
-                    
+                    page_texts = [f"--- Page {i+1} ---\n{pdf_reader.pages[i].extract_text() or ''}" for i in range(len(pdf_reader.pages))]
+                    pypdf2_raw_text = "\n\n".join(page_texts)
+                    if len(pypdf2_raw_text.strip()) > len(final_raw_text_to_store.strip()): # Only use if substantially better
+                        final_raw_text_to_store = pypdf2_raw_text
+                        logger.info(f"Successfully extracted {len(final_raw_text_to_store)} characters using PyPDF2 as fallback for {document_id}")
+                    else:
+                        logger.info(f"PyPDF2 fallback text for {document_id} was not substantially longer than Claude's output. Sticking with Claude output.")
                 except Exception as extract_error:
-                    logger.error(f"Failed to extract fallback text: {extract_error}", exc_info=True)
-                    raw_text = f"Failed to extract text content from {filename}. PDF may contain images or be protected."
+                    logger.error(f"Failed to extract PyPDF2 fallback text for {document_id}: {extract_error}", exc_info=True)
+                    if not final_raw_text_to_store: # If Claude gave nothing and PyPDF2 failed
+                         final_raw_text_to_store = f"Failed to extract text content from {filename}. PDF may contain images or be protected."
             
             # Update document with extracted content
-            logger.info(f"Updating document {document_id} content in database")
+            logger.info(f"Updating document {document_id} content in database. Raw text length: {len(final_raw_text_to_store)}")
             await self.document_repository.update_document_content(
                 document_id=document_id,
-                document_type=document_type,
-                periods=processed_document.periods,
-                extracted_data=processed_document.extracted_data,
-                raw_text=raw_text,
-                confidence_score=processed_document.confidence_score
+                document_type=document_type_enum,
+                periods=processed_document_model.periods,
+                extracted_data=processed_document_model.extracted_data, # This is now primarily structured data
+                raw_text=final_raw_text_to_store, # Use the definitive raw text
+                confidence_score=processed_document_model.confidence_score
             )
             
-            # Log document processing details for debugging
-            logger.info(f"Document {document_id} processed. Status: COMPLETED, Has raw_text: {bool(raw_text)}, Raw text length: {len(raw_text)}, Extracted data keys: {list(processed_document.extracted_data.keys()) if processed_document.extracted_data else 'None'}")
+            logger.info(f"Document {document_id} processed. Status: COMPLETED, Raw text length: {len(final_raw_text_to_store)}, Extracted data keys: {list(processed_document_model.extracted_data.keys()) if processed_document_model.extracted_data else 'None'}")
             
             # Add citations to the database
-            added_citations = []
-            logger.info(f"Storing {len(citations)} citations for document {document_id}")
-            for citation in citations:
-                # Create bounding box data if not present
-                bounding_box = citation.bounding_box or {
-                    "top": 0,
-                    "left": 0,
-                    "width": 0,
-                    "height": 0
+            added_db_citations: List[Citation] = []
+            logger.info(f"Storing {len(citations_list)} citations for document {document_id}")
+            for citation_schema_item in citations_list: # Assuming citations_list contains Pydantic CitationSchema objects
+                if not isinstance(citation_schema_item, CitationSchema):
+                    logger.warning(f"Skipping non-CitationSchema item in citations_list: {type(citation_schema_item)}")
+                    continue
+
+                bounding_box = citation_schema_item.bounding_box or {
+                    "top": 0, "left": 0, "width": 0, "height": 0
                 }
                 
                 db_citation = await self.document_repository.add_citation(
                     document_id=document_id,
-                    page=citation.page,
-                    text=citation.text,
-                    section=citation.section,
+                    page=citation_schema_item.page,
+                    text=citation_schema_item.text,
+                    section=citation_schema_item.section,
                     bounding_box=bounding_box
                 )
                 if db_citation:
-                    added_citations.append(db_citation)
+                    added_db_citations.append(db_citation)
             
-            # Link citations to financial insights if available
-            if "financial_data" in processed_document.extracted_data and "insights" in processed_document.extracted_data["financial_data"]:
-                insights = processed_document.extracted_data["financial_data"]["insights"]
+            # Link citations to financial insights if available (this logic might need adjustment based on how citations are now structured)
+            if processed_document_model.extracted_data and \
+               isinstance(processed_document_model.extracted_data.get('financial_data'), dict) and \
+               isinstance(processed_document_model.extracted_data['financial_data'].get('insights'), dict):
                 
-                # Create a map of citation IDs to database citation IDs
-                citation_id_map = {}
-                for i, citation in enumerate(citations):
-                    citation_id = f"citation_{i}"
-                    if i < len(added_citations):
-                        citation_id_map[citation_id] = str(added_citations[i].id)
+                insights = processed_document_model.extracted_data['financial_data']['insights']
                 
-                # Update the extracted data with database citation IDs
-                for insight_id, insight_data in insights.items():
-                    if "citations" in insight_data:
-                        for i, citation_ref in enumerate(insight_data["citations"]):
-                            if "citation_id" in citation_ref and citation_ref["citation_id"] in citation_id_map:
-                                insight_data["citations"][i]["db_citation_id"] = citation_id_map[citation_ref["citation_id"]]
-                
-                # Update the document with the updated insights
-                await self.document_repository.update_document_content(
-                    document_id=document_id,
-                    extracted_data=processed_document.extracted_data,
-                    update_existing=True
-                )
+                # Create a map of original citation identifiers (if any) to new DB citation IDs
+                # This part is speculative as the structure of `citations_list` from Claude might not have old IDs
+                # For simplicity, we might just store DB citations and UI reconstructs context if needed
+                # For now, this section is simplified as direct mapping from Claude's raw citation output to DB IDs isn't straightforward without more context on Claude's citation structure
+                pass # Placeholder for more complex citation linking if needed later
             
-            # Update status to completed
             await self.document_repository.update_document_status(document_id, ProcessingStatusEnum.COMPLETED)
-            
-            logger.info(f"Document {document_id} processing completed with {len(added_citations)} citations extracted")
+            logger.info(f"Document {document_id} processing completed with {len(added_db_citations)} citations stored in DB")
                 
         except Exception as e:
             logger.error(f"Error processing document {document_id}: {str(e)}", exc_info=True)
