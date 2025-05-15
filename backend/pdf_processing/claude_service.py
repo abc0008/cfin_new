@@ -2,63 +2,36 @@
 Claude Service Module
 ====================
 
-This module provides the main interface for interacting with the Anthropic Claude API for PDF and financial document analysis within the backend system. It encapsulates all logic for:
+This module provides the main backend interface for interacting with the Anthropic Claude API for PDF and financial document analysis. It encapsulates all logic for:
+
 - Submitting PDFs (and optionally text documents) to Claude for extraction, analysis, and Q&A.
-- Extracting structured financial data, citations, and generating responses with or without visualization tools.
-- Handling tool-based analysis (charts/tables) and citation mapping for downstream frontend highlighting.
+- Extracting structured financial data, citations, and generating responses with or without visualization tools (charts/tables/metrics).
+- Handling tool-based analysis for financial visualizations and citation mapping for downstream frontend highlighting.
 - Acting as the primary AI/LLM service for document understanding, replacing legacy text extraction fallbacks.
 
-Key Responsibilities:
+**Key Responsibilities:**
 - Process PDF files using Claude's native PDF support, including extracting raw text, structured data, and citations.
-- Analyze documents and user queries, supporting tool-based visualizations (charts/tables) for financial analysis.
-- Generate responses for Q&A, including citation-aware answers for use with frontend highlighters.
+- Analyze documents and user queries, supporting tool-based visualizations (charts/tables/metrics) for financial analysis.
+- Generate citation-aware Q&A responses for use with frontend highlighters.
 - Convert and standardize citation data for downstream storage and frontend consumption.
 - Provide fallback to LangGraph or LangChain-based analysis for non-PDF or text-only scenarios.
 
-Interactions with other files:
------------------------------
-1. cfin/backend/models/document.py:
-    - Uses ProcessedDocument, DocumentCitation, DocumentContentType, DocumentMetadata, ProcessingStatus for representing processed documents and their metadata.
-    - These models define the structure for PDF processing results and citations.
+**Integration Points:**
+- `models.document`, `models.citation`, `models.tools`: Data models for processed documents, citations, and tool schemas.
+- `pdf_processing.langchain_service` and `pdf_processing.langgraph_service`: Fallbacks for text-based or advanced Q&A analysis.
+- `repositories.document_repository`: Used to fetch PDF binary content from storage when preparing documents for citation.
+- `services.conversation_service` and `pdf_processing.document_service`: Main consumers for document Q&A and PDF processing.
 
-2. cfin/backend/models/citation.py:
-    - Uses Citation, CitationType, CharLocationCitation, PageLocationCitation, ContentBlockLocationCitation for citation data structures.
-    - Provides models for storing and retrieving document citations with proper highlighting information.
-
-3. cfin/backend/models/tools.py:
-    - Imports ToolSchema, ALL_TOOLS, ALL_TOOLS_DICT for tool-based analysis (charts/tables) and visualization support.
-    - Used in analyze_with_visualization_tools for generating financial charts and tables.
-
-4. cfin/backend/pdf_processing/langchain_service.py:
-    - Uses LangChainService as a fallback for text-based document analysis if LangGraph/Claude is unavailable.
-    - Method used: analyze_document_content.
-    - Called by generate_response_with_langgraph method.
-
-5. cfin/backend/pdf_processing/langgraph_service.py:
-    - Uses LangGraphService for advanced document Q&A and citation-aware responses.
-    - Method used: simple_document_qa.
-    - Called by generate_response_with_langgraph method.
-
-6. cfin/backend/repositories/document_repository.py (indirect, via _prepare_document_for_citation):
-    - Used to fetch PDF binary content from storage if not present in the document dictionary.
-    - Method used: get_document_file_content.
-    - Called when preparing documents for citation.
-
-7. cfin/backend/services/conversation_service.py:
-    - ConversationService initializes and uses this service for all document Q&A interactions.
-    - Used for document understanding, response generation, and citation extraction in conversations.
-
-8. cfin/backend/pdf_processing/document_service.py:
-    - DocumentService initializes and uses this service for all PDF processing.
-    - Uses process_pdf method to handle document upload processing.
-
-Typical Usage in Application Flow:
+**Typical Usage:**
 - Called by DocumentService for PDF processing and extraction.
 - Used by ConversationService for generating responses to user queries with citation support.
 - Used by AnalysisService for tool-based financial analysis and visualization generation.
 
-Note:
-This file is central to the backend's AI/LLM capabilities and is designed to be the single point of interaction with Anthropic Claude for all document analysis, extraction, and Q&A tasks. It is tightly integrated with the backend's document, citation, and analysis models, and is responsible for ensuring all downstream consumers (including the frontend) receive consistent, citation-rich, and structured data.
+**Design Notes:**
+- This file is central to the backend's AI/LLM capabilities and is designed to be the single point of interaction with Anthropic Claude for all document analysis, extraction, and Q&A tasks.
+- It is tightly integrated with the backend's document, citation, and analysis models, and is responsible for ensuring all downstream consumers (including the frontend) receive consistent, citation-rich, and structured data.
+- Tool-based analysis (charts, tables, metrics) is prioritized when appropriate, with strict schema validation for frontend compatibility.
+- Fallback logic ensures robust operation even if Claude or advanced services are unavailable.
 """
 
 
@@ -205,8 +178,8 @@ class ClaudeService:
         
         logger.info(f"Initializing Claude API with key prefix: {masked_key}")
         
-        # Using Claude 3.5 Sonnet for enhanced PDF support and citations
-        self.model = "claude-3-5-sonnet-latest"  # Use the latest model version that supports citations
+        # Using Claude 3.7 Sonnet for token-efficient tool use and enhanced PDF support
+        self.model = "claude-3-7-sonnet-20250219"  # Updated model
         try:
             self.client = AsyncAnthropic(
                 api_key=self.api_key,
@@ -1048,7 +1021,7 @@ Follow these guidelines:
             logger.debug(f"Sending request to Claude with {len(messages)} message(s) and {len(ALL_TOOLS_DICT)} tools.")
 
             # Call Claude API with tools
-            response = await self.client.messages.create(
+            response = await self.client.with_options(beta_headers=["token-efficient-tools-2025-02-19"]).messages.create(
                 model=self.model,
                 system=FINANCIAL_ANALYSIS_SYSTEM_PROMPT,  # Use the refined system prompt
                 messages=messages,
@@ -1085,6 +1058,134 @@ Follow these guidelines:
 
         except Exception as e:
             logger.exception(f"Error during analysis with visualization tools: {e}")
+            return {
+                "analysis_text": f"An error occurred during analysis: {e}",
+                "visualizations": {"charts": [], "tables": []},
+                "metrics": []
+            }
+
+    async def analyze_with_financial_analysis_template(
+        self,
+        system_prompt: str,
+        document_text: str,
+        user_query: str,
+        knowledge_base: str = "",
+        document_base64: Optional[str] = None,
+        document_filename: Optional[str] = "document.pdf"
+    ) -> Dict[str, Any]:
+        """
+        Analyze a financial document using a custom system prompt (template) with tool support for visualizations.
+
+        Args:
+            system_prompt: The system prompt/template to use for the analysis.
+            document_text: Text content of the financial document (can be a summary).
+            user_query: The user's specific question or analysis request.
+            knowledge_base: Optional additional context or domain knowledge.
+            document_base64: Optional base64 encoded full PDF content.
+            document_filename: Optional filename for the PDF, used if document_base64 is provided.
+
+        Returns:
+            A dictionary containing:
+            - "analysis_text": The textual analysis from Claude.
+            - "visualizations": A dict with "charts": [...] and "tables": [...]
+                                containing the structured JSON data generated by tools.
+            - "metrics": A list of extracted financial metrics.
+        """
+        if not self.client:
+            logger.error("Cannot analyze document because Claude API client is not available.")
+            return {
+                "analysis_text": "Error: Claude API client not configured.",
+                "visualizations": {"charts": [], "tables": []},
+                "metrics": []
+            }
+
+        try:
+            logger.info(f"Starting analysis with custom template for query: '{user_query[:50]}...'")
+
+            user_content_parts = []
+
+            if document_base64:
+                logger.info(f"Using base64 PDF content for tool-based analysis of '{document_filename}'.")
+                user_content_parts.append({
+                    "type": "document",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "application/pdf",
+                        "data": document_base64
+                    }
+                })
+                if document_text and len(document_text.strip()) > 0:
+                    user_content_parts.append({"type": "text", "text": f"""<document_summary_text>\n{document_text}\n</document_summary_text>"""})
+            elif document_text and len(document_text.strip()) > 0:
+                logger.info("Using provided text content for tool-based analysis.")
+                user_content_parts.append({
+                    "type": "text",
+                    "text": f"""<financial_document>\n{document_text}\n</financial_document>"""
+                })
+            else:
+                logger.warning("No document content (neither base64 PDF nor text) provided for tool-based analysis.")
+                return {
+                    "analysis_text": "Error: No document content provided for analysis.",
+                    "visualizations": {"charts": [], "tables": []},
+                    "metrics": []
+                }
+
+            if knowledge_base:
+                user_content_parts.append({
+                    "type": "text",
+                    "text": f"""<knowledge_base>\n{knowledge_base}\n</knowledge_base>"""
+                })
+
+            user_content_parts.append({
+                "type": "text",
+                "text": f"User Query: {user_query}"
+            })
+
+            if not user_content_parts:
+                logger.error("No content parts to send to Claude for analysis.")
+                return {
+                    "analysis_text": "Error: Internal error preparing analysis request (no content).",
+                    "visualizations": {"charts": [], "tables": []},
+                    "metrics": []
+                }
+
+            messages = [{"role": "user", "content": user_content_parts}]
+
+            logger.debug(f"Sending request to Claude with {len(messages)} message(s) and {len(ALL_TOOLS_DICT)} tools (custom template).")
+
+            response = await self.client.with_options(beta_headers=["token-efficient-tools-2025-02-19"]).messages.create(
+                model=self.model,
+                system=system_prompt,  # Use the provided custom system prompt
+                messages=messages,
+                tools=ALL_TOOLS_DICT,
+                tool_choice={"type": "auto"},
+                temperature=0.3,
+                max_tokens=4096
+            )
+
+            logger.info("Received response from Claude API (custom template).")
+            if response and response.content:
+                logger.info(f"analyze_with_financial_analysis_template - Claude API Full Response Content (First 500 chars per block):")
+                for i, block in enumerate(response.content):
+                    logger.info(f"  Block {i+1} Type: {block.type}")
+                    if block.type == "text":
+                        logger.info(f"    Text: {block.text[:500]}{'...' if len(block.text) > 500 else ''}")
+                    elif block.type == "tool_use":
+                        logger.info(f"    Tool Name: {block.name}")
+                        logger.info(f"    Tool Input (First 500 chars): {str(block.input)[:500]}{'...' if len(str(block.input)) > 500 else ''}")
+            else:
+                logger.info("analyze_with_financial_analysis_template - Claude API Response or content is empty.")
+
+            processed_result = self._process_tool_calls(response)
+
+            logger.info(f"Analysis complete (custom template). Text length: {len(processed_result['analysis_text'])}. "
+                        f"Charts: {len(processed_result['visualizations']['charts'])}. "
+                        f"Tables: {len(processed_result['visualizations']['tables'])}.")
+
+            return processed_result
+
+        except Exception as e:
+            logger.exception(f"Error during analysis with custom template: {e}")
             return {
                 "analysis_text": f"An error occurred during analysis: {e}",
                 "visualizations": {"charts": [], "tables": []},

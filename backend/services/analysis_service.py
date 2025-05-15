@@ -1,3 +1,43 @@
+"""
+Analysis Service Module
+======================
+
+This module provides the main backend service for orchestrating financial document analysis workflows. It acts as the central point for running, managing, and retrieving analyses on financial documents, supporting both single and multi-document scenarios, and leveraging advanced AI/LLM services for tool-based visualizations and insights.
+
+Key Responsibilities:
+---------------------
+- Route analysis requests to the appropriate AI/LLM service (e.g., ClaudeService) or internal agent (FinancialAnalysisAgent) based on analysis type.
+- Aggregate and validate content from one or more financial documents, including extracting raw text and PDF content.
+- Support a variety of analysis types (comprehensive, ratios, trends, benchmarking, sentiment, etc.) with extensible logic for new types.
+- Manage the full lifecycle of an analysis: input validation, execution, result formatting, and storage via repositories.
+- Format and enrich analysis results with metadata, visualizations (charts/tables/metrics), insights, and summary statistics for downstream API and frontend consumption.
+- Provide utility methods for listing, retrieving, and summarizing analyses, including support for pagination and filtering.
+
+Integration Points:
+-------------------
+- `ClaudeService`: For AI-powered analysis, tool-based visualizations, and sentiment analysis.
+- `FinancialAnalysisAgent`: For internal calculations (ratios, trends, benchmarks) and chart/table data preparation.
+- `AnalysisRepository` and `DocumentRepository`: For persistent storage and retrieval of analyses and document metadata/content.
+- `visualization_helpers`: For post-processing and structuring visualization data.
+- Models: Uses data models from `models.analysis`, `models.visualization`, and `models.database_models` for type safety and result formatting.
+
+Typical Usage:
+--------------
+- Called by API endpoints or other backend services to run a new analysis on one or more documents, specifying the analysis type and parameters.
+- Used to retrieve, list, or summarize past analyses for a document or user.
+- Supports both synchronous and asynchronous workflows, with robust error handling and logging for traceability.
+- Designed to be extensible for new analysis types, additional AI services, or custom business logic.
+
+Design Notes:
+-------------
+- Centralizes all analysis orchestration logic to ensure consistency and maintainability.
+- Supports multi-document aggregation and validation, with future extensibility for user-specific access control.
+- Leverages tool-based AI analysis for rich, structured outputs (charts, tables, metrics) compatible with modern frontend frameworks.
+- Provides detailed logging at each step for debugging and auditability.
+- Designed for modularity: new analysis types or AI services can be added with minimal changes to the core workflow.
+- Ensures all outputs are formatted for downstream API and UI consumption, including metadata, visualizations, and insights.
+"""
+
 import os
 import logging
 import json
@@ -9,7 +49,7 @@ import base64 # Added for PDF content encoding
 
 from repositories.analysis_repository import AnalysisRepository
 from repositories.document_repository import DocumentRepository
-from pdf_processing.claude_service import ClaudeService
+from pdf_processing.claude_service import ClaudeService, ALL_TOOLS_DICT
 from pdf_processing.financial_agent import FinancialAnalysisAgent
 from models.database_models import AnalysisResult, Document
 from utils.visualization_helpers import (
@@ -34,13 +74,13 @@ First, review the following financial documents and knowledge base:
 </financial_documents>
 
 <knowledge_base>
-{{KNOWLEDGE_BASE}}
+{KNOWLEDGE_BASE}
 </knowledge_base>
 
 Now, analyze the following user query:
 
 <user_query>
-{{USER_QUERY}}
+{USER_QUERY}
 </user_query>
 
 Before providing your final response, wrap your analysis planning inside <financial_analysis_planning> tags using the following structure:
@@ -149,6 +189,11 @@ class AnalysisService:
             "type": "basic_financial",
             "display_name": "Basic Financial Analysis",
             "description": "Provides a concise textual summary of the key financial highlights, extracts key financial metrics, and presents a summary table of important figures."
+        },
+        {
+            "type": "financial_template",
+            "display_name": "Template-Driven Financial Analysis",
+            "description": "Runs the custom financial analysis template for advanced, structured analysis and visualization."
         }
     ]
 
@@ -255,7 +300,190 @@ class AnalysisService:
                 logger.error(f"Error fetching/encoding PDF for {primary_doc_filename}: {str(e)}")
 
         try:
-            if analysis_type == "comprehensive" or analysis_type == "comprehensive_tools":
+            if analysis_type == "financial_template":
+                logger.info(f"Starting sequential orchestration for 'financial_template' analysis on documents {document_ids} with query: '{query}'")
+                MAX_TURNS = 7  # Max conversation turns to prevent infinite loops
+
+                # 1. Initial Setup
+                user_query_for_template = parameters.get("query", query or "Provide a comprehensive financial analysis of these documents, generating relevant charts and tables using the provided tools.")
+                
+                system_prompt = financial_analysis_template.format(
+                    document_text=aggregate_text, # This is already aggregated from all docs
+                    KNOWLEDGE_BASE=parameters.get("knowledge_base", ""),
+                    USER_QUERY=user_query_for_template
+                )
+
+                # Prepare initial user message content parts (similar to ClaudeService)
+                initial_user_content_parts = []
+                if primary_doc_base64: # From the existing run_analysis logic
+                    initial_user_content_parts.append({
+                        "type": "document",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "application/pdf",
+                            "data": primary_doc_base64
+                        }
+                    })
+                    if aggregate_text: # if there's also summary text
+                         initial_user_content_parts.append({"type": "text", "text": f"<document_summary_text>\n{aggregate_text}\n</document_summary_text>"})
+                elif aggregate_text:
+                    initial_user_content_parts.append({
+                        "type": "text",
+                        "text": f"<financial_document>\n{aggregate_text}\n</financial_document>"
+                    })
+                else: # Should not happen if validation passed
+                    logger.error("No aggregate_text or primary_doc_base64 for financial_template analysis.")
+                    raise ValueError("No document content for financial_template analysis.")
+
+                if parameters.get("knowledge_base"):
+                    initial_user_content_parts.append({
+                        "type": "text",
+                        "text": f"<knowledge_base>\n{parameters.get('knowledge_base', '')}\n</knowledge_base>"
+                    })
+                
+                # The main user query is already part of the system_prompt for this template.
+                # The 'messages' for Claude should start with the user's implicit instruction to act on the system prompt.
+                # For tool use, the first user message might just be a simple trigger if the system prompt contains all context.
+                # However, Claude's examples often show the user query also in the first message.
+                # The `financial_analysis_template` is passed as the *system* prompt.
+                # The first *user* message can be simple, e.g., "Begin analysis." or the query itself.
+                # Let's use the user_query_for_template as the first user message content.
+                
+                conversation_messages = [{"role": "user", "content": user_query_for_template}]
+
+
+                # Initialize accumulators
+                accumulated_text = ""
+                accumulated_charts = []
+                accumulated_tables = []
+                accumulated_metrics = []
+
+                for turn in range(MAX_TURNS):
+                    logger.info(f"Financial Template Orchestration - Turn {turn + 1}/{MAX_TURNS}")
+
+                    api_response = await self.claude_service.client.with_options(
+                        beta_headers=["token-efficient-tools-2025-02-19"]
+                    ).messages.create(
+                        model=self.claude_service.model, # Uses the updated model from ClaudeService
+                        system=system_prompt,
+                        messages=conversation_messages,
+                        tools=ALL_TOOLS_DICT, # Make sure this is available
+                        tool_choice={"type": "auto"},
+                        max_tokens=4096,
+                        temperature=0.3
+                    )
+
+                    logger.info(f"Claude API response received. Stop reason: {api_response.stop_reason}")
+                    
+                    # Add Claude's response to conversation history
+                    # Ensure content is a list of blocks as expected by Anthropic SDK
+                    assistant_response_content_blocks = []
+                    if api_response.content:
+                        for block in api_response.content:
+                            if block.type == "text":
+                                assistant_response_content_blocks.append({"type": "text", "text": block.text})
+                            elif block.type == "tool_use":
+                                assistant_response_content_blocks.append({
+                                    "type": "tool_use",
+                                    "id": block.id,
+                                    "name": block.name,
+                                    "input": block.input
+                                })
+                    
+                    if assistant_response_content_blocks: # Only add if there's content
+                        conversation_messages.append({
+                            "role": "assistant",
+                            "content": assistant_response_content_blocks
+                        })
+                    elif api_response.stop_reason != 'tool_use': # if no content and not a tool_use stop, it's likely an error or empty response.
+                        logger.warning(f"Assistant response was empty and stop_reason was not 'tool_use': {api_response.stop_reason}")
+
+
+                    tool_results_for_this_turn = []
+                    has_tool_use = any(block.type == "tool_use" for block in api_response.content)
+
+                    for block in api_response.content:
+                        if block.type == "text":
+                            accumulated_text += block.text + "\n"
+                        elif block.type == "tool_use":
+                            tool_name = block.name
+                            tool_input = block.input
+                            tool_use_id = block.id
+                            logger.info(f"Processing tool use: {tool_name} (ID: {tool_use_id})")
+
+                            try:
+                                # Use the existing processing logic from ClaudeService
+                                processed_data = self.claude_service._process_visualization_input(tool_name, tool_input, tool_use_id)
+                                
+                                if processed_data:
+                                    logger.info(f"Tool {tool_name} processed successfully.")
+                                    if tool_name == "generate_graph_data":
+                                        accumulated_charts.append(processed_data)
+                                    elif tool_name == "generate_table_data":
+                                        accumulated_tables.append(processed_data)
+                                    elif tool_name == "generate_financial_metric":
+                                        accumulated_metrics.append(processed_data)
+                                    
+                                    tool_results_for_this_turn.append({
+                                        "type": "tool_result",
+                                        "tool_use_id": tool_use_id,
+                                        "content": json.dumps(processed_data) # Claude expects content as a string or list of blocks
+                                    })
+                                else:
+                                    logger.warning(f"Tool {tool_name} (ID: {tool_use_id}) did not return processed data.")
+                                    tool_results_for_this_turn.append({
+                                        "type": "tool_result",
+                                        "tool_use_id": tool_use_id,
+                                        "content": "Error: Tool processing failed or returned no data.",
+                                        "is_error": True 
+                                    })
+                            except Exception as e:
+                                logger.error(f"Error processing tool {tool_name} (ID: {tool_use_id}): {e}", exc_info=True)
+                                tool_results_for_this_turn.append({
+                                    "type": "tool_result",
+                                    "tool_use_id": tool_use_id,
+                                    "content": f"Error executing tool: {str(e)}",
+                                    "is_error": True
+                                })
+                    
+                    if api_response.stop_reason == "tool_use":
+                        if not tool_results_for_this_turn:
+                            logger.warning("Stop reason is 'tool_use' but no tool results were generated. This might be an issue.")
+                            # Potentially break or send an error message back if this state is problematic
+                            # For now, we'll let it continue, but it might loop if Claude expects a tool_result.
+                            # To be safe, let's add a message indicating no tools were successfully run this turn.
+                            conversation_messages.append({
+                                "role": "user",
+                                "content": [{
+                                    "type": "text",
+                                    "text": "No tools were executed in the previous turn, or tool execution failed. Please proceed with the analysis based on available information or request a different tool if necessary."
+                                }]
+                            })
+                        else:
+                             conversation_messages.append({"role": "user", "content": tool_results_for_this_turn})
+                    elif api_response.stop_reason in ["stop_sequence", "end_turn"]:
+                        logger.info("Analysis sequence complete based on stop reason.")
+                        break 
+                    else: # Other stop reasons like max_tokens
+                        logger.warning(f"Loop terminated due to stop_reason: {api_response.stop_reason} or max turns reached.")
+                        break
+                
+                if turn == MAX_TURNS - 1:
+                    logger.warning("Max turns reached for financial_template orchestration.")
+
+                # Consolidate results
+                result_data = {
+                    "analysis_text": accumulated_text.strip(),
+                    "visualizations": {
+                        "charts": accumulated_charts,
+                        "tables": accumulated_tables,
+                    },
+                    "metrics": accumulated_metrics,
+                    # Include other fields that might be populated by the template, e.g., insights, ratios if they are extracted
+                }
+                analysis_type = "financial_template" # Ensure this is set for metadata
+
+            elif analysis_type == "comprehensive" or analysis_type == "comprehensive_tools":
                 logger.info(f"Routing to comprehensive tool-based analysis for documents {document_ids}")
                 result_data = await self.claude_service.analyze_with_visualization_tools(
                     document_text=aggregate_text, 
@@ -706,7 +934,7 @@ class AnalysisService:
              visualization_data = {}
 
         response_payload = {
-            "id": f"analysis-{analysis.id}", # Add prefix back
+            "id": f"analysis-{analysis.id}", # Add prefix
             "documentIds": [analysis.document_id], # Wrap in list
             "analysisType": analysis.analysis_type,
             "timestamp": analysis.created_at.isoformat(),
