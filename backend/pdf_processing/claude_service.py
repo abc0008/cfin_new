@@ -42,20 +42,24 @@ import asyncio
 import json
 import re
 import uuid
-from typing import Dict, List, Optional, Any, Tuple, Union, TYPE_CHECKING, ForwardRef
+from typing import Dict, List, Optional, Any, Tuple, Union, TYPE_CHECKING, ForwardRef, AsyncGenerator, cast
 import logging
-from anthropic import AsyncAnthropic
-from anthropic.types import Message as AnthropicMessage, ToolUseBlock
+from anthropic import AsyncAnthropic, APIStatusError, APITimeoutError, RateLimitError
+from anthropic.types import Message as AnthropicMessage, ToolUseBlock, MessageStreamEvent, ContentBlockDeltaEvent, MessageDeltaEvent
 import string
 from datetime import datetime
 import contextlib
 import httpx
+import backoff
 
 from models.document import ProcessedDocument, Citation as DocumentCitation, DocumentContentType, DocumentMetadata, ProcessingStatus
 from models.citation import Citation, CitationType, CharLocationCitation, PageLocationCitation, ContentBlockLocationCitation
 from pdf_processing.langchain_service import LangChainService
 from utils.database import get_db
 from models.visualization import ChartData, TableData
+from models.analysis import FinancialMetric
+from ..models.tools import ALL_TOOLS_DICT, CLAUDE_API_TOOLS_LIST, ToolSchema # Ensure this import is present
+from ..models.document import DocumentTypeMapping
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -160,27 +164,20 @@ class ClaudeService:
             api_key: Optional API key to use instead of environment variable
         """
         # Try to get API key from parameter first, then environment
-        self.api_key = api_key
+        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not self.api_key:
-            self.api_key = os.environ.get("ANTHROPIC_API_KEY")
-            logger.info("Using ANTHROPIC_API_KEY from environment variables")
+            logger.error("ANTHROPIC_API_KEY not found.")
+            raise ValueError("ANTHROPIC_API_KEY is required for ClaudeService")
+
+        # Initialize tools for API calls - expects list of dicts
+        self.tools_for_api = CLAUDE_API_TOOLS_LIST # CORRECTED: Use CLAUDE_API_TOOLS_LIST
         
-        if not self.api_key:
-            logger.warning("Missing ANTHROPIC_API_KEY environment variable or API key parameter")
-            self.client = None
-            return
-        
-        # Mask API key for logging (show first 8 chars and last 4)
-        if len(self.api_key) > 12:
-            masked_key = f"{self.api_key[:8]}...{self.api_key[-4:]}"
-        else:
-            masked_key = "***masked***"
-        
-        logger.info(f"Initializing Claude API with key prefix: {masked_key}")
-        
-        # Using Claude 3.7 Sonnet for token-efficient tool use and enhanced PDF support
-        self.model = "claude-3-7-sonnet-20250219"  # Updated model
+        # Store the new ALL_TOOLS_DICT (Dict[str, ToolSchema]) for processor lookup
+        self.tool_schemas_map = ALL_TOOLS_DICT # This maps name to ToolSchema instance
+
         try:
+            # Using Claude 3.7 Sonnet for token-efficient tool use and enhanced PDF support
+            self.model = "claude-3-7-sonnet-20250219"  # Updated model
             self.client = AsyncAnthropic(
                 api_key=self.api_key,
                 timeout=httpx.Timeout(30.0, connect=5.0), # Set overall timeout to 30s
@@ -1224,11 +1221,34 @@ Follow these guidelines:
             elif block.type == "tool_use":
                 tool_name = block.name
                 tool_input = block.input
+                tool_use_id = block.id # Get tool_use_id
 
-                logger.info(f"Processing tool use: {tool_name}")
-                #logger.debug(f"Tool Input: {json.dumps(tool_input, indent=2)}") # Log tool input for debugging
+                logger.info(f"Processing tool use: {tool_name} (ID: {tool_use_id})")
+                
+                tool_schema = self.tool_schemas_map.get(tool_name)
+                processed_data = None
 
-                processed_data = self._process_visualization_input(tool_name, tool_input, block.id)
+                if tool_schema and tool_schema.processor:
+                    try:
+                        # Pass tool_input and block_id if processor expects it
+                        # Current processors in tool_processing.py only take tool_input.
+                        # If block_id is needed for logging within processor, 
+                        # processor signature and ToolSchema.processor type hint must change.
+                        # For now, assume tool_input is sufficient for the processor itself.
+                        processed_data = tool_schema.processor(tool_input)
+                        if processed_data is None:
+                            logger.warning(f"Processor for {tool_name} (ID: {tool_use_id}) returned None.")
+                    except Exception as e:
+                        logger.error(f"Error in processor for tool {tool_name} (ID: {tool_use_id}): {e}")
+                        processed_data = None # Ensure it's None on processor error
+                else:
+                    logger.warning(f"No processor for tool: {tool_name} (ID: {tool_use_id}) or tool not found in schema map. Raw input: {tool_input}")
+                    # Fallback or specific handling for tools without processors, if any.
+                    # For now, similar to before, this will lead to processed_data being None.
+
+                # The old call was: self._process_visualization_input(tool_name, tool_input, block.id)
+                # This has been replaced by the processor logic above.
+                                
                 if processed_data:
                     if tool_name == "generate_graph_data":
                         charts.append(processed_data)
@@ -1740,3 +1760,86 @@ Follow these guidelines:
         except Exception as e:
             logger.exception(f"Error converting Claude citation: {e}")
             return None
+
+    @backoff.on_exception(backoff.expo,
+                          (APIStatusError, APITimeoutError, RateLimitError), # Target specific Anthropic errors
+                          max_tries=5,
+                          jitter=backoff.full_jitter)
+    async def execute_tool_interaction_turn(
+        self,
+        system_prompt: str,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[ToolSchema]] = None,
+        max_tokens: int = 4096,
+        temperature: float = 0.3
+    ) -> AnthropicMessage:
+        """
+        Executes a single turn of interaction with the Claude API, supporting tool use.
+
+        Args:
+            system_prompt: The system prompt to guide Claude.
+            messages: The list of messages in the conversation so far.
+            tools: Optional list of ToolSchema objects to provide to Claude.
+                   Defaults to ALL_TOOLS if None.
+            max_tokens: The maximum number of tokens to generate.
+            temperature: The sampling temperature.
+
+        Returns:
+            The raw AnthropicMessage response from Claude.
+        
+        Raises:
+            ConnectionError: If the Anthropic client is not initialized.
+            httpx.HTTPStatusError: For API errors from Claude.
+            Exception: For other unexpected errors during the API call.
+        """
+        if not self.client:
+            logger.error("Anthropic client not initialized. Cannot execute tool interaction.")
+            raise ConnectionError("Anthropic client not initialized.")
+
+        effective_tools: List[ToolSchema] = [] # Ensure effective_tools is always a list
+        if tools is not None:
+            effective_tools = tools
+        elif TOOLS_SUPPORT and ALL_TOOLS: # ALL_TOOLS is the list of ToolSchema objects
+            effective_tools = ALL_TOOLS
+        else:
+            logger.warning("No tools explicitly provided and ALL_TOOLS not available or TOOLS_SUPPORT is False. Proceeding without tools for this turn.")
+            # effective_tools remains an empty list
+
+        try:
+            # Basic logging; avoid logging full messages/tools for brevity/PII
+            logger.debug(
+                f"Executing tool interaction turn with model {self.model}, "
+                f"max_tokens={max_tokens}, temperature={temperature}, "
+                f"{len(effective_tools)} tools. System prompt (first 100 chars): '{system_prompt[:100]}...'"
+            )
+            
+            # Ensure messages conform to expected structure if necessary, though typically handled by caller.
+            # For instance, ensuring 'content' is correctly formatted (string or list of blocks).
+
+            response = await self.client.messages.create(
+                model=self.model,
+                system=system_prompt,
+                messages=messages, # type: ignore 
+                tools=effective_tools, # type: ignore
+                tool_choice={"type": "auto"},
+                max_tokens=max_tokens,
+                temperature=temperature,
+                extra_headers={"anthropic-beta": "token-efficient-tools-2025-02-19"}
+            )
+            return response
+        except httpx.HTTPStatusError as e:
+            # Log more detailed error information if possible
+            error_details = "Unknown error"
+            try:
+                error_details = e.response.json() # Or e.response.text if not JSON
+            except Exception:
+                error_details = e.response.text
+            logger.error(
+                f"HTTPStatusError during Claude API call in execute_tool_interaction_turn: "
+                f"{e.response.status_code} - Details: {error_details}", 
+                exc_info=True
+            )
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during Claude API call in execute_tool_interaction_turn: {e}", exc_info=True)
+            raise

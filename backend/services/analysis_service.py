@@ -46,6 +46,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 import asyncio
 import base64 # Added for PDF content encoding
+from fastapi import HTTPException # Added for Story #17
 
 from repositories.analysis_repository import AnalysisRepository
 from repositories.document_repository import DocumentRepository
@@ -61,99 +62,28 @@ from utils.visualization_helpers import (
 from models.analysis import FinancialMetric, FinancialRatio, ComparativePeriod
 from models.visualization import ChartData, TableData # Assuming these are defined
 
+from .analysis_strategies import strategy_map # Added for Story #1
+from ..utils import tool_processing # Added for Story #9
+from ..utils.exceptions import ToolSchemaValidationError # Added for Story #17
+
 logger = logging.getLogger(__name__)
 
-# Define the financial analysis template at module level
-financial_analysis_template = """
-You are an advanced AI system functioning as a Regional Bank Financial Analyst. Your primary role is to analyze internal financial documents, provide insights on financial trends or anomalies, and create visualizations to illustrate financial data.
+# System prompts for Story #2
+BASIC_FINANCIAL_SYSTEM_PROMPT = """You are an AI financial analyst. Your task is to provide a concise textual summary of key financial highlights from the provided document excerpts.
+You MUST perform the following actions in this exact order:
+1. Call the `generate_financial_metric` tool exactly twice to extract two different key financial metrics.
+2. Call the `generate_table_data` tool exactly once to present a summary table of important figures.
+3. Provide a brief overall textual summary based on the document and the tool results.
+Adhere strictly to the Pydantic models provided in the tool descriptions for tool inputs.
+Ensure your final textual summary is concise and directly answers the user's query if provided, incorporating the extracted metrics and table.
+"""
 
-First, review the following financial documents and knowledge base:
-
-<financial_documents>
-{document_text}
-</financial_documents>
-
-<knowledge_base>
-{KNOWLEDGE_BASE}
-</knowledge_base>
-
-Now, analyze the following user query:
-
-<user_query>
-{USER_QUERY}
-</user_query>
-
-Before providing your final response, wrap your analysis planning inside <financial_analysis_planning> tags using the following structure:
-
-1. Query Breakdown: Identify key areas to focus on based on the user query.
-2. Relevant Information: Extract and quote pertinent data from the financial documents and knowledge base.
-3. Key Data Points: List relevant data points from the provided sources.
-4. Financial Ratios and Metrics: Identify and list key ratios and metrics relevant to the query, focusing on those specific to regional banks.
-5. Industry Benchmarks: Consider industry benchmarks and how the bank's performance compares.
-6. Time Periods: Analyze trends over multiple time periods (e.g., quarter-over-quarter, year-over-year, multi-year trends).
-7. Analytical Approach: Outline your approach, including planned calculations and comparisons.
-8. Visualization Planning: Plan the following visualizations:
-   - Multi-period Balance Sheet Composition stacked Column Chart
-   - Balance Sheet Change Analysis Column Chart
-   - Asset Composition Line Chart
-   - Liability Composition Line Chart
-   - Margin Analysis
-   - Non-Interest Revenue Trend Chart
-   - Non-Interest Revenue Period over period Chart
-   - Key Financial Ratio Trend Line Charts
-   - Expense Composition Trend Stacked Bar Chart
-9. Visualization Insights: For each proposed visualization, list key insights you expect to highlight. These insights should be rendered only within or beneath each chart component in the final artifact.
-10. Next Actions: Brainstorm possible deeper analyses that could follow from your initial findings, focusing only on analyses possible with the provided files.
-11. Challenges and Limitations: Consider potential challenges or limitations in your analysis.
-12. Tool Evaluation: Assess whether the beta analysis tool in Claude.ai could benefit this specific query.
-13. External Factors: Identify potential external factors affecting the financial data and explain their possible impacts.
-14. Key Terms: List and define key financial terms relevant to the query.
-15. Regional Bank Specifics: Identify any metrics or considerations that are particularly important for regional banks.
-
-Guidelines for your analysis and response:
-
-1. Incorporate information from both the financial documents and the knowledge base.
-2. Focus on core banking concepts like Funds Transfer Pricing when relevant.
-3. Use LaTeX rendering for all mathematical calculations, enclosing formulas in $$ symbols.
-4. For period-over-period changes, use the most recent linked quarter unless specified otherwise.
-5. Provide detailed explanations, breaking down complex concepts into understandable terms.
-6. Highlight any inconsistencies or unusual patterns in the financial data, offering possible explanations.
-7. Support all recommendations and insights with data from the financial documents.
-8. Consider using the beta analysis tool in Claude.ai when appropriate for deeper financial analysis.
-9. Generate a single visualization artifact containing all proposed charts, graphs, and text blocks.
-10. Present all analysis and key insights within the artifact using a mixture of cards or text blocks.
-11. Use React and Recharts for visualizations with multiple data views.
-12. Ensure all cards have the current metric and a period-over-period change percentage.
-13. Create all suggested charts without exception.
-14. Ensure that "Key Findings" are only rendered in or beneath each chart component within the artifact.
-15. For suggested next actions, only propose further analyses of details from the provided financials.
-
-Structure your final response as follows:
-
-<response>
-Query Restatement: [Restate the user's query]
-
-Approach Overview: [Brief explanation of your analytical approach]
-
-Artifact:
-[Single artifact containing all charts, graphs, text blocks, and cards]
-[Include all analysis and key insights within this artifact]
-[For each chart, graph, or analysis section:]
-   Key Insights:
-   - [First key insight]
-   - [Second key insight]
-   - [Third key insight]
-
-Summary and Recommendations:
-[Concise summary of findings and data-supported recommendations]
-
-Suggested Next Actions:
-1. [First suggested deeper analysis of provided financials, phrased to directly trigger the next analysis]
-2. [Second suggested deeper analysis of provided financials, phrased to directly trigger the next analysis]
-3. [Third suggested deeper analysis of provided financials, phrased to directly trigger the next analysis]
-</response>
-
- Provide your response within <response> tags.
+SENTIMENT_ANALYSIS_SYSTEM_PROMPT = """You are an AI sentiment analysis expert. Your task is to analyze the sentiment of the provided text.
+You MUST perform the following actions in this exact order:
+1. Provide an overall sentiment (e.g., Positive, Negative, Neutral) and a sentiment score (a float between -1.0 and 1.0) as text.
+2. Call the `generate_table_data` tool exactly once to create a table listing up to 5 key phrases from the text that most contribute to this sentiment, along with their individual sentiment if determinable.
+3. Provide a brief textual summary explaining the sentiment based on these phrases.
+Adhere strictly to the Pydantic models provided in the tool descriptions for tool inputs.
 """
 
 class AnalysisService:
@@ -249,444 +179,206 @@ class AnalysisService:
         if custom_knowledge_base:
             parameters["knowledge_base"] = custom_knowledge_base
 
-        if query:
-            parameters["query"] = query
+        # Generate a unique ID for this analysis run
+        analysis_id = str(uuid.uuid4())
+        logger.info(f"Starting analysis {analysis_id} of type '{analysis_type}' for documents: {document_ids}")
 
-        # --- Multi-Document Input Validation ---
-        # Remove duplicates
-        document_ids = list(dict.fromkeys(document_ids))
+        documents: List[Document] = []
+        aggregated_text = ""
+        pdf_base64_contents: List[str] = []
+
+        # Initial error handling for document_ids (can be refined)
         if not document_ids:
-            raise ValueError("No documents provided for analysis")
+            logger.error("No document IDs provided for analysis.")
+            raise HTTPException(status_code=400, detail="At least one document ID must be provided for analysis.")
 
-        # Validate all document IDs exist (ownership check can be added if user context is available)
-        valid_documents = []
-        for doc_id in document_ids:
-            doc = await self.document_repository.get_document(doc_id)
-            if not doc:
-                raise ValueError(f"Document {doc_id} not found or inaccessible")
-            valid_documents.append(doc)
-        # (Future: Check doc.user_id == current_user_id for security)
+        try: # Main try for document loading and overall analysis orchestration
+            docs_data = await asyncio.gather(*[self.document_repository.get_document_by_id(doc_id) for doc_id in document_ids])
+            
+            loaded_docs_count = 0
+            for doc_data in docs_data:
+                if doc_data is None:
+                    # Log and continue for now, or decide if this should be a hard error
+                    logger.warning(f"Document not found for one of the provided IDs. Analysis {analysis_id} may be incomplete.")
+                    continue 
 
-        document_id = document_ids[0]
-        document = await self.document_repository.get_document(document_id)
-        if not document:
-            raise ValueError(f"Document {document_id} not found")
-
-        # --- Multi-Document Content Aggregation ---
-        # Aggregate content from all valid documents (concatenate raw_text or extracted text)
-        combined_document_texts = []
-        for doc in valid_documents:
-            text = doc.raw_text
-            if not text and doc.extracted_data and isinstance(doc.extracted_data, dict):
-                text = doc.extracted_data.get("raw_text", "")
-            if not text:
-                text = f"Document ID: {doc.id}, Filename: {doc.filename}. No text content could be extracted."
-            combined_document_texts.append(text)
-        aggregate_text = "\n\n".join(combined_document_texts)
-
-        primary_doc_base64: Optional[str] = None
-        primary_doc_filename: Optional[str] = None
-        if valid_documents: # Attempt to get full PDF content for the primary document
-            primary_document_obj = valid_documents[0]
-            primary_doc_filename = primary_document_obj.filename
-            try:
-                pdf_bytes = await self.document_repository.get_document_binary(str(primary_document_obj.id))
-                if pdf_bytes:
-                    primary_doc_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
-                    logger.info(f"Fetched and encoded PDF content for {primary_doc_filename} for tool-based analysis.")
-                else:
-                    logger.warning(f"No PDF file content found for {primary_doc_filename} via repository.")
-            except Exception as e:
-                logger.error(f"Error fetching/encoding PDF for {primary_doc_filename}: {str(e)}")
-
-        try:
-            if analysis_type == "financial_template":
-                logger.info(f"Starting sequential orchestration for 'financial_template' analysis on documents {document_ids} with query: '{query}'")
-                MAX_TURNS = 7  # Max conversation turns to prevent infinite loops
-
-                # 1. Initial Setup
-                user_query_for_template = parameters.get("query", query or "Provide a comprehensive financial analysis of these documents, generating relevant charts and tables using the provided tools.")
+                doc = Document(**doc_data) if isinstance(doc_data, dict) else doc_data
+                documents.append(doc)
+                loaded_docs_count += 1
                 
-                system_prompt = financial_analysis_template.format(
-                    document_text=aggregate_text, # This is already aggregated from all docs
-                    KNOWLEDGE_BASE=parameters.get("knowledge_base", ""),
-                    USER_QUERY=user_query_for_template
-                )
-
-                # Prepare initial user message content parts (similar to ClaudeService)
-                initial_user_content_parts = []
-                if primary_doc_base64: # From the existing run_analysis logic
-                    initial_user_content_parts.append({
-                        "type": "document",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "application/pdf",
-                            "data": primary_doc_base64
-                        }
-                    })
-                    if aggregate_text: # if there's also summary text
-                         initial_user_content_parts.append({"type": "text", "text": f"<document_summary_text>\n{aggregate_text}\n</document_summary_text>"})
-                elif aggregate_text:
-                    initial_user_content_parts.append({
-                        "type": "text",
-                        "text": f"<financial_document>\n{aggregate_text}\n</financial_document>"
-                    })
-                else: # Should not happen if validation passed
-                    logger.error("No aggregate_text or primary_doc_base64 for financial_template analysis.")
-                    raise ValueError("No document content for financial_template analysis.")
-
-                if parameters.get("knowledge_base"):
-                    initial_user_content_parts.append({
-                        "type": "text",
-                        "text": f"<knowledge_base>\n{parameters.get('knowledge_base', '')}\n</knowledge_base>"
-                    })
+                if doc.content_text:
+                    aggregated_text += doc.content_text + "\n\n"
                 
-                # The main user query is already part of the system_prompt for this template.
-                # The 'messages' for Claude should start with the user's implicit instruction to act on the system prompt.
-                # For tool use, the first user message might just be a simple trigger if the system prompt contains all context.
-                # However, Claude's examples often show the user query also in the first message.
-                # The `financial_analysis_template` is passed as the *system* prompt.
-                # The first *user* message can be simple, e.g., "Begin analysis." or the query itself.
-                # Let's use the user_query_for_template as the first user message content.
+                # Aggregate PDF base64 content if needed by strategies (and if available)
+                if hasattr(doc, 'content_pdf_path') and doc.content_pdf_path: # Assuming PDF path is stored
+                    try:
+                        # This is a placeholder for actual PDF to base64 conversion logic
+                        # You would typically read the file from doc.content_pdf_path and encode it
+                        # For example:
+                        # with open(doc.content_pdf_path, "rb") as pdf_file:
+                        #     encoded_string = base64.b64encode(pdf_file.read()).decode('utf-8')
+                        #     pdf_base64_contents.append(encoded_string)
+                        # This logic depends on how PDF paths are stored and accessed.
+                        # For now, we are not populating pdf_base64_contents to avoid file I/O here.
+                        pass
+                    except Exception as e:
+                        logger.error(f"Error encoding PDF for document {doc.id}: {e}")
+
+            if loaded_docs_count == 0:
+                logger.error(f"No valid documents could be loaded for analysis {analysis_id} with IDs: {document_ids}.")
+                raise HTTPException(status_code=404, detail="None of the provided document IDs could be loaded.")
+
+            logger.info(f"Aggregated text for analysis {analysis_id}. Total length: {len(aggregated_text)}")
+
+            result_data: Dict[str, Any] = {}
+            
+            strategy_cls = strategy_map.get(analysis_type)
+
+            if strategy_cls:
+                logger.info(f"Using strategy {strategy_cls.__name__} for analysis type \'{analysis_type}\'")
+                strategy = strategy_cls(self.claude_service)
                 
-                conversation_messages = [{"role": "user", "content": user_query_for_template}]
-
-
-                # Initialize accumulators
-                accumulated_text = ""
-                accumulated_charts = []
-                accumulated_tables = []
-                accumulated_metrics = []
-
-                for turn in range(MAX_TURNS):
-                    logger.info(f"Financial Template Orchestration - Turn {turn + 1}/{MAX_TURNS}")
-
-                    api_response = await self.claude_service.client.with_options(
-                        beta_headers=["token-efficient-tools-2025-02-19"]
-                    ).messages.create(
-                        model=self.claude_service.model, # Uses the updated model from ClaudeService
-                        system=system_prompt,
-                        messages=conversation_messages,
-                        tools=ALL_TOOLS_DICT, # Make sure this is available
-                        tool_choice={"type": "auto"},
-                        max_tokens=4096,
-                        temperature=0.3
-                    )
-
-                    logger.info(f"Claude API response received. Stop reason: {api_response.stop_reason}")
-                    
-                    # Add Claude's response to conversation history
-                    # Ensure content is a list of blocks as expected by Anthropic SDK
-                    assistant_response_content_blocks = []
-                    if api_response.content:
-                        for block in api_response.content:
-                            if block.type == "text":
-                                assistant_response_content_blocks.append({"type": "text", "text": block.text})
-                            elif block.type == "tool_use":
-                                assistant_response_content_blocks.append({
-                                    "type": "tool_use",
-                                    "id": block.id,
-                                    "name": block.name,
-                                    "input": block.input
-                                })
-                    
-                    if assistant_response_content_blocks: # Only add if there's content
-                        conversation_messages.append({
-                            "role": "assistant",
-                            "content": assistant_response_content_blocks
-                        })
-                    elif api_response.stop_reason != 'tool_use': # if no content and not a tool_use stop, it's likely an error or empty response.
-                        logger.warning(f"Assistant response was empty and stop_reason was not 'tool_use': {api_response.stop_reason}")
-
-
-                    tool_results_for_this_turn = []
-                    has_tool_use = any(block.type == "tool_use" for block in api_response.content)
-
-                    for block in api_response.content:
-                        if block.type == "text":
-                            accumulated_text += block.text + "\n"
-                        elif block.type == "tool_use":
-                            tool_name = block.name
-                            tool_input = block.input
-                            tool_use_id = block.id
-                            logger.info(f"Processing tool use: {tool_name} (ID: {tool_use_id})")
-
-                            try:
-                                # Use the existing processing logic from ClaudeService
-                                processed_data = self.claude_service._process_visualization_input(tool_name, tool_input, tool_use_id)
-                                
-                                if processed_data:
-                                    logger.info(f"Tool {tool_name} processed successfully.")
-                                    if tool_name == "generate_graph_data":
-                                        accumulated_charts.append(processed_data)
-                                    elif tool_name == "generate_table_data":
-                                        accumulated_tables.append(processed_data)
-                                    elif tool_name == "generate_financial_metric":
-                                        accumulated_metrics.append(processed_data)
-                                    
-                                    tool_results_for_this_turn.append({
-                                        "type": "tool_result",
-                                        "tool_use_id": tool_use_id,
-                                        "content": json.dumps(processed_data) # Claude expects content as a string or list of blocks
-                                    })
-                                else:
-                                    logger.warning(f"Tool {tool_name} (ID: {tool_use_id}) did not return processed data.")
-                                    tool_results_for_this_turn.append({
-                                        "type": "tool_result",
-                                        "tool_use_id": tool_use_id,
-                                        "content": "Error: Tool processing failed or returned no data.",
-                                        "is_error": True 
-                                    })
-                            except Exception as e:
-                                logger.error(f"Error processing tool {tool_name} (ID: {tool_use_id}): {e}", exc_info=True)
-                                tool_results_for_this_turn.append({
-                                    "type": "tool_result",
-                                    "tool_use_id": tool_use_id,
-                                    "content": f"Error executing tool: {str(e)}",
-                                    "is_error": True
-                                })
-                    
-                    if api_response.stop_reason == "tool_use":
-                        if not tool_results_for_this_turn:
-                            logger.warning("Stop reason is 'tool_use' but no tool results were generated. This might be an issue.")
-                            # Potentially break or send an error message back if this state is problematic
-                            # For now, we'll let it continue, but it might loop if Claude expects a tool_result.
-                            # To be safe, let's add a message indicating no tools were successfully run this turn.
-                            conversation_messages.append({
-                                "role": "user",
-                                "content": [{
-                                    "type": "text",
-                                    "text": "No tools were executed in the previous turn, or tool execution failed. Please proceed with the analysis based on available information or request a different tool if necessary."
-                                }]
-                            })
-                        else:
-                             conversation_messages.append({"role": "user", "content": tool_results_for_this_turn})
-                    elif api_response.stop_reason in ["stop_sequence", "end_turn"]:
-                        logger.info("Analysis sequence complete based on stop reason.")
-                        break 
-                    else: # Other stop reasons like max_tokens
-                        logger.warning(f"Loop terminated due to stop_reason: {api_response.stop_reason} or max turns reached.")
-                        break
-                
-                if turn == MAX_TURNS - 1:
-                    logger.warning("Max turns reached for financial_template orchestration.")
-
-                # Consolidate results
-                result_data = {
-                    "analysis_text": accumulated_text.strip(),
-                    "visualizations": {
-                        "charts": accumulated_charts,
-                        "tables": accumulated_tables,
-                    },
-                    "metrics": accumulated_metrics,
-                    # Include other fields that might be populated by the template, e.g., insights, ratios if they are extracted
+                strategy_input_args = {
+                    "aggregated_text": aggregated_text,
+                    "documents": documents,
+                    "parameters": parameters,
+                    "user_query": query,
+                    "pdf_base64_contents": pdf_base64_contents
                 }
-                analysis_type = "financial_template" # Ensure this is set for metadata
-
-            elif analysis_type == "comprehensive" or analysis_type == "comprehensive_tools":
-                logger.info(f"Routing to comprehensive tool-based analysis for documents {document_ids}")
-                result_data = await self.claude_service.analyze_with_visualization_tools(
-                    document_text=aggregate_text, 
-                    user_query=parameters.get("query", "Provide a comprehensive financial analysis of these documents, generating relevant charts and tables using the provided tools."),
-                    knowledge_base=parameters.get("knowledge_base", ""),
-                    document_base64=primary_doc_base64, 
-                    document_filename=primary_doc_filename
-                )
-                analysis_type = "comprehensive_tools"
-            elif analysis_type in ["financial_ratios", "trend_analysis", "benchmarking", "sentiment_analysis", "basic_financial"]:
-                logger.info(f"Routing analysis type '{analysis_type}' to comprehensive tool-based flow with PDF if available.")
-                query_for_type = parameters.get("query")
-                if not query_for_type:
-                    # Create a more specific default query based on the analysis type
-                    if analysis_type == "financial_ratios":
-                        query_for_type = "Calculate and present key financial ratios from this document, using tools for tables or charts where appropriate."
-                    elif analysis_type == "trend_analysis":
-                        query_for_type = "Analyze financial trends in this document, using tools for tables or charts where appropriate."
-                    elif analysis_type == "benchmarking":
-                        query_for_type = "Perform a benchmarking analysis on this document, using tools for tables or charts where appropriate."
-                    elif analysis_type == "sentiment_analysis":
-                        query_for_type = "Perform a sentiment analysis on this document, summarizing findings and using tools if applicable."
-                    elif analysis_type == "basic_financial":
-                        query_for_type = "Provide a concise textual summary of the key financial highlights, extract at least two key financial metrics using the 'generate_financial_metric' tool, and present a summary table of important figures from this document using the 'generate_table_data' tool."
-                    else: # Should not be reached if analysis_type is in the list above
-                        query_for_type = f"Perform a {analysis_type.replace('_', ' ')} on this document, using appropriate tools."
                 
-                result_data = await self.claude_service.analyze_with_visualization_tools(
-                    document_text=aggregate_text,
-                    user_query=query_for_type,
-                    knowledge_base=parameters.get("knowledge_base", ""),
-                    document_base64=primary_doc_base64,
-                    document_filename=primary_doc_filename
-                )
-                # Retain the original analysis_type for storage, but Claude used comprehensive tools
-            else: # Fallback for any other unknown analysis_type
-                logger.warning(f"Unknown or unhandled analysis type '{analysis_type}'. Defaulting to comprehensive tool-based analysis with PDF if available.")
-                result_data = await self.claude_service.analyze_with_visualization_tools(
-                    document_text=aggregate_text,
-                    user_query=parameters.get("query", "Provide a comprehensive financial analysis of these documents, generating relevant charts and tables using the provided tools."),
-                    knowledge_base=parameters.get("knowledge_base", ""),
-                    document_base64=primary_doc_base64,
-                    document_filename=primary_doc_filename
-                )
-                analysis_type = "comprehensive_tools" # Update analysis_type to what was actually run
+                try: # Inner try for strategy execution
+                    result_data = await strategy.execute(**strategy_input_args)
+                except ToolSchemaValidationError as e:
+                    logger.error(f"Tool schema validation error during \'{analysis_type}\' for analysis {analysis_id}: {e}", exc_info=True)
+                    error_detail = f"Tool input/output validation failed: {str(e)}."
+                    if e.original_exception and hasattr(e.original_exception, 'errors'):
+                        try:
+                            pydantic_errors = json.dumps(e.original_exception.errors(), indent=2) # type: ignore
+                            error_detail += f" Details: {pydantic_errors}"
+                        except Exception:
+                            pass
+                    raise HTTPException(status_code=422, detail=error_detail)
+                except Exception as e: # Added general exception for strategy execution
+                    logger.error(f"Error executing strategy {strategy_cls.__name__} for analysis {analysis_id}: {e}", exc_info=True)
+                    raise HTTPException(status_code=500, detail=f"An unexpected error occurred while running the \'{analysis_type}\' strategy: {str(e)}")
 
-            analysis_id = str(uuid.uuid4())
+            elif analysis_type == "basic_financial":
+                logger.info(f"Executing basic_financial analysis for analysis {analysis_id}")
+                turn_results = []
+                current_messages = [
+                    {"role": "user", "content": aggregated_text if aggregated_text else "No document text available."}
+                ]
+                if query:
+                    current_messages.append({"role": "user", "content": f"User query: {query}"})
+
+                max_turns = 4 
+                for turn in range(max_turns):
+                    logger.info(f"Basic financial analysis - Turn {turn + 1}")
+                    try:
+                        api_response = await self.claude_service.execute_tool_interaction_turn(
+                            system_prompt=BASIC_FINANCIAL_SYSTEM_PROMPT,
+                            messages=current_messages, # type: ignore
+                            tools=ALL_TOOLS_DICT 
+                        )
+                        processed_turn_data = self.claude_service._process_tool_calls(api_response)
+                        turn_results.append(processed_turn_data)
+                        current_messages.append({"role": "assistant", "content": api_response.content})
+
+                        has_tool_use = any(block.type == 'tool_use' for block in api_response.content)
+                        if has_tool_use:
+                            for tool_name, tool_results_list in processed_turn_data.get("processed_tool_outputs", {}).items():
+                                for res in tool_results_list: 
+                                    current_messages.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": res.get("tool_use_id", "missing_tool_use_id"), "content": json.dumps(res.get("output_data")) if res.get("output_data") is not None else "null"}]})
+                        if api_response.stop_reason == "stop_sequence" or not has_tool_use:
+                            logger.info(f"Basic financial analysis completed in turn {turn + 1}.")
+                            break 
+                        if turn == max_turns -1:
+                             logger.info(f"Basic financial analysis reached max turns.")
+                    except ToolSchemaValidationError as e:
+                        logger.error(f"Tool schema validation error during basic_financial analysis {analysis_id}, turn {turn+1}: {e}", exc_info=True)
+                        raise HTTPException(status_code=422, detail=f"Tool input/output validation failed during basic financial analysis: {str(e)}.")
+                    except Exception as e:
+                        logger.error(f"Error during basic_financial analysis turn {turn + 1} for analysis {analysis_id}: {e}", exc_info=True)
+                        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during turn {turn + 1} of basic financial analysis: {str(e)}")
+                
+                # Consolidate results from turns for basic_financial
+                final_text = "\n".join([res.get("analysis_text", "") for res in turn_results])
+                final_charts = [chart for res in turn_results for chart in res.get("visualizations", {}).get("charts", [])]
+                final_tables = [table for res in turn_results for table in res.get("visualizations", {}).get("tables", [])]
+                final_metrics = [metric for res in turn_results for metric in res.get("metrics", [])]
+                result_data = {
+                    "analysis_text": final_text,
+                    "visualizations": {"charts": final_charts, "tables": final_tables},
+                    "metrics": final_metrics
+                }
+
+            elif analysis_type == "sentiment_analysis":
+                logger.info(f"Executing sentiment_analysis for analysis {analysis_id}")
+                turn_results = []
+                current_messages = [
+                    {"role": "user", "content": aggregated_text if aggregated_text else "No document text available."}
+                ]
+                if query:
+                    current_messages.append({"role": "user", "content": f"User query: {query}"})
+
+                max_turns = 4 # Or a different max_turns suitable for sentiment analysis
+                for turn in range(max_turns):
+                    logger.info(f"Sentiment analysis - Turn {turn + 1}")
+                    try:
+                        api_response = await self.claude_service.execute_tool_interaction_turn(
+                            system_prompt=SENTIMENT_ANALYSIS_SYSTEM_PROMPT,
+                            messages=current_messages, # type: ignore
+                            tools=ALL_TOOLS_DICT 
+                        )
+                        processed_turn_data = self.claude_service._process_tool_calls(api_response)
+                        turn_results.append(processed_turn_data)
+                        current_messages.append({"role": "assistant", "content": api_response.content})
+
+                        has_tool_use = any(block.type == 'tool_use' for block in api_response.content)
+                        if has_tool_use:
+                            for tool_name, tool_results_list in processed_turn_data.get("processed_tool_outputs", {}).items():
+                                for res in tool_results_list: 
+                                    current_messages.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": res.get("tool_use_id", "missing_tool_use_id"), "content": json.dumps(res.get("output_data")) if res.get("output_data") is not None else "null"}]})
+                        if api_response.stop_reason == "stop_sequence" or not has_tool_use:
+                            logger.info(f"Sentiment analysis completed in turn {turn + 1}.")
+                            break
+                        if turn == max_turns -1:
+                             logger.info(f"Sentiment analysis reached max turns.")
+                    except ToolSchemaValidationError as e:
+                        logger.error(f"Tool schema validation error during sentiment_analysis {analysis_id}, turn {turn+1}: {e}", exc_info=True)
+                        raise HTTPException(status_code=422, detail=f"Tool input/output validation failed during sentiment analysis: {str(e)}.")
+                    except Exception as e:
+                        logger.error(f"Error during sentiment_analysis turn {turn + 1} for analysis {analysis_id}: {e}", exc_info=True)
+                        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during turn {turn + 1} of sentiment analysis: {str(e)}")
+                
+                # Consolidate results from turns for sentiment_analysis
+                final_text = "\n".join([res.get("analysis_text", "") for res in turn_results])
+                final_charts = [chart for res in turn_results for chart in res.get("visualizations", {}).get("charts", [])]
+                final_tables = [table for res in turn_results for table in res.get("visualizations", {}).get("tables", [])]
+                final_metrics = [metric for res in turn_results for metric in res.get("metrics", [])]
+                result_data = {
+                    "analysis_text": final_text,
+                    "visualizations": {"charts": final_charts, "tables": final_tables},
+                    "metrics": final_metrics
+                }
+            else:
+                logger.warning(f"Unsupported analysis type: {analysis_type}")
+                raise HTTPException(status_code=400, detail=f"Unsupported analysis type: {analysis_type}")
             
-            # Log the raw result_data from ClaudeService
-            logger.info(f"--- Raw result_data from ClaudeService for analysis {analysis_id} ---")
-            logger.info(json.dumps(result_data, indent=2, default=str)) # Use default=str for any non-serializable items
-            logger.info(f"--- End raw result_data from ClaudeService ---")
-
-            current_doc_for_meta = valid_documents[0] if valid_documents else None
-
-            result_data_with_metadata = {
-                "id": analysis_id,
-                "document_ids": [str(doc.id) for doc in valid_documents],
-                "analysis_type": analysis_type, # Use the potentially updated analysis_type
-                "timestamp": datetime.now().isoformat(),
-                "query": parameters.get("query"),
-                "analysis_text": result_data.get("analysis_text"),
-                "visualization_data": result_data.get("visualizations", {"charts": [], "tables": []}),
-                "metrics": result_data.get("metrics", []),
-                "document_type": current_doc_for_meta.document_type.value if current_doc_for_meta and current_doc_for_meta.document_type else None,
-                "periods": current_doc_for_meta.periods if current_doc_for_meta else [],
-                "ratios": [], 
-                "comparative_periods": [],
-                "insights": [],
-                "citation_references": {},
-            }
-
-            # Log the constructed result_data_with_metadata before saving and returning
-            logger.info(f"--- Constructed result_data_with_metadata for analysis {analysis_id} ---")
-            logger.info(json.dumps(result_data_with_metadata, indent=2, default=str))
-            logger.info(f"--- End result_data_with_metadata ---")
-            
-            # Log the structure for debugging (already present, but ensure it reflects the above)
-            logger.info(f"Constructed response_payload (result_data_with_metadata) for analysis {analysis_id} (multi-document):")
-            logger.info(f"Payload keys: {list(result_data_with_metadata.keys())}")
-            try:
-                logger.info(f"  - id type: {type(result_data_with_metadata.get('id'))}")
-                logger.info(f"  - documentIds type: {type(result_data_with_metadata.get('document_ids'))}")
-                logger.info(f"  - timestamp type: {type(result_data_with_metadata.get('timestamp'))}")
-                viz_data = result_data_with_metadata.get('visualization_data')
-                logger.info(f"  - visualizationData type: {type(viz_data)}")
-                if isinstance(viz_data, dict):
-                    logger.info(f"    - charts type: {type(viz_data.get('charts'))}")
-                    logger.info(f"    - tables type: {type(viz_data.get('tables'))}")
-                    # Log type of first chart/table if they exist
-                    if isinstance(viz_data.get('charts'), list) and viz_data.get('charts'):
-                        logger.info(f"      - First chart type: {type(viz_data['charts'][0])}")
-                    if isinstance(viz_data.get('tables'), list) and viz_data.get('tables'):
-                        logger.info(f"      - First table type: {type(viz_data['tables'][0])}")
-                metrics_data = result_data_with_metadata.get('metrics')
-                logger.info(f"  - metrics type: {type(metrics_data)}")
-                if isinstance(metrics_data, list) and metrics_data:
-                    logger.info(f"    - first metric type: {type(metrics_data[0])}")
-                # Add logging for other potentially complex fields
-                logger.info(f"  - document_type type: {type(result_data_with_metadata.get('document_type'))}")
-                logger.info(f"  - periods type: {type(result_data_with_metadata.get('periods'))}")
-                logger.info(f"  - query type: {type(result_data_with_metadata.get('query'))}")
-            except Exception as log_e:
-                logger.error(f"Error during detailed logging of result_data_with_metadata: {log_e}")
-
-            # Call the correct repository method with the correct arguments
-            # The create_analysis method will generate its own ID and timestamp.
-            await self.analysis_repository.create_analysis(
-                document_ids=[str(doc.id) for doc in valid_documents],
-                analysis_type=analysis_type, # Use the potentially updated analysis_type from logic above
-                result_data=result_data_with_metadata
-            )
-            # The analysis_id used earlier (from uuid.uuid4()) is what we expect the object to have,
-            # and it's included in result_data_with_metadata which is saved.
-            # The create_analysis might return the saved object, which could be used for confirmation if needed.
-
-            return analysis_id, result_data_with_metadata
-
-        except Exception as e:
-            logger.error(f"Error running analysis for documents {document_ids}: {str(e)}", exc_info=True)
-            raise
-
-    async def _run_tool_based_comprehensive_analysis(
-        self,
-        document: Document,
-        parameters: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        Run comprehensive analysis using Claude with tool-based visualization generation.
-        Now also processes metrics/insights to populate specific visualization keys.
-
-        Args:
-            document: Document to analyze
-            parameters: Analysis parameters
-
-        Returns:
-            Dictionary containing the analysis results with visualizations
-        """
-        try:
-            logger.info(f"Running comprehensive tool-based analysis for document: {document.id}")
-
-            document_text = document.raw_text
-            if not document_text and document.extracted_data and isinstance(document.extracted_data, dict):
-                document_text = document.extracted_data.get("raw_text", "")
-
-            if not document_text:
-                logger.warning(f"No text content found for document {document.id}, attempting fallback.")
-                document_text = f"Document ID: {document.id}, Filename: {document.filename}. No text content could be extracted."
-
-            user_query = parameters.get("query", "Provide a comprehensive financial analysis of this document, generating relevant charts and tables using the provided tools.")
-            logger.info(f"User query: {user_query}")
-
-            knowledge_base = parameters.get("knowledge_base", "")
-
-            analysis_result = await self.claude_service.analyze_with_visualization_tools(
-                document_text=document_text,
-                user_query=user_query,
-                knowledge_base=knowledge_base
+            # Save and return the analysis result (if not raised by this point)
+            return await self._save_and_return_analysis_result(
+                analysis_id, document_ids, analysis_type, result_data, query, parameters
             )
 
-            # Extract base data from Claude's response
-            analysis_text = analysis_result.get("analysis_text", "")
-            visualizations = analysis_result.get("visualizations", {"charts": [], "tables": []})
-            metrics = analysis_result.get("metrics", [])
-            ratios = analysis_result.get("ratios", [])
-            insights = analysis_result.get("insights", []) # Assuming insights are returned
-            comparative_periods = analysis_result.get("comparative_periods", [])
-            citation_references = analysis_result.get("citation_references", {})
-
-            # Ensure visualizations is a dict
-            if not isinstance(visualizations, dict):
-                 logger.warning("visualizations from ClaudeService was not a dict, re-initializing.")
-                 visualizations = {"charts": [], "tables": []}
-            
-            # --- Populate specific visualization keys using helpers ---
-            # Use metrics, insights, or other relevant data as input to helpers
-            # Example: Assuming helpers process the raw metrics list
-            visualizations["monetaryValues"] = generate_monetary_values_data(metrics, insights)
-            visualizations["percentages"] = generate_percentage_data(metrics, ratios, insights)
-            visualizations["keywordFrequency"] = generate_keyword_frequency_data(analysis_text, insights)
-            # --- End population ---
-
-
-            # Format the result for the analysis repository and API response
-            result_data = {
-                "analysis_text": analysis_text,
-                "visualization_data": visualizations, # Now includes specific keys + charts/tables
-                "metrics": metrics,
-                "ratios": ratios,
-                "insights": insights, # Include insights if returned and processed
-                "comparative_periods": comparative_periods,
-                "citation_references": citation_references,
-                "document_type": document.document_type.value if document.document_type else "other",
-                "periods": document.periods or [],
-                "query": user_query
-            }
-
-            return result_data
-
-        except Exception as e:
-            logger.error(f"Error in tool-based comprehensive analysis for {document.id}: {str(e)}", exc_info=True)
-            # Re-raise to be caught by run_analysis
+        except HTTPException: # Re-raise HTTPExceptions directly
             raise
+        except ValueError as e: # Catch ValueErrors (e.g., no documents)
+            logger.error(f"ValueError during analysis {analysis_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e: # Catch any other unexpected errors
+            logger.error(f"Unexpected error during analysis {analysis_id}: {e}", exc_info=True)
+            # Consider a more generic server error for truly unexpected issues
+            raise HTTPException(status_code=500, detail=f"An unexpected server error occurred: {str(e)}")
 
     async def _run_financial_ratio_analysis(
         self,
@@ -852,60 +544,6 @@ class AnalysisService:
         
         return result_data
     
-    async def _run_sentiment_analysis(
-        self,
-        document: Document,
-        parameters: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        Run sentiment analysis on document text.
-        
-        Args:
-            document: Document to analyze
-            parameters: Analysis parameters
-            
-        Returns:
-            Dictionary containing the analysis results
-        """
-        # Get document text
-        text = document.raw_text
-        
-        if not text:
-            raise ValueError("No text content found in document")
-        
-        # Use Claude to analyze sentiment
-        sentiment_analysis = await self.claude_service.analyze_document_sentiment(text)
-        
-        # Build the result data
-        result_data = {
-            "sentiment": sentiment_analysis["sentiment"],
-            "sentiment_score": sentiment_analysis["score"],
-            "document_type": document.document_type.value if document.document_type else "other",
-            "key_phrases": sentiment_analysis.get("key_phrases", []),
-            "insights": sentiment_analysis.get("insights", [])
-        }
-        
-        # Prepare chart data if requested
-        if parameters.get("generate_charts", True):
-            chart_data = [{
-                "type": "gauge",
-                "title": "Sentiment Score",
-                "data": {
-                    "value": sentiment_analysis["score"],
-                    "min": -1,
-                    "max": 1,
-                    "thresholds": [
-                        { "value": -0.5, "color": "red" },
-                        { "value": 0, "color": "yellow" },
-                        { "value": 0.5, "color": "green" }
-                    ]
-                }
-            }]
-            
-            result_data["chart_data"] = chart_data
-        
-        return result_data
-    
     async def get_analysis(self, analysis_id: str) -> Dict[str, Any]:
         """
         Get an analysis by ID.
@@ -1025,3 +663,46 @@ class AnalysisService:
             summary["sample_insight"] = result_data["insights"][0][:100] + "..." # Truncate
 
         return summary
+
+    async def _save_and_return_analysis_result(
+        self,
+        analysis_id: str,
+        document_ids: List[str],
+        analysis_type: str,
+        result_data: Dict[str, Any],
+        user_query: Optional[str] = None,
+        parameters: Optional[Dict[str, Any]] = None
+    ) -> Tuple[str, Dict[str, Any]]:
+        logger.info(f"Saving analysis result for {analysis_id}, type {analysis_type}, docs {document_ids}")
+        analysis_to_save = AnalysisResult(
+            id=analysis_id,
+            document_ids=document_ids, # Store list of document IDs
+            analysis_type=analysis_type,
+            parameters=parameters if parameters else {},
+            query_text=user_query,
+            result_data=result_data, # This is the direct output from strategy or other methods
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            status="completed" # Or derive status
+        )
+        try:
+            await self.analysis_repository.create_analysis(analysis_to_save.dict())
+            logger.info(f"Successfully saved analysis {analysis_id}")
+
+            # Format for return, including metadata
+            # This is just an example structure, adapt as needed
+            formatted_return = {
+                "analysis_id": analysis_id,
+                "document_ids": document_ids,
+                "analysis_type": analysis_type,
+                "status": "completed", # analysis_to_save.status,
+                "created_at": analysis_to_save.created_at.isoformat(),
+                "query": user_query,
+                "parameters": parameters,
+                "results": result_data # The core analysis output
+            }
+            return analysis_id, formatted_return
+        except Exception as e:
+            logger.error(f"Failed to save analysis {analysis_id}: {e}", exc_info=True)
+            # Depending on requirements, might raise an error that translates to HTTP 500
+            raise Exception(f"Failed to save analysis result for {analysis_id}")

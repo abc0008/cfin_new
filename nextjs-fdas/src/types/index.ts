@@ -128,3 +128,12 @@ export interface FinancialMetric {
   unit: string;
   isEstimated?: boolean;
 }
+
+// Added for Story # (Resolving linter error)
+export interface DocumentPlus extends ProcessedDocument {
+  // Define any additional properties that DocumentPlus might have compared to ProcessedDocument
+  // For example:
+  // userPermissions?: string[];
+  // analysisSummaries?: any[]; 
+  isActive?: boolean; // Just an example property
+}
