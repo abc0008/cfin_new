@@ -1,0 +1,83 @@
+name: Python CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # Adjust path to requirements.txt if it's not at the root of the checkout
+        # Example: if it's in cfin/backend/
+        if [ -f cfin/backend/requirements.txt ]; then 
+          pip install -r cfin/backend/requirements.txt
+        elif [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        else
+          echo "requirements.txt not found"
+          exit 1
+        fi
+        pip install alembic psycopg2-binary # Ensure alembic and db driver are installed
+
+    - name: Set up PostgreSQL # Added for Story #18
+      uses: HarmonDay/actions-postgresql@v1
+      with:
+        postgresql-version: '13' # Or your desired version
+        postgresql-db: test_db
+        postgresql-user: test_user
+        postgresql-password: test_password
+
+    - name: Run Pytest with Coverage # Existing test run
+      env: # Added for Story #18 (Database URL for tests if needed)
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+        # Ensure your application uses this DATABASE_URL when running in CI for tests
+      run: |
+        cd cfin/backend
+        pytest \\
+          --cov=services \\
+          --cov=models \\
+          --cov=utils \\
+          --cov=pdf_processing \\
+          --cov=services.analysis_strategies \\
+          --cov-report=xml \\
+          --cov-fail-under=85
+
+    - name: Test Alembic migrations # Added for Story #18
+      env:
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+        # Ensure your alembic.ini or env.py uses this DATABASE_URL
+      run: |
+        cd cfin/backend # Or wherever your alembic.ini is
+        echo "Running Alembic upgrade to head..."
+        alembic upgrade head
+        echo "Running Alembic downgrade by one revision..."
+        alembic downgrade -1
+        echo "Running Alembic upgrade to head again to leave DB in latest state..."
+        alembic upgrade head
+        echo "Alembic migration smoke test successful."
+
+    - name: Upload coverage to Codecov (Optional)
+      # This step is optional and assumes you use Codecov.
+      # It also assumes the coverage.xml file is generated in the working-directory (cfin/backend)
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }} # Store your Codecov token in GitHub secrets
+        # files: ./coverage.xml # Specify if not auto-detected
+        working-directory: ./cfin/backend # Specify where coverage.xml is located
+        fail_ci_if_error: true

@@ -1,11 +1,62 @@
-'use client'
+/**
+ * Dashboard Page Component
+ * 
+ * This is the main dashboard page that provides an overview of the financial analysis system.
+ * It includes:
+ * - Document management (upload, view, delete)
+ * - Analysis tracking and access
+ * - Key metrics display
+ * - Recent analyses overview
+ * 
+ * The page is organized into several sections:
+ * 1. Header with quick access to new analysis
+ * 2. Stats overview showing document count, analysis count, and last activity
+ * 3. Main content area with document list and upload functionality
+ * 4. Recent analyses section showing past analysis results
+ */
 
-import Link from 'next/link'
-import { useState } from 'react'
+"use client"
+
+import { useEffect, useState } from 'react'
 import { BarChart2, Calendar, FileText, Plus } from 'lucide-react'
-import { UploadForm } from '../../components/UploadForm'
-import { DocumentList } from '../../components/DocumentList'
-import { ProcessedDocument } from '@/types'
+import Link from 'next/link'
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
+import { Separator } from "@/components/ui/separator"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Textarea } from "@/components/ui/textarea"
+import { DocumentList } from '@/components/DocumentList'
+import { UploadForm } from '@/components/document/UploadForm'
+import { DocumentDetails } from '@/components/document/DocumentDetails'
+import { AnalysisControls } from '@/components/analysis/AnalysisControls'
+import { fetchAnalysesForDocument, fetchDocument, fetchDocuments, uploadFile } from '@/lib/api/documentApi'
+import { AnalysisResult, DocumentPlus, ProcessedDocument } from '@/types'
 
 export default function Dashboard() {
   // State to trigger document list refresh when uploading a new document

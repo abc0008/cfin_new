@@ -1,6 +1,7 @@
-from typing import Dict, List, Optional, Any, Literal, Union
+from typing import Dict, List, Optional, Any, Literal, Union, Callable
 from pydantic import BaseModel, Field, ConfigDict, RootModel
 import logging
+from ..utils import tool_processing
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class ToolSchema(BaseModel):
     description: str
     input_schema: Dict[str, Any]
     cache_control: Optional[Dict[str, str]] = Field(default=None, alias="cacheControl", description="Optional cache control settings")
+    processor: Optional[Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]] = Field(default=None, exclude=True)
 
     class Config:
         alias_generator = to_camel
@@ -225,21 +227,38 @@ Comparative periods should include:
     }
 
 # List of all available tools for Claude
-ALL_TOOLS: List[ToolSchema] = [
+ALL_TOOLS_SCHEMAS: List[ToolSchema] = [
     ChartGenerationTool(),
     TableGenerationTool(),
     FinancialMetricGenerationTool(),
     ComparativePeriodGenerationTool()
 ]
 
-# Create dictionary versions for the API call if needed
-ALL_TOOLS_DICT = [tool.model_dump(exclude_none=True) for tool in ALL_TOOLS]
+# Create dictionary for easier lookup by name, mapping to ToolSchema instances
+ALL_TOOLS_DICT: Dict[str, ToolSchema] = {}
+for tool_schema_instance in ALL_TOOLS_SCHEMAS:
+    if tool_schema_instance.name == "generate_graph_data":
+        tool_schema_instance.processor = tool_processing.process_chart_input
+    elif tool_schema_instance.name == "generate_table_data":
+        tool_schema_instance.processor = tool_processing.process_table_input
+    elif tool_schema_instance.name == "generate_financial_metric":
+        tool_schema_instance.processor = tool_processing.process_financial_metric_input
+    # ComparativePeriodGenerationTool does not have a processor yet
+    ALL_TOOLS_DICT[tool_schema_instance.name] = tool_schema_instance
 
-# Legacy name for backward compatibility
-DEFAULT_TOOLS = ALL_TOOLS
+# For the API call to Claude, we need a list of dicts (JSON schema for tools)
+# This remains as before but uses ALL_TOOLS_SCHEMAS now.
+CLAUDE_API_TOOLS_LIST = [tool.model_dump(exclude_none=True) for tool in ALL_TOOLS_SCHEMAS]
 
-logger.info(f"Loaded {len(ALL_TOOLS)} tools for Claude API.")
-logger.info(f"Tool names: {[tool.name for tool in ALL_TOOLS]}")
+# Legacy name for backward compatibility, now points to the new dict structure if appropriate,
+# or the list of dicts if that's what downstream code expects from 'DEFAULT_TOOLS'.
+# Given ClaudeService.execute_tool_interaction_turn takes Optional[List[ToolSchema]],
+# DEFAULT_TOOLS should probably be List[ToolSchema] or the list of dicts.
+# The variable ClaudeService.ALL_TOOLS_DICT used in init should be CLAUDE_API_TOOLS_LIST.
+DEFAULT_TOOLS = ALL_TOOLS_SCHEMAS
+
+logger.info(f"Loaded {len(ALL_TOOLS_SCHEMAS)} tools for Claude API.")
+logger.info(f"Tool names: {[tool.name for tool in ALL_TOOLS_SCHEMAS]}")
 
 # Example Usage (for testing schema generation)
 if __name__ == "__main__":
