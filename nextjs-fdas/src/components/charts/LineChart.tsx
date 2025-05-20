@@ -25,12 +25,36 @@ interface LineChartProps {
  * Uses Recharts library for rendering the chart
  */
 export default function LineChart({ data, height = 400, width = '100%' }: LineChartProps) {
-  const { config, chartConfig } = data;
+  const { config, chartConfig, data: rawDataPointsFromBackend } = data;
+  let processedData = rawDataPointsFromBackend;
+
+  // Determine the key for the category axis (X-axis)
+  // Prefer xAxisKey from config, fallback to a sanitized xAxisLabel, or default to 'category' or 'date'
+  const categoryKey = config.xAxisKey || 
+                     (config.xAxisLabel ? config.xAxisLabel.toLowerCase().replace(/\s+/g, '_') : 'date');
   
-  // Extract the keys that should be rendered as lines (all except the category axis)
-  const categoryKey = config.xAxisLabel ? config.xAxisLabel.toLowerCase() : 'date';
-  const metricKeys = Object.keys(chartConfig).filter(key => key !== categoryKey);
-  
+  // Determine the metric keys for the lines from chartConfig
+  const metricKeys = Object.keys(chartConfig);
+
+  // Transform data if it's in [{x: val, y: val}, ...] format and we have a single metric key
+  if (
+    metricKeys.length === 1 &&
+    Array.isArray(rawDataPointsFromBackend) && 
+    rawDataPointsFromBackend.length > 0 && 
+    rawDataPointsFromBackend[0].hasOwnProperty('x') && 
+    rawDataPointsFromBackend[0].hasOwnProperty('y')
+  ) {
+    const singleMetricKey = metricKeys[0]; // e.g., "eps"
+    processedData = rawDataPointsFromBackend.map(point => ({
+      [categoryKey]: point.x,       // Use the derived categoryKey, e.g., { date: "Q1 2024", ... }
+      [singleMetricKey]: point.y    // Use the metricKey from chartConfig, e.g., { ..., eps: 0.78 }
+    }));
+  }
+  // If data is already in the correct flat format with multiple metric keys, it should pass through
+  // e.g. [{category: "Q1", sales: 100, profit: 20}, {category: "Q2", sales: 120, profit: 25}]
+  // and chartConfig: {sales: {label: "Sales"}, profit: {label: "Profit"}}
+  // In this case, categoryKey would be "category", and metricKeys would be ["sales", "profit"]
+
   // Generate lines for each metric with their respective colors
   const lines = metricKeys.map((key, index) => {
     const metricConfig: MetricConfig = chartConfig[key];
@@ -70,7 +94,7 @@ export default function LineChart({ data, height = 400, width = '100%' }: LineCh
       
       <ResponsiveContainer width={width} height={height}>
         <RechartsLineChart
-          data={data.data}
+          data={processedData}
           margin={{ top: 10, right: 30, left: 20, bottom: 30 }}
         >
           {config.showGrid !== false && <CartesianGrid strokeDasharray="3 3" />}

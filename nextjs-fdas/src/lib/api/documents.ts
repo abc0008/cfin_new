@@ -214,7 +214,7 @@ export const documentsApi = {
       console.log('Polling for document processing completion...');
       let document = initialDocument;
       let retries = 0;
-      const maxRetries = 30; // 30 * 2 seconds = 1 minute max
+      const maxRetries = 150; // 150 * 2 seconds = 5 minutes max
       
       while (retries < maxRetries && document.processingStatus !== 'completed' && document.processingStatus !== 'failed') {
         await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
@@ -491,7 +491,7 @@ export const documentsApi = {
       
       let document = initialDocument;
       let retries = 0;
-      const maxRetries = 30; // 30 * 2 seconds = 1 minute max
+      const maxRetries = 150; // 150 * 2 seconds = 5 minutes max
       
       while (retries < maxRetries && document.processingStatus !== 'completed' && document.processingStatus !== 'failed') {
         await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds

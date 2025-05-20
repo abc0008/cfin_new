@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from models.database_models import Document
 from models.visualization import ChartData, TableData
 from models.analysis import FinancialMetric
-from pdf_processing.claude_service import ClaudeService
+from cfin.backend.pdf_processing.api_service import ClaudeService
 
 
 class AnalysisStrategy(ABC):

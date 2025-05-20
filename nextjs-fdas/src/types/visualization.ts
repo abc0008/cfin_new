@@ -5,11 +5,11 @@
 
 import type { FinancialMetric } from './index';
 
-// Supported chart types
-export type ChartType = 'line' | 'bar' | 'area' | 'pie' | 'multiBar' | 'scatter';
+// Supported chart types - Aligned with backend and Zod schema
+export type ChartType = 'bar' | 'multiBar' | 'line' | 'pie' | 'area' | 'stackedArea' | 'scatter';
 
-// Supported table types
-export type TableType = 'comparison' | 'summary' | 'detailed';
+// Supported table types - Aligned with backend and Zod schema
+export type TableType = 'simple' | 'matrix' | 'comparison' | 'summary' | 'detailed';
 
 // Format types for table columns
 export type FormatType = 'number' | 'currency' | 'percentage' | 'text';
@@ -98,6 +98,7 @@ export interface VisualizationData {
   charts: ChartData[];
   tables: TableData[];
   metrics?: FinancialMetric[];
+  analysisText?: string;
   // Legacy format fields - keep for backward compatibility
   monetaryValues?: any;
   percentages?: any;

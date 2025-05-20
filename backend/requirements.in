@@ -25,3 +25,4 @@ aiosqlite==0.19.0
 greenlet==3.2.2
 psutil==6.0.0
 backoff
+colorama

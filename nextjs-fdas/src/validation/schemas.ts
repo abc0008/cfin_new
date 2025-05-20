@@ -183,7 +183,7 @@ export const ChartSeriesSchema = z.object({
 });
 
 export const ChartDataSchema = z.object({
-  chartType: z.enum(['line', 'bar', 'area', 'pie', 'multiBar', 'scatter']),
+  chartType: z.enum(['bar', 'multiBar', 'line', 'pie', 'area', 'stackedArea', 'scatter']),
   config: ChartConfigSchema,
   data: z.union([z.array(ChartDataItemSchema), z.array(ChartSeriesSchema)]),
   chartConfig: z.record(MetricConfigSchema).optional(),
@@ -209,7 +209,7 @@ export const TableConfigSchema = z.object({
 });
 
 export const TableDataSchema = z.object({
-  tableType: z.enum(['comparison', 'summary', 'detailed']),
+  tableType: z.enum(['simple', 'matrix', 'comparison', 'summary', 'detailed']),
   config: TableConfigSchema,
   data: z.array(z.any())
 });

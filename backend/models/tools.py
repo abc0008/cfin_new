@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Any, Literal, Union, Callable
 from pydantic import BaseModel, Field, ConfigDict, RootModel
 import logging
-from ..utils import tool_processing
+from utils import tool_processing
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,26 @@ class ToolSchema(BaseModel):
     class Config:
         alias_generator = to_camel
         allow_population_by_field_name = True
+
+# --- New Tool Registration Logic (PlanPlanPlan.md item 2) ---
+ALL_TOOLS_SCHEMAS: list[ToolSchema] = []
+CLAUDE_API_TOOLS_LIST: list[dict[str, Any]] = []
+
+def register_tool(tool: ToolSchema) -> None:
+    ALL_TOOLS_SCHEMAS.append(tool)
+    # Construct the schema for Claude API, ensuring only relevant fields are included
+    api_schema_dict = tool.model_dump(
+        by_alias=True, 
+        exclude_none=True, 
+        include={'name', 'description', 'input_schema', 'cache_control'}
+    )
+
+    # Ensure the key is 'input_schema' as expected by Anthropic,
+    # overriding Pydantic's camelCase aliasing for this specific field.
+    if 'inputSchema' in api_schema_dict and 'input_schema' not in api_schema_dict:
+        api_schema_dict['input_schema'] = api_schema_dict.pop('inputSchema')
+    
+    CLAUDE_API_TOOLS_LIST.append(api_schema_dict)
 
 # --- Chart Generation Tool ---
 
@@ -78,6 +98,8 @@ class ChartGenerationTool(ToolSchema):
         alias_generator = to_camel
         allow_population_by_field_name = True
 
+register_tool(ChartGenerationTool()) # Register after definition
+
 # --- Table Generation Tool ---
 
 class TableColumnConfig(BaseModel):
@@ -124,6 +146,8 @@ class TableGenerationTool(ToolSchema):
         alias_generator = to_camel
         allow_population_by_field_name = True
 
+register_tool(TableGenerationTool()) # Register after definition
+
 # Keep the existing FinancialMetricGenerationTool and ComparativePeriodGenerationTool
 class FinancialMetricGenerationTool(ToolSchema):
     """Tool for generating financial metrics."""
@@ -169,6 +193,8 @@ Metrics should include:
         },
         "required": ["category", "name", "period", "value"]
     }
+
+register_tool(FinancialMetricGenerationTool()) # Register after definition
 
 class ComparativePeriodGenerationTool(ToolSchema):
     """Tool for generating comparative period data."""
@@ -226,29 +252,27 @@ Comparative periods should include:
         "required": ["metric", "currentPeriod", "previousPeriod", "currentValue", "previousValue"]
     }
 
-# List of all available tools for Claude
-ALL_TOOLS_SCHEMAS: List[ToolSchema] = [
-    ChartGenerationTool(),
-    TableGenerationTool(),
-    FinancialMetricGenerationTool(),
-    ComparativePeriodGenerationTool()
-]
+register_tool(ComparativePeriodGenerationTool()) # Register after definition
+
+# List of all available tools for Claude - NO LONGER POPULATED DIRECTLY
+# ALL_TOOLS_SCHEMAS: List[ToolSchema] = [
+#     ChartGenerationTool(),
+#     TableGenerationTool(),
+#     FinancialMetricGenerationTool(),
+#     ComparativePeriodGenerationTool()
+# ]
 
 # Create dictionary for easier lookup by name, mapping to ToolSchema instances
+# This remains, but now iterates over the registered ALL_TOOLS_SCHEMAS
 ALL_TOOLS_DICT: Dict[str, ToolSchema] = {}
-for tool_schema_instance in ALL_TOOLS_SCHEMAS:
+for tool_schema_instance in ALL_TOOLS_SCHEMAS: # Iterates over dynamically populated list
     if tool_schema_instance.name == "generate_graph_data":
         tool_schema_instance.processor = tool_processing.process_chart_input
     elif tool_schema_instance.name == "generate_table_data":
         tool_schema_instance.processor = tool_processing.process_table_input
     elif tool_schema_instance.name == "generate_financial_metric":
         tool_schema_instance.processor = tool_processing.process_financial_metric_input
-    # ComparativePeriodGenerationTool does not have a processor yet
     ALL_TOOLS_DICT[tool_schema_instance.name] = tool_schema_instance
-
-# For the API call to Claude, we need a list of dicts (JSON schema for tools)
-# This remains as before but uses ALL_TOOLS_SCHEMAS now.
-CLAUDE_API_TOOLS_LIST = [tool.model_dump(exclude_none=True) for tool in ALL_TOOLS_SCHEMAS]
 
 # Legacy name for backward compatibility, now points to the new dict structure if appropriate,
 # or the list of dicts if that's what downstream code expects from 'DEFAULT_TOOLS'.

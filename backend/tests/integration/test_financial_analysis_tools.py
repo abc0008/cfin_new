@@ -6,12 +6,12 @@ import json
 from typing import Dict, Any, List, Optional
 
 from fastapi.testclient import TestClient
-from main import app
-from database.repository import DocumentRepository
+from app.main import app
+from repositories.document_repository import DocumentRepository
 from services.document_service import DocumentService
 from services.analysis_service import AnalysisService
-from pdf_processing.claude_service import ClaudeService
-from models.document import ProcessedDocument, DocumentMetadata, DocumentContentType, ProcessingStatus
+from cfin.backend.pdf_processing.api_service import ClaudeService
+from models.document import ProcessedDocument, DocumentMetadata, DocumentContentType, ProcessingStatus, DocumentCitation
 
 
 @pytest.fixture
@@ -162,7 +162,7 @@ class TestFinancialAnalysisToolsIntegration:
     @patch('app.routes.analysis.get_document_service')
     async def test_financial_analysis_endpoint_with_tools(
         self, mock_get_doc_service, mock_get_analysis_service, 
-        test_client, mock_document_service, mock_claude_service
+        test_client, mock_document_service, mock_claude_service, monkeypatch
     ):
         """Test the financial analysis endpoint with tool-based analysis"""
         # Setup
@@ -198,7 +198,7 @@ class TestFinancialAnalysisToolsIntegration:
         }
 
         # Call the endpoint
-        response = await client.post("/api/v1/analysis/", json=analysis_request)
+        response = await test_client.post("/api/v1/analysis/", json=analysis_request)
 
         # Assertions
         assert response.status_code == 202  # Accepted for background processing
@@ -245,7 +245,7 @@ class TestFinancialAnalysisToolsIntegration:
                 structured_data={"raw_text": "Extracted text from PDF.", "some_metric": 12345},
                 summary="Summary of the PDF.",
                 key_insights=["Insight 1", "Insight 2"],
-                status=ProcessingStatusEnum.COMPLETED,
+                status=ProcessingStatus.COMPLETED,
                 citations_count=1
             ),
             [DocumentCitation(document_id="new_doc_id", citation_id="cit1", page_number=1, text="This is a citation.")]

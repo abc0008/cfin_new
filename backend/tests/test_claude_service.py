@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch, MagicMock, Mock
 from typing import Dict, List, Tuple
 
 import asyncio
-from pdf_processing.claude_service import ClaudeService
+from cfin.backend.pdf_processing.api_service import ClaudeService
 from models.document import ProcessedDocument, Citation, DocumentContentType
 from models.document import DocumentMetadata, ProcessingStatus
 

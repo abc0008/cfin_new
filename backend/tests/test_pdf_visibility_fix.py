@@ -30,7 +30,7 @@ from app.main import app
 from services.conversation_service import ConversationService
 from repositories.conversation_repository import ConversationRepository
 from repositories.document_repository import DocumentRepository
-from pdf_processing.claude_service import ClaudeService
+from cfin.backend.pdf_processing.api_service import ClaudeService
 from sqlalchemy.ext.asyncio import AsyncSession
 
 

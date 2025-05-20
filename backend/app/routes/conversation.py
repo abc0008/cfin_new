@@ -11,7 +11,7 @@ from pdf_processing.document_service import DocumentService
 from repositories.document_repository import DocumentRepository
 from repositories.conversation_repository import ConversationRepository
 from services.conversation_service import ConversationService
-from pdf_processing.claude_service import ClaudeService
+from cfin.backend.pdf_processing.api_service import ClaudeService
 from utils.database import get_db
 
 logger = logging.getLogger(__name__)

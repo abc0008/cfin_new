@@ -101,7 +101,8 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             return {
               charts,
               tables,
-              metrics
+              metrics,
+              analysisText: msg.analysis_blocks.find(b => b.block_type === 'text_summary')?.content || undefined
             };
           }
         }
@@ -127,7 +128,8 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             metrics: latestResult.metrics || [],
             monetaryValues: latestResult.visualizationData.monetaryValues,
             percentages: latestResult.visualizationData.percentages,
-            keywordFrequency: latestResult.visualizationData.keywordFrequency
+            keywordFrequency: latestResult.visualizationData.keywordFrequency,
+            analysisText: latestResult.analysisText
           };
         }
         // Legacy format: metrics, charts, tables as top-level properties
@@ -136,7 +138,8 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
           return {
             charts: latestResult.visualizationData?.charts || [],
             tables: latestResult.visualizationData?.tables || [],
-            metrics: latestResult.metrics || []
+            metrics: latestResult.metrics || [],
+            analysisText: latestResult.analysisText
           };
         }
       }
@@ -147,7 +150,8 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
     return {
       charts: [],
       tables: [],
-      metrics: []
+      metrics: [],
+      analysisText: undefined
     };
   }, []);
 
@@ -232,7 +236,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-4 overflow-y-auto max-h-[calc(100vh-280px)]">
         {currentTab === 'overview' ? (
           <div className="space-y-6">
             <MetricGrid 
@@ -251,6 +255,16 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             
             {visualizationData.tables && visualizationData.tables.length > 0 && (
               <TableRenderer data={visualizationData.tables[0]} />
+            )}
+            
+            {/* Display Analysis Text if available */}
+            {visualizationData.analysisText && (
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg shadow-sm border border-gray-200">
+                <h4 className="text-md font-semibold text-gray-700 mb-2">Textual Summary</h4>
+                <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                  {visualizationData.analysisText}
+                </p>
+              </div>
             )}
           </div>
         ) : (

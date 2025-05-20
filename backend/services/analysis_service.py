@@ -47,10 +47,11 @@ from typing import List, Dict, Any, Optional, Tuple
 import asyncio
 import base64 # Added for PDF content encoding
 from fastapi import HTTPException # Added for Story #17
+from anthropic.types import Message, TextBlock, ToolUseBlock # Moved import
 
 from repositories.analysis_repository import AnalysisRepository
 from repositories.document_repository import DocumentRepository
-from pdf_processing.claude_service import ClaudeService, ALL_TOOLS_DICT
+from cfin.backend.pdf_processing.api_service import ClaudeService, ALL_TOOLS_DICT
 from pdf_processing.financial_agent import FinancialAnalysisAgent
 from models.database_models import AnalysisResult, Document
 from utils.visualization_helpers import (
@@ -63,19 +64,24 @@ from models.analysis import FinancialMetric, FinancialRatio, ComparativePeriod
 from models.visualization import ChartData, TableData # Assuming these are defined
 
 from .analysis_strategies import strategy_map # Added for Story #1
-from ..utils import tool_processing # Added for Story #9
-from ..utils.exceptions import ToolSchemaValidationError # Added for Story #17
+from utils import tool_processing # Corrected import
+from utils.exceptions import ToolSchemaValidationError # Corrected import
 
 logger = logging.getLogger(__name__)
+
+# Added for PlanPlanPlan.md item 3
+# TODO: Make this environment-driven as per plan
+KW_FREQ_ENABLED = False 
 
 # System prompts for Story #2
 BASIC_FINANCIAL_SYSTEM_PROMPT = """You are an AI financial analyst. Your task is to provide a concise textual summary of key financial highlights from the provided document excerpts.
 You MUST perform the following actions in this exact order:
 1. Call the `generate_financial_metric` tool exactly twice to extract two different key financial metrics.
 2. Call the `generate_table_data` tool exactly once to present a summary table of important figures.
-3. Provide a brief overall textual summary based on the document and the tool results.
+3. Call the `generate_graph_data` tool at least once to visualize a key trend or comparison relevant to the extracted data.
+4. Provide a brief overall textual summary based on the document and the tool results.
 Adhere strictly to the Pydantic models provided in the tool descriptions for tool inputs.
-Ensure your final textual summary is concise and directly answers the user's query if provided, incorporating the extracted metrics and table.
+Ensure your final textual summary is concise and directly answers the user's query if provided, incorporating the extracted metrics, table, and chart.
 """
 
 SENTIMENT_ANALYSIS_SYSTEM_PROMPT = """You are an AI sentiment analysis expert. Your task is to analyze the sentiment of the provided text.
@@ -193,7 +199,7 @@ class AnalysisService:
             raise HTTPException(status_code=400, detail="At least one document ID must be provided for analysis.")
 
         try: # Main try for document loading and overall analysis orchestration
-            docs_data = await asyncio.gather(*[self.document_repository.get_document_by_id(doc_id) for doc_id in document_ids])
+            docs_data = await asyncio.gather(*[self.document_repository.get_document(doc_id) for doc_id in document_ids])
             
             loaded_docs_count = 0
             for doc_data in docs_data:
@@ -206,8 +212,8 @@ class AnalysisService:
                 documents.append(doc)
                 loaded_docs_count += 1
                 
-                if doc.content_text:
-                    aggregated_text += doc.content_text + "\n\n"
+                if doc.raw_text:
+                    aggregated_text += doc.raw_text + "\n\n"
                 
                 # Aggregate PDF base64 content if needed by strategies (and if available)
                 if hasattr(doc, 'content_pdf_path') and doc.content_pdf_path: # Assuming PDF path is stored
@@ -248,12 +254,39 @@ class AnalysisService:
                 
                 try: # Inner try for strategy execution
                     result_data = await strategy.execute(**strategy_input_args)
-                except ToolSchemaValidationError as e:
-                    logger.error(f"Tool schema validation error during \'{analysis_type}\' for analysis {analysis_id}: {e}", exc_info=True)
-                    error_detail = f"Tool input/output validation failed: {str(e)}."
-                    if e.original_exception and hasattr(e.original_exception, 'errors'):
+
+                    # Derived Visuals Logic (PlanPlanPlan.md item 3)
+                    # Ensure 'visualizations' key exists and is a dict
+                    if 'visualizations' not in result_data or not isinstance(result_data['visualizations'], dict):
+                        result_data['visualizations'] = {}
+                    viz = result_data['visualizations']
+
+                    # Ensure 'metrics' key exists and is a list (or at least iterable)
+                    metrics_data = result_data.get('metrics')
+                    if metrics_data and isinstance(metrics_data, list):
+                        logger.info(f"Generating monetary values and percentages from {len(metrics_data)} metrics.")
+                        # Assuming generate_monetary_values_data and generate_percentage_data can handle empty lists if necessary
+                        viz['monetary_values'] = generate_monetary_values_data(metrics_data, result_data.get('insights', [])) # insights added based on deep dive
+                        viz['percentages']    = generate_percentage_data(metrics_data, result_data.get('insights', [])) # insights added based on deep dive
+                    else:
+                        logger.warning("Metrics data not found or not in expected format for derived visuals.")
+                        viz['monetary_values'] = {}
+                        viz['percentages']    = {}
+
+                    if KW_FREQ_ENABLED and aggregated_text:
+                        logger.info("Generating keyword frequency data.")
+                        viz['keyword_frequency'] = generate_keyword_frequency_data(aggregated_text)
+                    elif KW_FREQ_ENABLED:
+                        logger.warning("KW_FREQ_ENABLED is true, but aggregated_text is empty.")
+                        viz['keyword_frequency'] = {}
+                    # If KW_FREQ_ENABLED is False, keywordFrequency will not be added, which is fine.
+
+                except ToolSchemaValidationError as tsve: # Story #17 - Specific error for tool schema issues
+                    logger.error(f"Tool schema validation error during strategy execution for analysis {analysis_id}: {tsve}", exc_info=True)
+                    error_detail = f"Tool input/output validation failed: {str(tsve)}."
+                    if tsve.original_exception and hasattr(tsve.original_exception, 'errors'):
                         try:
-                            pydantic_errors = json.dumps(e.original_exception.errors(), indent=2) # type: ignore
+                            pydantic_errors = json.dumps(tsve.original_exception.errors(), indent=2) # type: ignore
                             error_detail += f" Details: {pydantic_errors}"
                         except Exception:
                             pass
@@ -264,103 +297,205 @@ class AnalysisService:
 
             elif analysis_type == "basic_financial":
                 logger.info(f"Executing basic_financial analysis for analysis {analysis_id}")
-                turn_results = []
-                current_messages = [
-                    {"role": "user", "content": aggregated_text if aggregated_text else "No document text available."}
+                # Initial message from user to assistant
+                current_messages: List[Dict[str, Any]] = [
+                    {"role": "user", "content": [{"type": "text", "text": aggregated_text if aggregated_text else "No document text available."}]}
                 ]
                 if query:
-                    current_messages.append({"role": "user", "content": f"User query: {query}"})
+                    current_messages[0]["content"].append({"type": "text", "text": f"User query: {query}"}) # type: ignore
 
-                max_turns = 4 
+                # Store all assistant responses that include text or final (non-tool_use) content blocks
+                final_assistant_responses_content: List[Dict[str, Any]] = []
+                
+                # Initialize collectors for processed tool outputs
+                collected_charts: List[Dict[str, Any]] = []
+                collected_tables: List[Dict[str, Any]] = []
+                collected_metrics: List[Dict[str, Any]] = []
+                final_text_summary_parts: List[str] = []
+
+                max_turns = 5 # Max turns to prevent infinite loops
                 for turn in range(max_turns):
                     logger.info(f"Basic financial analysis - Turn {turn + 1}")
                     try:
-                        api_response = await self.claude_service.execute_tool_interaction_turn(
+                        api_response: Message = await self.claude_service.execute_tool_interaction_turn(
                             system_prompt=BASIC_FINANCIAL_SYSTEM_PROMPT,
-                            messages=current_messages, # type: ignore
-                            tools=ALL_TOOLS_DICT 
+                            messages=current_messages,
+                            tools=self.claude_service.tools_for_api
                         )
-                        processed_turn_data = self.claude_service._process_tool_calls(api_response)
-                        turn_results.append(processed_turn_data)
-                        current_messages.append({"role": "assistant", "content": api_response.content})
+                        
+                        # Add assistant's response to message history
+                        # The content should be a list of blocks (text or tool_use)
+                        assistant_message_content_blocks = [block.model_dump() for block in api_response.content]
+                        current_messages.append({"role": "assistant", "content": assistant_message_content_blocks})
+                        
+                        tool_results_for_next_turn: List[Dict[str, Any]] = []
+                        contains_tool_use = False
 
-                        has_tool_use = any(block.type == 'tool_use' for block in api_response.content)
-                        if has_tool_use:
-                            for tool_name, tool_results_list in processed_turn_data.get("processed_tool_outputs", {}).items():
-                                for res in tool_results_list: 
-                                    current_messages.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": res.get("tool_use_id", "missing_tool_use_id"), "content": json.dumps(res.get("output_data")) if res.get("output_data") is not None else "null"}]})
-                        if api_response.stop_reason == "stop_sequence" or not has_tool_use:
-                            logger.info(f"Basic financial analysis completed in turn {turn + 1}.")
-                            break 
-                        if turn == max_turns -1:
-                             logger.info(f"Basic financial analysis reached max turns.")
-                    except ToolSchemaValidationError as e:
+                        for block in api_response.content:
+                            if block.type == 'tool_use':
+                                contains_tool_use = True
+                                tool_name = block.name
+                                tool_use_id = block.id
+                                tool_input = block.input
+                                
+                                logger.info(f"Assistant requested tool: {tool_name} (ID: {tool_use_id}) with input: {tool_input}")
+                                
+                                processed_data_for_tool: Optional[Dict[str, Any]] = None
+                                tool_output_content_for_claude = "" # String representation for Claude
+
+                                tool_schema = self.claude_service.tool_schemas_map.get(tool_name)
+                                if tool_schema and tool_schema.processor:
+                                    try:
+                                        processed_data_for_tool = tool_schema.processor(tool_input) # Actual processed data
+                                        if processed_data_for_tool is not None:
+                                            # Store the structured data
+                                            if tool_name == "generate_graph_data":
+                                                collected_charts.append(processed_data_for_tool)
+                                            elif tool_name == "generate_table_data":
+                                                collected_tables.append(processed_data_for_tool)
+                                            elif tool_name == "generate_financial_metric":
+                                                collected_metrics.append(processed_data_for_tool)
+                                            tool_output_content_for_claude = json.dumps(processed_data_for_tool)
+                                        else:
+                                            tool_output_content_for_claude = json.dumps({"status": "Tool processed, no output."})
+                                    except Exception as proc_e:
+                                        logger.error(f"Error processing tool {tool_name} (ID: {tool_use_id}): {proc_e}")
+                                        tool_output_content_for_claude = json.dumps({"error": f"Failed to process tool {tool_name}: {str(proc_e)}"})
+                                else:
+                                    logger.warning(f"No processor for tool {tool_name} (ID: {tool_use_id})")
+                                    tool_output_content_for_claude = json.dumps({"error": f"No processor for tool {tool_name}"})
+                                
+                                tool_results_for_next_turn.append({
+                                    "type": "tool_result",
+                                    "tool_use_id": tool_use_id,
+                                    "content": tool_output_content_for_claude, 
+                                })
+                            elif block.type == 'text':
+                                # This text block is part of an intermediate assistant message.
+                                # We'll collect text from the *final* assistant message after the loop.
+                                pass
+
+                        if tool_results_for_next_turn:
+                            current_messages.append({"role": "user", "content": tool_results_for_next_turn})
+                        
+                        if api_response.stop_reason == "stop_sequence" or not contains_tool_use:
+                            logger.info(f"Basic financial analysis conversation loop finished in turn {turn + 1}. Stop Reason: {api_response.stop_reason}")
+                            # The last assistant message (assistant_message_content_blocks) is the final one.
+                            final_assistant_responses_content.extend(assistant_message_content_blocks)
+                            break
+                        
+                        if turn == max_turns - 1:
+                            logger.warning(f"Basic financial analysis reached max_turns ({max_turns}). Last assistant message content: {assistant_message_content_blocks}")
+                            final_assistant_responses_content.extend(assistant_message_content_blocks) # Store last attempt
+
+                    except ToolSchemaValidationError as e: # Handle specific validation errors
                         logger.error(f"Tool schema validation error during basic_financial analysis {analysis_id}, turn {turn+1}: {e}", exc_info=True)
-                        raise HTTPException(status_code=422, detail=f"Tool input/output validation failed during basic financial analysis: {str(e)}.")
-                    except Exception as e:
+                        raise HTTPException(status_code=422, detail=f"Tool input/output validation failed: {str(e)}.")
+                    except Exception as e: # General errors during a turn
                         logger.error(f"Error during basic_financial analysis turn {turn + 1} for analysis {analysis_id}: {e}", exc_info=True)
-                        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during turn {turn + 1} of basic financial analysis: {str(e)}")
+                        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during turn {turn + 1} of basic_financial analysis: {str(e)}")
                 
-                # Consolidate results from turns for basic_financial
-                final_text = "\n".join([res.get("analysis_text", "") for res in turn_results])
-                final_charts = [chart for res in turn_results for chart in res.get("visualizations", {}).get("charts", [])]
-                final_tables = [table for res in turn_results for table in res.get("visualizations", {}).get("tables", [])]
-                final_metrics = [metric for res in turn_results for metric in res.get("metrics", [])]
+                # Process the final assistant response(s) for text
+                if final_assistant_responses_content:
+                    for block_dict in final_assistant_responses_content:
+                        if block_dict.get("type") == "text":
+                            final_text_summary_parts.append(block_dict.get("text", ""))
+                
+                final_text_summary = "\\n".join(final_text_summary_parts).strip()
+
                 result_data = {
-                    "analysis_text": final_text,
-                    "visualizations": {"charts": final_charts, "tables": final_tables},
-                    "metrics": final_metrics
+                    "analysis_text": final_text_summary,
+                    "visualizations": {
+                        "charts": collected_charts,
+                        "tables": collected_tables
+                    },
+                    "metrics": collected_metrics
                 }
 
             elif analysis_type == "sentiment_analysis":
                 logger.info(f"Executing sentiment_analysis for analysis {analysis_id}")
-                turn_results = []
-                current_messages = [
-                    {"role": "user", "content": aggregated_text if aggregated_text else "No document text available."}
+                current_messages: List[Dict[str, Any]] = [
+                    {"role": "user", "content": [{"type": "text", "text": aggregated_text if aggregated_text else "No document text available."}]}
                 ]
                 if query:
-                    current_messages.append({"role": "user", "content": f"User query: {query}"})
+                    current_messages[0]["content"].append({"type": "text", "text": f"User query: {query}"}) # type: ignore
 
-                max_turns = 4 # Or a different max_turns suitable for sentiment analysis
+                final_assistant_responses_content: List[Dict[str, Any]] = []
+                max_turns = 5 
                 for turn in range(max_turns):
                     logger.info(f"Sentiment analysis - Turn {turn + 1}")
                     try:
-                        api_response = await self.claude_service.execute_tool_interaction_turn(
+                        api_response: Message = await self.claude_service.execute_tool_interaction_turn(
                             system_prompt=SENTIMENT_ANALYSIS_SYSTEM_PROMPT,
-                            messages=current_messages, # type: ignore
-                            tools=ALL_TOOLS_DICT 
+                            messages=current_messages,
+                            tools=self.claude_service.tools_for_api
                         )
-                        processed_turn_data = self.claude_service._process_tool_calls(api_response)
-                        turn_results.append(processed_turn_data)
-                        current_messages.append({"role": "assistant", "content": api_response.content})
+                        
+                        assistant_message_content_blocks = [block.model_dump() for block in api_response.content]
+                        current_messages.append({"role": "assistant", "content": assistant_message_content_blocks})
+                        
+                        tool_results_for_next_turn: List[Dict[str, Any]] = []
+                        contains_tool_use = False
+                        for block in api_response.content:
+                            if block.type == 'tool_use':
+                                contains_tool_use = True
+                                tool_name = block.name
+                                tool_use_id = block.id
+                                tool_input = block.input
+                                logger.info(f"Assistant requested tool: {tool_name} (ID: {tool_use_id}) with input: {tool_input}")
+                                tool_output_str = ""
+                                tool_schema = self.claude_service.tool_schemas_map.get(tool_name)
+                                if tool_schema and tool_schema.processor:
+                                    try:
+                                        processed_data = tool_schema.processor(tool_input)
+                                        tool_output_str = json.dumps(processed_data) if processed_data is not None else json.dumps({"status": "Tool processed, no output."})
+                                    except Exception as proc_e:
+                                        logger.error(f"Error processing tool {tool_name} (ID: {tool_use_id}): {proc_e}")
+                                        tool_output_str = json.dumps({"error": f"Failed to process tool {tool_name}: {str(proc_e)}"})
+                                else:
+                                    logger.warning(f"No processor for tool {tool_name} (ID: {tool_use_id})")
+                                    tool_output_str = json.dumps({"error": f"No processor for tool {tool_name}"})
+                                tool_results_for_next_turn.append({
+                                    "type": "tool_result",
+                                    "tool_use_id": tool_use_id,
+                                    "content": tool_output_str,
+                                })
+                        
+                        if tool_results_for_next_turn:
+                            current_messages.append({"role": "user", "content": tool_results_for_next_turn})
 
-                        has_tool_use = any(block.type == 'tool_use' for block in api_response.content)
-                        if has_tool_use:
-                            for tool_name, tool_results_list in processed_turn_data.get("processed_tool_outputs", {}).items():
-                                for res in tool_results_list: 
-                                    current_messages.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": res.get("tool_use_id", "missing_tool_use_id"), "content": json.dumps(res.get("output_data")) if res.get("output_data") is not None else "null"}]})
-                        if api_response.stop_reason == "stop_sequence" or not has_tool_use:
-                            logger.info(f"Sentiment analysis completed in turn {turn + 1}.")
+                        if api_response.stop_reason == "stop_sequence" or not contains_tool_use:
+                            logger.info(f"Sentiment analysis conversation loop finished in turn {turn + 1}. Stop Reason: {api_response.stop_reason}")
+                            final_assistant_responses_content.extend(assistant_message_content_blocks)
                             break
-                        if turn == max_turns -1:
-                             logger.info(f"Sentiment analysis reached max turns.")
+                        
+                        if turn == max_turns - 1:
+                            logger.warning(f"Sentiment analysis reached max_turns ({max_turns}). Last assistant message content: {assistant_message_content_blocks}")
+                            final_assistant_responses_content.extend(assistant_message_content_blocks)
+
                     except ToolSchemaValidationError as e:
                         logger.error(f"Tool schema validation error during sentiment_analysis {analysis_id}, turn {turn+1}: {e}", exc_info=True)
-                        raise HTTPException(status_code=422, detail=f"Tool input/output validation failed during sentiment analysis: {str(e)}.")
+                        raise HTTPException(status_code=422, detail=f"Tool input/output validation failed: {str(e)}.")
                     except Exception as e:
                         logger.error(f"Error during sentiment_analysis turn {turn + 1} for analysis {analysis_id}: {e}", exc_info=True)
-                        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during turn {turn + 1} of sentiment analysis: {str(e)}")
+                        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during turn {turn + 1} of sentiment_analysis: {str(e)}")
                 
-                # Consolidate results from turns for sentiment_analysis
-                final_text = "\n".join([res.get("analysis_text", "") for res in turn_results])
-                final_charts = [chart for res in turn_results for chart in res.get("visualizations", {}).get("charts", [])]
-                final_tables = [table for res in turn_results for table in res.get("visualizations", {}).get("tables", [])]
-                final_metrics = [metric for res in turn_results for metric in res.get("metrics", [])]
-                result_data = {
-                    "analysis_text": final_text,
-                    "visualizations": {"charts": final_charts, "tables": final_tables},
-                    "metrics": final_metrics
-                }
+                processed_content_blocks = []
+                for block_dict in final_assistant_responses_content: # Iterate over the collected final content
+                    block_type = block_dict.get("type")
+                    if block_type == "text":
+                        processed_content_blocks.append(TextBlock(type="text", text=block_dict.get("text","")))
+                    elif block_type == "tool_use":
+                        logger.debug(f"Skipping tool_use block (id: {block_dict.get('id')}) when creating mock for _process_tool_calls in sentiment_analysis.")
+                        pass # Pass for now
+                
+                mock_final_api_response = Message(
+                    id="final_mock_response_sentiment", type="message", role="assistant", model="mock_model",
+                    content=processed_content_blocks, stop_reason="stop_sequence", stop_sequence=None,
+                    usage={"input_tokens": 0, "output_tokens": 0}
+                )
+                result_data = self.claude_service._process_tool_calls(mock_final_api_response)
+
             else:
                 logger.warning(f"Unsupported analysis type: {analysis_type}")
                 raise HTTPException(status_code=400, detail=f"Unsupported analysis type: {analysis_type}")
@@ -669,37 +804,67 @@ class AnalysisService:
         analysis_id: str,
         document_ids: List[str],
         analysis_type: str,
-        result_data: Dict[str, Any],
+        result_data: Dict[str, Any], # This is the core output from the analysis (e.g., text, visualizations)
         user_query: Optional[str] = None,
         parameters: Optional[Dict[str, Any]] = None
     ) -> Tuple[str, Dict[str, Any]]:
         logger.info(f"Saving analysis result for {analysis_id}, type {analysis_type}, docs {document_ids}")
+        
+        # Consolidate all information to be stored in the result_data JSONB field
+        persisted_result_payload = {
+            "analysis_output": result_data,  # The actual results from Claude/strategy
+            "input_parameters": parameters if parameters else {},
+            "input_query": user_query,
+            "processing_status": "completed" # Status of this analysis run
+        }
+        
         analysis_to_save = AnalysisResult(
             id=analysis_id,
-            document_ids=document_ids, # Store list of document IDs
+            document_ids=document_ids, 
             analysis_type=analysis_type,
-            parameters=parameters if parameters else {},
-            query_text=user_query,
-            result_data=result_data, # This is the direct output from strategy or other methods
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-            status="completed" # Or derive status
+            result_data=persisted_result_payload, # Store the consolidated payload
+            created_at=datetime.utcnow()
+            # No 'parameters', 'query_text', 'updated_at', or 'status' direct fields in DB model
         )
         try:
-            await self.analysis_repository.create_analysis(analysis_to_save.dict())
+            await self.analysis_repository.create_analysis(
+                document_ids=analysis_to_save.document_ids,
+                analysis_type=analysis_to_save.analysis_type,
+                result_data=analysis_to_save.result_data
+            )
             logger.info(f"Successfully saved analysis {analysis_id}")
 
             # Format for return, including metadata
-            # This is just an example structure, adapt as needed
+            # This structure should align with what API consumers expect.
+            # The 'results' key in the formatted return should ideally contain what was in the original 'result_data' argument.
+            
+            # Extract core analysis outputs from result_data
+            analysis_text_content = result_data.get("analysis_text", "") # Ensure this key matches _process_tool_calls output
+            visualizations_content = result_data.get("visualizations", {"charts": [], "tables": []})
+            metrics_content = result_data.get("metrics", [])
+            # Assuming result_data might also contain other keys like 'ratios', 'insights' etc. from strategies
+            # These should also be promoted if the frontend expects them at the top level.
+            # For now, focusing on the ones derived from _process_tool_calls and seen in frontend issues.
+
             formatted_return = {
-                "analysis_id": analysis_id,
+                "analysis_id": analysis_id, # Or "id": analysis_id if frontend expects "id"
                 "document_ids": document_ids,
                 "analysis_type": analysis_type,
-                "status": "completed", # analysis_to_save.status,
-                "created_at": analysis_to_save.created_at.isoformat(),
-                "query": user_query,
+                "status": persisted_result_payload["processing_status"], # Get status from the payload
+                "created_at": analysis_to_save.created_at.isoformat(), # Or "timestamp"
+                "query": user_query, 
                 "parameters": parameters,
-                "results": result_data # The core analysis output
+                # Promoted fields:
+                "analysis_text": analysis_text_content,
+                "visualization_data": visualizations_content,
+                "metrics": metrics_content,
+                # Spread other potential top-level fields from result_data if necessary,
+                # for example, if strategies directly return 'ratios', 'insights' at top of their result_data dict:
+                "ratios": result_data.get("ratios", []),
+                "insights": result_data.get("insights", []),
+                "comparativePeriods": result_data.get("comparative_periods", []), # Example
+                "citationReferences": result_data.get("citation_references", {}) # Example
+                # Remove the nested "results" key
             }
             return analysis_id, formatted_return
         except Exception as e:

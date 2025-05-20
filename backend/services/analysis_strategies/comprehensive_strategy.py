@@ -1,25 +1,24 @@
 import json
 from typing import List, Dict, Any, Optional
 import logging
+from importlib.resources import files # Added for PlanPlanPlan.md item 1.1
 
 from .base_strategy import AnalysisStrategy
-from pdf_processing.claude_service import ClaudeService, ALL_TOOLS_DICT # Assuming ALL_TOOLS_DICT is here
+from cfin.backend.pdf_processing.api_service import ClaudeService # Removed ALL_TOOLS_DICT import
+# ALL_TOOLS_DICT is no longer directly used here for passing to execute_tool_interaction_turn
+# from pdf_processing.claude_service import ClaudeService, ALL_TOOLS_DICT
 from models.database_models import Document
 from models.visualization import ChartData, TableData
 from models.analysis import FinancialMetric
-from ...utils import tool_processing # Added for Story #9
+from utils import tool_processing # Added for Story #9
 
 logger = logging.getLogger(__name__)
 
-COMPREHENSIVE_SYSTEM_PROMPT = """You are an AI financial analyst. Your primary goal is to conduct a thorough and comprehensive analysis of the provided financial documents and user query.
-Always aim to provide a detailed textual summary of your findings.
-You MUST actively use the available tools (`generate_graph_data`, `generate_table_data`, `generate_financial_metric`) to create relevant visualizations (charts, tables) and extract key financial metrics that support your analysis.
-If the user query is broad, identify key areas for analysis and address them systematically.
-If the user requests specific charts, tables, or metrics, ensure you fulfill these requests using the appropriate tools.
-Structure your response clearly. Ensure your textual analysis explains the data presented in any charts, tables, or metrics you generate.
-Adhere strictly to the Pydantic models provided in the tool descriptions for tool inputs.
-Continue your analysis and tool use across multiple turns if necessary to be comprehensive, up to a maximum of 7 turns.
-"""
+# Updated for PlanPlanPlan.md item 1.1 and user-provided path
+PROMPT_PATH = files('services.analysis_strategies').joinpath(
+    'prebuilt_prompts/Claude Financial Analysis Prompt.md'
+)
+COMPREHENSIVE_SYSTEM_PROMPT: str = PROMPT_PATH.read_text(encoding='utf-8')
 
 class ComprehensiveAnalysisStrategy(AnalysisStrategy):
     """
@@ -73,12 +72,14 @@ class ComprehensiveAnalysisStrategy(AnalysisStrategy):
 
             # Ensure ALL_TOOLS_DICT is available. It might be better to pass it from AnalysisService
             # or ensure ClaudeService provides access to it if it's not globally available here.
-            tools_to_use = getattr(self.claude_service, 'ALL_TOOLS_DICT', ALL_TOOLS_DICT) # Defensive
+            # tools_to_use = getattr(self.claude_service, 'ALL_TOOLS_DICT', ALL_TOOLS_DICT) # Defensive
+            # Use tools_for_api from claude_service instance, which is CLAUDE_API_TOOLS_LIST
+            tools_for_api_call = self.claude_service.tools_for_api
             
             api_response = await self.claude_service.execute_tool_interaction_turn(
                 system_prompt=COMPREHENSIVE_SYSTEM_PROMPT,
                 messages=conversation_messages,
-                tools=tools_to_use,
+                tools=tools_for_api_call, # Pass the correct list of dicts
                 # temperature=0.3, # Optional: can be set here or in ClaudeService
                 # max_tokens=4096   # Optional: can be set here or in ClaudeService
             )

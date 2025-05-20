@@ -25,14 +25,45 @@ interface BarChartProps {
  * Uses Recharts library for rendering the chart
  */
 export default function BarChart({ data, height = 400, width = '100%' }: BarChartProps) {
-  const { config, chartConfig } = data;
+  const { config, chartConfig, data: rawChartData, chartType } = data;
+  
+  let processedData = rawChartData;
+  // Expected categoryKey from config.xAxisKey or a fallback
+  const categoryKey = config.xAxisKey || 
+                     (config.xAxisLabel ? config.xAxisLabel.toLowerCase().replace(/\s+/g, '_') : 'category');
+
+  if (chartType === 'multiBar' && Array.isArray(rawChartData) && rawChartData.length > 0 && rawChartData[0].hasOwnProperty('name') && rawChartData[0].hasOwnProperty('data')) {
+    // Transform data for multiBar:
+    // from: [ { name: "SeriesA", data: [{x: "cat1", y: valA1}, ...] }, ... ]
+    // to:   [ { [categoryKey]: "cat1", SeriesA: valA1, SeriesB: valB1}, ... ]
+    // where SeriesA/SeriesB are keys from chartConfig
+    
+    const seriesKeysFromChartConfig = Object.keys(chartConfig);
+    const transformedDataMap = new Map();
+
+    rawChartData.forEach(seriesObject => {
+      // Find the key in chartConfig that corresponds to seriesObject.name (the series identifier in the raw data)
+      // This assumes seriesObject.name directly matches a key in chartConfig or its label.
+      const seriesDataKey = seriesKeysFromChartConfig.find(
+        key => chartConfig[key].label === seriesObject.name || key === seriesObject.name
+      );
+
+      if (seriesDataKey && Array.isArray(seriesObject.data)) {
+        seriesObject.data.forEach(point => {
+          const xValue = point.x; // This is the actual category value like "Net Interest Income"
+          if (!transformedDataMap.has(xValue)) {
+            transformedDataMap.set(xValue, { [categoryKey]: xValue });
+          }
+          transformedDataMap.get(xValue)[seriesDataKey] = point.y;
+        });
+      }
+    });
+    processedData = Array.from(transformedDataMap.values());
+  }
   
   // Extract the keys that should be rendered as bars (all except the category axis)
-  // Try different possible keys in order of preference
-  const categoryKey = config.xAxisKey || 
-                     (config.xAxisLabel ? config.xAxisLabel.toLowerCase() : 'category');
-  
-  const metricKeys = Object.keys(chartConfig).filter(key => key !== categoryKey);
+  // These are the keys from chartConfig (e.g., "2025", "2024" for multiBar)
+  const metricKeys = Object.keys(chartConfig);
   
   // Generate bars for each metric with their respective colors
   const bars = metricKeys.map((key, index) => {
@@ -78,7 +109,7 @@ export default function BarChart({ data, height = 400, width = '100%' }: BarChar
       
       <ResponsiveContainer width={width} height={height}>
         <RechartsBarChart
-          data={data.data}
+          data={processedData}
           margin={{ top: 10, right: 30, left: 20, bottom: 30 }}
           barSize={config.stack ? 20 : 40}
           barGap={config.stack ? 0 : 4}

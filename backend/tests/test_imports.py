@@ -44,7 +44,7 @@ except ImportError as e:
     print(f"❌ Error importing services.conversation_service: {e}")
 
 try:
-    from pdf_processing.claude_service import ClaudeService
+    from cfin.backend.pdf_processing.api_service import ClaudeService
     print("✅ pdf_processing.claude_service imports successful")
 except ImportError as e:
     print(f"❌ Error importing pdf_processing.claude_service: {e}")

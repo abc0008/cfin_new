@@ -1,15 +1,38 @@
 import json
 from typing import List, Dict, Any, Optional
 import logging
+import re # Added for PlanPlanPlan.md item 1.2
 
+from models.analysis import FinancialMetric
 from .base_strategy import AnalysisStrategy
-from pdf_processing.claude_service import ClaudeService, ALL_TOOLS_DICT
+from cfin.backend.pdf_processing.api_service import ClaudeService
 from models.database_models import Document
 from models.visualization import ChartData, TableData
-from models.analysis import FinancialMetric
-from ...utils import tool_processing
+from utils import tool_processing
 
 logger = logging.getLogger(__name__)
+
+# Added for PlanPlanPlan.md item 1.2
+REQUIRED_CHARTS = {
+    'multi-period balance sheet composition stacked column',
+    'balance sheet change analysis column',
+    'asset composition line',
+    'liability composition line',
+    'margin analysis',
+    'non-interest revenue trend',
+    'non-interest revenue period over period',
+    'key financial ratio trend line',
+    'expense composition trend stacked bar',
+}
+
+def extract_between_tags(text: str, tag: str) -> str:
+    # import re # No need to import re again if already at top level
+    match = re.search(
+        rf'<{tag}>(.*?)</{tag}>',
+        text,
+        flags=re.DOTALL | re.IGNORECASE  # DOTALL + case-insensitive
+    )
+    return (match.group(1) if match else '').strip()
 
 # Moved from analysis_service.py (Story #7)
 FINANCIAL_ANALYSIS_TEMPLATE_PROMPT = """
@@ -112,7 +135,8 @@ class FinancialTemplateStrategy(AnalysisStrategy):
 
     def __init__(self, claude_service: ClaudeService):
         super().__init__(claude_service)
-        self.max_turns = 7
+        self.max_turns = 9
+        self.planning_verified = False # Added for PlanPlanPlan.md item 1.2
 
     async def execute(
         self,
@@ -151,19 +175,21 @@ class FinancialTemplateStrategy(AnalysisStrategy):
                     "metrics": []
                 }
             
-            tools_to_use = getattr(self.claude_service, 'ALL_TOOLS_DICT', ALL_TOOLS_DICT)
+            tools_for_api_call = self.claude_service.tools_for_api
 
             api_response = await self.claude_service.execute_tool_interaction_turn(
                 system_prompt=system_prompt,
                 messages=conversation_messages,
-                tools=tools_to_use,
+                tools=tools_for_api_call,
             )
 
             assistant_response_content_blocks = []
+            assistant_text_this_turn = "" # To capture text for planning guard
             if api_response.content:
                 for block in api_response.content:
                     if block.type == "text":
                         accumulated_text += block.text + "\n"
+                        assistant_text_this_turn += block.text # Capture for planning guard
                         assistant_response_content_blocks.append({"type": "text", "text": block.text})
                     elif block.type == "tool_use":
                         assistant_response_content_blocks.append({
@@ -175,6 +201,26 @@ class FinancialTemplateStrategy(AnalysisStrategy):
             
             if assistant_response_content_blocks:
                 conversation_messages.append({"role": "assistant", "content": assistant_response_content_blocks})
+                
+                # Planning Guard Logic from PlanPlanPlan.md item 1.2
+                if not self.planning_verified and '<financial_analysis_planning' in assistant_text_this_turn.lower():
+                    plan_txt = extract_between_tags(assistant_text_this_turn, 'financial_analysis_planning').lower()
+                    missing_charts = [chart_name for chart_name in REQUIRED_CHARTS if chart_name not in plan_txt]
+                    if missing_charts:
+                        logger.info(f"Planning guard: Missing charts in plan: {missing_charts}")
+                        # Append a user message to request missing charts
+                        conversation_messages.append({
+                            'role': 'user',
+                            'content': (
+                                "Great start on the plan! Please update your plan to explicitly include these visualizations: "
+                                f"{', '.join(missing_charts)}."
+                            ),
+                        })
+                        # Potentially continue to the next turn to let Claude update the plan
+                        # The current loop structure will send this new user message in the next iteration.
+                    else:
+                        logger.info("Planning guard: All required charts found in the plan.")
+                        self.planning_verified = True
             elif api_response.stop_reason != 'tool_use':
                  logger.warning(f"FinancialTemplateStrategy: Assistant response empty, stop_reason not tool_use: {api_response.stop_reason}")
 
