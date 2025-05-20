@@ -16,7 +16,7 @@ from models.document import (
     DocumentUploadResponse
 )
 from models.database_models import DocumentType, ProcessingStatusEnum, Document, Citation
-from pdf_processing.claude_service import ClaudeService
+from cfin.backend.pdf_processing.api_service import ClaudeService
 from repositories.document_repository import DocumentRepository
 
 

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch, MagicMock, Mock
 from typing import Dict, List, Any
 
 import asyncio
-from pdf_processing.claude_service import ClaudeService
+from cfin.backend.pdf_processing.api_service import ClaudeService
 from models.document import ProcessedDocument, DocumentContentType, DocumentMetadata, ProcessingStatus
 from models.tools import ChartGenerationTool, TableGenerationTool
 
@@ -113,7 +113,7 @@ class TestClaudeServiceTools:
         self.service.client = self.mock_client
         
         # Patch the tools support to be True for testing
-        monkeypatch.setattr("pdf_processing.claude_service.TOOLS_SUPPORT", True)
+        monkeypatch.setattr("pdf_processing.api_service.TOOLS_SUPPORT", True)
 
     @pytest.mark.asyncio
     async def test_generate_response_with_tools(self, mock_tool_response):
@@ -144,7 +144,7 @@ class TestClaudeServiceTools:
     async def test_generate_response_with_tools_no_tools_support(self, monkeypatch):
         """Test fallback when tools support is not available"""
         # Setup - TOOLS_SUPPORT is False
-        monkeypatch.setattr("pdf_processing.claude_service.TOOLS_SUPPORT", False)
+        monkeypatch.setattr("pdf_processing.api_service.TOOLS_SUPPORT", False)
         
         # Mock regular response method
         original_generate_response = self.service.generate_response
@@ -165,8 +165,20 @@ class TestClaudeServiceTools:
         self.service.generate_response = original_generate_response
         
     @pytest.mark.asyncio
-    async def test_analyze_with_visualization_tools_success(self, mock_claude_service, sample_document_text, sample_user_query):
-        # ... existing code ...
+    async def test_analyze_with_visualization_tools_success(self, mock_tool_response, sample_document_text, sample_user_query):
+        # Setup: Mock the underlying client call that analyze_with_visualization_tools will make.
+        # This assumes analyze_with_visualization_tools internally calls something like messages.create.
+        # The mock_tool_response fixture provides a response that includes tool uses.
+        self.mock_client.messages.create = AsyncMock(return_value=mock_tool_response)
+
+        # Execute the method under test
+        result = await self.service.analyze_with_visualization_tools(
+            document_text=sample_document_text, 
+            user_query=sample_user_query
+            # If analyze_with_visualization_tools takes a knowledge_base_id, add it here e.g., knowledge_base_id=""
+        )
+        
+        # ... existing code ... : This comment was originally here, the asserts below are the existing code.
         assert "visualizations" in result
         assert "charts" in result["visualizations"]
         assert "tables" in result["visualizations"]

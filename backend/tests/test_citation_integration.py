@@ -12,7 +12,7 @@ import pathlib
 
 # Import required modules
 from pdf_processing.langgraph_service import LangGraphService
-from pdf_processing.claude_service import ClaudeService
+from cfin.backend.pdf_processing.api_service import ClaudeService
 from services.conversation_service import ConversationService
 from models.citation import Citation, CitationType, CharLocationCitation, PageLocationCitation
 

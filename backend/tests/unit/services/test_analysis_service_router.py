@@ -11,7 +11,7 @@ from services.analysis_strategies.financial_template_strategy import FinancialTe
 # Assuming a base strategy for type hinting if necessary, though not strictly needed for this mock
 from services.analysis_strategies.base_strategy import AnalysisStrategy 
 
-from pdf_processing.claude_service import ClaudeService
+from cfin.backend.pdf_processing.api_service import ClaudeService
 from repositories.analysis_repository import AnalysisRepository
 from repositories.document_repository import DocumentRepository
 from models.database_models import Document, AnalysisResult, User

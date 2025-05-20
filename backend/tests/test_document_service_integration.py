@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 
 from pdf_processing.document_service import DocumentService
-from pdf_processing.claude_service import ClaudeService
+from cfin.backend.pdf_processing.api_service import ClaudeService
 from models.document import ProcessedDocument, Citation, DocumentContentType
 from models.document import DocumentMetadata, ProcessingStatus
 from repositories.document_repository import DocumentRepository

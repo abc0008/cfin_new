@@ -7,7 +7,7 @@ from services.analysis_service import AnalysisService
 from models.document import ProcessedDocument, DocumentMetadata, DocumentContentType, ProcessingStatus
 from models.tools import ChartGenerationTool, TableGenerationTool
 from models.visualization import ChartData, TableData, VisualizationData
-from pdf_processing.claude_service import ClaudeService
+from cfin.backend.pdf_processing.api_service import ClaudeService
 
 
 @pytest.fixture
@@ -358,7 +358,7 @@ class TestAnalysisServiceEnhancements:
         assert result.visualization_data is None # No visualizations for this path
         assert result.metrics is None # No separate metrics for this path currently
         assert result.comparative_periods is None # No comparative periods for this path
-        assert result.status == ProcessingStatusEnum.COMPLETED
+        assert result.status == ProcessingStatus.COMPLETED
         assert len(result.citations) == 1
 
     @pytest.mark.asyncio
@@ -400,4 +400,4 @@ class TestAnalysisServiceEnhancements:
         assert len(result.visualization_data["tables"]) == 1
         assert len(result.metrics) == 1
         assert len(result.comparative_periods) == 1
-        assert result.status == ProcessingStatusEnum.COMPLETED 
+        assert result.status == ProcessingStatus.COMPLETED 

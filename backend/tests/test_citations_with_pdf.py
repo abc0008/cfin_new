@@ -6,7 +6,7 @@ import json
 from dotenv import load_dotenv
 import argparse
 from pdf_processing.langgraph_service import LangGraphService
-from pdf_processing.claude_service import ClaudeService
+from cfin.backend.pdf_processing.api_service import ClaudeService
 from colorama import init, Fore, Style
 
 # Initialize colorama for colored terminal output

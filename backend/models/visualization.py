@@ -11,10 +11,10 @@ def to_camel(string: str) -> str:
 class MetricConfig(BaseModel):
     """Configuration for a metric in a chart."""
     label: str
-    unit: Optional[str] = None  # Added for frontend consistency
-    color: Optional[str] = None
-    formatter: Optional[str] = None  # Added for frontend formatting
-    precision: Optional[int] = None  # Added for frontend number formatting
+    unit: str = ""  # Changed from Optional[str] = None
+    color: str = ""  # Changed from Optional[str] = None
+    formatter: str = ""  # Changed from Optional[str] = None
+    precision: int = 2  # Changed from Optional[int] = None
 
     class Config:
         alias_generator = to_camel
@@ -27,7 +27,7 @@ class ChartConfig(BaseModel):
     subtitle: Optional[str] = None  # Added for frontend consistency
     x_axis_label: Optional[str] = Field(None, alias="xAxisLabel")
     y_axis_label: Optional[str] = Field(None, alias="yAxisLabel")
-    x_axis_key: Optional[str] = Field(None, alias="xAxisKey")
+    x_axis_key: str = Field("category", alias="xAxisKey")  # Changed from Optional[str], added default
     trend: Optional[Dict[str, Any]] = None
     footer: Optional[str] = None
     total_label: Optional[str] = Field(None, alias="totalLabel")
@@ -42,12 +42,30 @@ class ChartConfig(BaseModel):
         alias_generator = to_camel
         allow_population_by_field_name = True
 
+class ChartDataItem(BaseModel):
+    """A single data point for a chart."""
+    x_value: Union[str, int, float] = Field(alias="x")
+    y_value: Union[int, float] = Field(alias="y")
+
+    class Config:
+        alias_generator = to_camel
+        populate_by_name = True
+
+class PydanticMultiSeriesChartDataItem(BaseModel):
+    """Represents a single series in a multi-series chart."""
+    name: str
+    data: List[ChartDataItem]
+
+    class Config:
+        alias_generator = to_camel
+        populate_by_name = True
+
 class ChartData(BaseModel):
-    """Base model for chart data."""
-    chart_type: Literal["bar", "multiBar", "line", "pie", "area", "stackedArea"] = Field(..., alias="chartType")
+    """Data structure for a chart, including type, config, data points, and chart-specific config."""
+    chart_type: str = Field(alias="chartType")
     config: ChartConfig
-    data: List[Dict[str, Any]]
-    chart_config: Dict[str, MetricConfig] = Field(..., alias="chartConfig")
+    data: Union[List[ChartDataItem], List[PydanticMultiSeriesChartDataItem]]
+    chart_config: Dict[str, Any] = Field(alias="chartConfig")
     
     model_config = ConfigDict(
         populate_by_name=True,
@@ -90,7 +108,7 @@ class TableConfig(BaseModel):
 
 class TableData(BaseModel):
     """Model for table data."""
-    table_type: Literal["simple", "matrix", "comparison"] = Field(..., alias="tableType")
+    table_type: Literal["simple", "matrix", "comparison", "summary", "detailed"] = Field(..., alias="tableType")
     config: TableConfig
     data: List[Dict[str, Any]]
     

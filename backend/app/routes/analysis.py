@@ -19,7 +19,7 @@ from repositories.document_repository import DocumentRepository
 from repositories.analysis_repository import AnalysisRepository
 from services.analysis_service import AnalysisService
 from pdf_processing.document_service import DocumentService
-from pdf_processing.claude_service import ClaudeService
+from cfin.backend.pdf_processing.api_service import ClaudeService
 from pdf_processing.langchain_service import LangChainService
 from utils.database import get_db
 from utils.response import handle_exception, create_error_response, get_error_type_from_status, add_cors_headers

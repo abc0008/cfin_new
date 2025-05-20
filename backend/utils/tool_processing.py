@@ -4,8 +4,8 @@ from typing import Dict, List, Optional, Any
 
 from pydantic import ValidationError
 
-from ..models.visualization import ChartData, TableData
-from ..models.analysis import FinancialMetric
+from models.visualization import ChartData, TableData
+from models.analysis import FinancialMetric
 from .exceptions import ToolSchemaValidationError
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,90 @@ def process_chart_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
     if "description" not in config or config["description"] is None:
         config["description"] = config.get("title", "")
     processed_chart["config"] = config
+
+    # Transform data structure
+    original_data = processed_chart.get("data", [])
+    chart_type = processed_chart.get("chartType")
+    chart_config_settings = processed_chart.get("chartConfig", {})
+    x_axis_key = config.get("xAxisKey")
+
+    transformed_data = []
+
+    if not x_axis_key:
+        raise ToolSchemaValidationError(f"xAxisKey is missing in chart config. Input: {tool_input}")
+
+    # Determine if it's a multi-series chart based on chartConfig keys
+    # Simple charts (like a single series bar/line or pie) usually have one entry in chartConfig or chartConfig keys map directly to y-values from data.
+    # Multi-series charts (like multiBar) have multiple entries in chartConfig representing each series.
+    
+    series_keys = list(chart_config_settings.keys())
+
+    if chart_type in ["bar", "line", "scatter", "area"] and len(series_keys) == 1:
+        # Single series bar, line, scatter, or area chart
+        y_axis_data_key = series_keys[0]
+        for item in original_data:
+            if x_axis_key in item and y_axis_data_key in item:
+                transformed_data.append({
+                    "x": item[x_axis_key],
+                    "y": item[y_axis_data_key]
+                })
+            else:
+                logger.warning(f"Missing x ('{x_axis_key}') or y ('{y_axis_data_key}') key in item: {item} for single series {chart_type}")
+    elif chart_type == "pie":
+        # Pie chart: data items usually have a name (x_axis_key) and a value (first key in chart_config_settings or a common key like 'value')
+        # The Zod schema ChartDataItemSchema expects 'x' and 'y'.
+        # Let's assume the y-value key is the first one found in chart_config_settings if only one, or 'value' if present in data item.
+        y_value_key = None
+        if len(series_keys) == 1:
+            y_value_key = series_keys[0]
+
+        for item in original_data:
+            current_y_key = y_value_key
+            if not current_y_key:
+                # Try to find a 'value' key or the first numeric key other than x_axis_key
+                possible_y_keys = [k for k, v in item.items() if k != x_axis_key and isinstance(v, (int, float))]
+                if 'value' in possible_y_keys:
+                    current_y_key = 'value'
+                elif possible_y_keys:
+                    current_y_key = possible_y_keys[0]
+            
+            if x_axis_key in item and current_y_key and current_y_key in item:
+                transformed_data.append({
+                    "x": item[x_axis_key],
+                    "y": item[current_y_key]
+                })
+            else:
+                logger.warning(f"Pie chart: Missing x ('{x_axis_key}') or deduced y key ('{current_y_key}') in item: {item}")
+
+    elif chart_type in ["bar", "multiBar", "stackedArea"] and len(series_keys) > 1:
+        # Potentially a multi-series chart (e.g., multiBar, or bar that should be multiBar)
+        # If original type was 'bar' but we have multiple series, treat as 'multiBar'
+        if chart_type == "bar":
+            logger.info(f"Chart type 'bar' with multiple series_keys ({series_keys}) being treated as 'multiBar'.")
+            processed_chart["chartType"] = "multiBar" # Update chartType
+        
+        for series_key in series_keys:
+            series_name = chart_config_settings[series_key].get("label", series_key)
+            current_series_data = []
+            for item in original_data:
+                if x_axis_key in item and series_key in item:
+                    current_series_data.append({
+                        "x": item[x_axis_key],
+                        "y": item[series_key]
+                    })
+                else:
+                    logger.warning(f"Missing x ('{x_axis_key}') or series key ('{series_key}') in item: {item} for multi-series chart")
+            transformed_data.append({
+                "name": series_name,
+                "data": current_series_data
+            })
+    else:
+        # Fallback or unhandled chart type / series_keys combination
+        logger.warning(f"Unhandled chart data transformation for chartType '{chart_type}' with series_keys {series_keys}. Using original data.")
+        transformed_data = original_data # Keep original if no specific transformation logic applies
+
+    processed_chart["data"] = transformed_data
+
     try:
         validated_chart = ChartData(**processed_chart)
         logger.info(f"Successfully processed chart: {validated_chart.config.title if validated_chart.config else 'Untitled Chart'}")
@@ -69,11 +153,14 @@ def process_table_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
     if "tableType" not in processed_table or processed_table.get("tableType") is None:
         logger.warning(f"Missing 'tableType' in tool_input from Claude. Defaulting to 'comparison'. Input: {tool_input}")
         processed_table["tableType"] = "comparison"
-    allowed_table_types = ["simple", "matrix", "comparison"]
+    
+    allowed_table_types = ["simple", "matrix", "comparison", "summary", "detailed"]
     current_table_type = processed_table.get("tableType")
+    
     if current_table_type not in allowed_table_types:
         logger.warning(f"Invalid tableType '{current_table_type}' received from Claude. Defaulting to 'comparison'. Input: {tool_input}")
         processed_table["tableType"] = "comparison"
+    
     try:
         config = processed_table.get("config", {})
         if "description" not in config or config["description"] is None:

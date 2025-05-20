@@ -174,22 +174,27 @@ export default function Workspace() {
       });
     } else {
       // SUCCESSFUL ANALYSIS: Use result.analysisText for an assistant message
-      const currentAnalysisResult = typedResult; // No need for another `as AnalysisResult` if typedResult is already correctly typed
-      
-      // Log the values to understand why the fallback might be hit
-      console.log("[handleAnalysisResult] Inspecting analysisText:");
-      console.log("[handleAnalysisResult] typedResult.analysisText:", typedResult.analysisText);
+      const currentAnalysisResult = typedResult;
+
+      console.log("[handleAnalysisResult] Inspecting analysisText (pre-trim):");
+      console.log("[handleAnalysisResult] typeof typedResult.analysisText: " + typeof typedResult.analysisText);
+      console.log("[handleAnalysisResult] typedResult.analysisText VALUE: '" + typedResult.analysisText + "'");
       
       const detailedAnalysisContent = currentAnalysisResult.analysisText?.trim();
-      console.log("[handleAnalysisResult] detailedAnalysisContent (after trim):", detailedAnalysisContent);
+      console.log("[handleAnalysisResult] detailedAnalysisContent (post-trim):");
+      console.log("[handleAnalysisResult] typeof detailedAnalysisContent: " + typeof detailedAnalysisContent);
+      console.log("[handleAnalysisResult] detailedAnalysisContent VALUE: '" + detailedAnalysisContent + "'");
+      console.log("[handleAnalysisResult] Is detailedAnalysisContent TRUTHY?: " + !!detailedAnalysisContent);
 
       if (detailedAnalysisContent) {
+        console.log("[handleAnalysisResult] Condition 'detailedAnalysisContent' is TRUE. Setting assistant message.");
+        const messageContent = `[FROM IF-BLOCK]: ${detailedAnalysisContent}`;
         setMessages(prev => {
           const newAssistantMessage: Message = {
             id: `msg-${Date.now()}`,
             sessionId: sessionId,
             role: 'assistant',
-            content: detailedAnalysisContent,
+            content: messageContent,
             timestamp: new Date().toISOString(),
             referencedDocuments: [selectedDocument?.metadata?.id || documentId],
             referencedAnalyses: [currentAnalysisResult.id],
@@ -197,7 +202,8 @@ export default function Workspace() {
           return [...prev, newAssistantMessage];
         });
       } else {
-        const fallbackMessage = `Financial analysis for "${selectedDocument?.metadata?.filename || documentId}" is complete. Key findings are available in the Analysis tab, though a textual summary was not explicitly provided in the chat.`;
+        console.log("[handleAnalysisResult] Condition 'detailedAnalysisContent' is FALSE. Setting fallback system message.");
+        const fallbackMessage = `Financial analysis for "${selectedDocument?.metadata?.filename || documentId}" is complete. Key findings are available in the Analysis tab, though a textual summary (detailedAnalysisContent was '${detailedAnalysisContent}') was not explicitly provided in the chat.`;
         setMessages(prev => {
           const newSystemMessage: Message = {
             id: `msg-${Date.now()}`,
