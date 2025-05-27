@@ -52,6 +52,15 @@ import contextlib
 import httpx
 import backoff
 
+# Claude API optimization imports
+import settings
+from settings import ANTHROPIC_BETA
+from utils.claude_bucket import ClaudeBucket
+from pdf_processing.claude_file_client import upload_pdf
+from pdf_processing.model_router import choose_model
+from utils.hashlib_utils import sha256_str
+from utils.token_utils import count_tokens
+
 from models.document import ProcessedDocument, Citation as DocumentCitation, DocumentContentType, DocumentMetadata, ProcessingStatus
 from models.citation import Citation, CitationType, CharLocationCitation, PageLocationCitation, ContentBlockLocationCitation
 from pdf_processing.langchain_service import LangChainService
@@ -176,13 +185,18 @@ class ClaudeService:
 
         try:
             # Using Claude 3.7 Sonnet for token-efficient tool use and enhanced PDF support
-            self.model = "claude-3-7-sonnet-20250219"  # Updated model
+            self.model = settings.MODEL_SONNET
             self.client = AsyncAnthropic(
                 api_key=self.api_key,
                 timeout=httpx.Timeout(90.0, connect=5.0), # Set overall timeout to 90s
                 max_retries=5 # Set max retries to 5
             )
-            logger.info(f"ClaudeService initialized with model: {self.model}, PDF support, timeout=90s, max_retries=5")
+            
+            # Token efficiency headers for Claude API optimization
+            self._extra_headers = {"anthropic-beta": ANTHROPIC_BETA}
+            self._tools_for_api = CLAUDE_API_TOOLS_LIST  # existing list
+            
+            logger.info(f"ClaudeService initialized with model: {self.model}, PDF support, timeout=90s, max_retries=5, headers: {self._extra_headers}")
         except Exception as e:
             logger.error(f"Failed to initialize AsyncAnthropic client: {str(e)}")
             self.client = None
@@ -204,6 +218,37 @@ class ClaudeService:
         else:
             logger.warning("LangGraph service not available, skipping initialization")
             self.langgraph_service = None
+
+    async def _claude_call(self, **kwargs) -> AnthropicMessage:
+        """
+        Central wrapper for all Claude API calls with rate limiting and token efficiency.
+        
+        Args:
+            **kwargs: Arguments to pass to client.messages.create
+            
+        Returns:
+            Claude API response
+        """
+        # Estimate tokens for rate limiting
+        messages = kwargs.get("messages", [])
+        tokens_in = count_tokens(messages)
+        
+        # Apply rate limiting based on current token bucket state
+        await ClaudeBucket.throttle(tokens_in)
+
+        try:
+            # Make the API call with token efficiency headers
+            resp = await self.client.messages.create(
+                extra_headers=self._extra_headers,
+                **kwargs
+            )
+        except RateLimitError as e:
+            # Re-raise rate limit errors for upstream handling
+            raise
+        
+        # Update rate limit state from response headers
+        ClaudeBucket.update(resp.response_headers)
+        return resp
 
     async def generate_response(
         self,
@@ -309,6 +354,102 @@ class ClaudeService:
         except Exception as e:
             logger.error(f"Error during Claude full text extraction for {filename}: {str(e)}", exc_info=True)
             return f"Error extracting full text from {filename}: {str(e)}"
+
+    async def _extract_full_text(self, *, doc, pdf_bytes: bytes, prompt: str) -> str:
+        """
+        Extract full text using Claude Files API for token efficiency.
+        Uses cached file ID if available, otherwise uploads the PDF first.
+        
+        Args:
+            doc: Document database model with claude_file_id, full_text, text_sha256 fields
+            pdf_bytes: Raw PDF bytes  
+            prompt: Extraction prompt to use
+            
+        Returns:
+            Extracted full text
+        """
+        if not self.client:
+            logger.error(f"Claude client not available for full text extraction from {doc.filename}.")
+            return f"Error: Claude client not initialized for {doc.filename}."
+            
+        # Upload to Files API if not already done
+        if not doc.claude_file_id:
+            doc.claude_file_id = await upload_pdf(doc.filename, pdf_bytes)
+            # Note: We'll save the document after extracting text to also cache the text
+            
+        # Build message using Files API reference
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "document",
+                        "source": {"type": "file", "file_id": doc.claude_file_id},
+                        "citations": {"enabled": True}
+                    },
+                    {
+                        "type": "text",
+                        "text": prompt
+                    }
+                ],
+            }
+        ]
+
+        # Use Sonnet for text extraction (high quality, but this is a one-time cost)
+        resp = await self._claude_call(
+            model=settings.MODEL_SONNET,
+            messages=messages,
+            max_tokens=4096,
+        )
+        
+        # Extract text from response
+        text = resp.content[0].text if resp.content else ""
+        
+        # Cache the extracted text and its hash
+        doc.full_text = text
+        doc.text_sha256 = sha256_str(text)
+        # Note: Repository save should be done by caller
+        
+        logger.info(f"Successfully extracted full text ({len(text)} chars) from {doc.filename} using Files API.")
+        return text
+
+    async def get_document_text(self, doc_id: str, document_repo) -> str:
+        """
+        Get document text, using cache if available or extracting via Files API.
+        
+        Args:
+            doc_id: Document ID
+            document_repo: Document repository instance for database operations
+            
+        Returns:
+            Full text of the document
+        """
+        doc = await document_repo.get_document(doc_id)
+        if not doc:
+            raise ValueError(f"Document {doc_id} not found")
+            
+        # Return cached text if available
+        if doc.full_text:
+            logger.info(f"Using cached text for document {doc_id} ({len(doc.full_text)} chars)")
+            return doc.full_text
+            
+        # Extract text using Files API
+        pdf_bytes = await document_repo.storage_service.get_file(f"{doc_id}.pdf")
+        if not pdf_bytes:
+            raise ValueError(f"PDF content not found for document {doc_id}")
+            
+        from settings import PDF_EXTRACT_PROMPT
+        prompt = PDF_EXTRACT_PROMPT
+        text = await self._extract_full_text(doc=doc, pdf_bytes=pdf_bytes, prompt=prompt)
+        
+        # Save the updated document with cached text and file ID
+        await document_repo.update_document(doc_id, {
+            "full_text": doc.full_text,
+            "text_sha256": doc.text_sha256,
+            "claude_file_id": doc.claude_file_id
+        })
+        
+        return text
 
     async def process_pdf(self, pdf_data: bytes, filename: str) -> Tuple[str, ProcessedDocument, List[DocumentCitation]]:
         """
@@ -923,7 +1064,8 @@ Follow these guidelines:
         user_query: str,
         knowledge_base: str = "",
         document_base64: Optional[str] = None,
-        document_filename: Optional[str] = "document.pdf"
+        document_filename: Optional[str] = "document.pdf",
+        requested_tools: Optional[set[str]] = None
     ) -> Dict[str, Any]:
         """
         Analyze a financial document using Claude with tool support for visualizations.
@@ -1015,17 +1157,35 @@ Follow these guidelines:
 
             # Log request details
             logger.debug(f"Sending request to Claude with {len(messages)} message(s) and {len(ALL_TOOLS_DICT)} tools.")
+            
+            # Determine requested tools from parameter or user query for model routing
+            if requested_tools is None:
+                requested_tools = set()
+                query_lower = user_query.lower()
+                if 'table' in query_lower or 'generate_table_data' in query_lower:
+                    requested_tools.add('generate_table_data')
+                if 'chart' in query_lower or 'graph' in query_lower or 'generate_graph_data' in query_lower:
+                    requested_tools.add('generate_graph_data')  
+                if 'metric' in query_lower or 'generate_financial_metric' in query_lower:
+                    requested_tools.add('generate_financial_metric')
+                
+                # If no specific tools detected, default to common ones
+                if not requested_tools:
+                    requested_tools = {'generate_table_data', 'generate_financial_metric'}
+            
+            # Choose model based on tools and message size
+            token_estimate = count_tokens(messages)
+            model = choose_model(requested_tools, token_estimate)
 
-            # Call Claude API with tools
-            response = await self.client.messages.create(
-                model=self.model,
+            # Call Claude API with tools using central wrapper
+            response = await self._claude_call(
+                model=model,
                 system=FINANCIAL_ANALYSIS_SYSTEM_PROMPT,  # Use the refined system prompt
                 messages=messages,
                 tools=self.tools_for_api, # Use self.tools_for_api (CLAUDE_API_TOOLS_LIST)
                 tool_choice={"type": "auto"},
                 temperature=0.3, # Lower temp for more factual/structured output
                 max_tokens=4096,  # Maximize token limit for complex responses
-                extra_headers={"anthropic-beta": "token-efficient-tools-2025-02-19"} # Add beta header here
             )
 
             logger.info("Received response from Claude API.")
@@ -1827,7 +1987,7 @@ Follow these guidelines:
             # Ensure messages conform to expected structure if necessary, though typically handled by caller.
             # For instance, ensuring 'content' is correctly formatted (string or list of blocks).
 
-            response = await self.client.messages.create(
+            response = await self._claude_call(
                 model=self.model,
                 system=system_prompt,
                 messages=messages, # type: ignore
@@ -1835,7 +1995,6 @@ Follow these guidelines:
                 tool_choice={"type": "auto"},
                 max_tokens=max_tokens,
                 temperature=temperature,
-                extra_headers={"anthropic-beta": "token-efficient-tools-2025-02-19"} # Add beta header here
             )
             return response
         except httpx.HTTPStatusError as e:

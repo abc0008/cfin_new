@@ -1,0 +1,258 @@
+name: Claude API Production Readiness
+
+on:
+  # Run on PR to main/master for gate-keeping
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'backend/pdf_processing/**'
+      - 'backend/utils/**'
+      - 'backend/settings.py'
+      - 'backend/tests/integration/test_claude_production_readiness.py'
+  
+  # Run nightly for continuous monitoring
+  schedule:
+    - cron: '0 6 * * *'  # 6 AM UTC daily
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      run_api_tests:
+        description: 'Run tests that require API key'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PYTHONPATH: backend
+  LOG_LEVEL: INFO
+
+jobs:
+  claude-readiness-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      working-directory: backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio pytest-timeout
+    
+    - name: Run production readiness tests (without API)
+      working-directory: backend
+      env:
+        # Don't set ANTHROPIC_API_KEY to test offline capabilities
+        PYTHONPATH: .
+      run: |
+        python -m pytest tests/integration/test_claude_production_readiness.py \
+          -v --tb=short --timeout=300 \
+          -m "not (skipif and anthropic_api_key)"
+    
+    - name: Run API integration tests
+      if: github.event_name == 'schedule' || github.event.inputs.run_api_tests == 'true'
+      working-directory: backend
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        PYTHONPATH: .
+      run: |
+        if [ -n "$ANTHROPIC_API_KEY" ]; then
+          echo "🔑 Running API integration tests..."
+          python -m pytest tests/integration/test_claude_production_readiness.py::TestClaudeProductionReadiness::test_claude_api_integration_with_optimizations \
+            -v --tb=short --timeout=120
+        else
+          echo "⚠️ ANTHROPIC_API_KEY not available, skipping API tests"
+        fi
+    
+    - name: Generate readiness report
+      working-directory: backend
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        PYTHONPATH: .
+      run: |
+        echo "📊 Generating production readiness report..."
+        python -c "
+        import asyncio
+        import json
+        from tests.integration.test_claude_production_readiness import run_production_readiness_tests
+        
+        async def main():
+            results = await run_production_readiness_tests()
+            
+            # Write detailed results to file
+            with open('readiness_report.json', 'w') as f:
+                json.dump(results, f, indent=2, default=str)
+            
+            print(f'\\n📋 PRODUCTION READINESS REPORT:')
+            print(f'Status: {results[\"status\"]}')
+            print(f'Tests Passed: {results[\"tests_passed\"]}')
+            print(f'Tests Failed: {results[\"tests_failed\"]}')
+            print(f'Compliance: {results[\"compliance_status\"]}')
+            
+            # Exit with error code if not ready
+            if results['status'] != 'PRODUCTION_READY':
+                exit(1)
+        
+        asyncio.run(main())
+        "
+    
+    - name: Upload readiness report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: claude-readiness-report-py${{ matrix.python-version }}
+        path: backend/readiness_report.json
+        retention-days: 30
+    
+    - name: Check optimization metrics
+      working-directory: backend
+      env:
+        PYTHONPATH: .
+      run: |
+        echo "📈 Validating optimization metrics..."
+        python -c "
+        import json
+        import sys
+        
+        # Load results
+        try:
+            with open('readiness_report.json', 'r') as f:
+                results = json.load(f)
+        except FileNotFoundError:
+            print('❌ No readiness report found')
+            sys.exit(1)
+        
+        metrics = results.get('optimization_metrics', {})
+        model_stats = metrics.get('model_stats', {})
+        
+        # Validate key performance claims
+        checks = []
+        
+        # Check Haiku usage ratio (should be >40% for cost optimization)
+        haiku_ratio = model_stats.get('haiku_ratio', 0)
+        if haiku_ratio >= 0.4:
+            checks.append(f'✅ Haiku usage: {haiku_ratio:.1%} (target: >40%)')
+        else:
+            checks.append(f'❌ Haiku usage: {haiku_ratio:.1%} (target: >40%)')
+        
+        # Check cost reduction factor
+        cost_factor = model_stats.get('cost_reduction_factor', 1)
+        if cost_factor > 1:
+            savings = ((cost_factor - 1) / cost_factor) * 100
+            checks.append(f'✅ Cost reduction: {savings:.1f}% vs all-Sonnet')
+        else:
+            checks.append(f'❌ No cost reduction detected')
+        
+        # Check cache functionality
+        cache_stats = metrics.get('cache_stats', {})
+        if cache_stats.get('cached_files', 0) > 0:
+            checks.append(f'✅ File caching: {cache_stats[\"cached_files\"]} files cached')
+        else:
+            checks.append(f'⚠️ File caching: No cached files (expected in fresh environment)')
+        
+        # Print all checks
+        for check in checks:
+            print(check)
+        
+        # Determine if optimizations are working
+        failed_checks = [c for c in checks if c.startswith('❌')]
+        if failed_checks:
+            print(f'\\n❌ {len(failed_checks)} optimization checks failed')
+            sys.exit(1)
+        else:
+            print(f'\\n✅ All optimization checks passed!')
+        "
+    
+    - name: Security compliance check
+      working-directory: backend
+      env:
+        PYTHONPATH: .
+      run: |
+        echo "🔒 Checking security compliance..."
+        python -c "
+        from utils.secure_logging import audit_log_compliance
+        
+        report = audit_log_compliance()
+        
+        print(f'Secure logging: {\"✅\" if report[\"secure_logging_active\"] else \"❌\"}')
+        print(f'Audit trails: {\"✅\" if report[\"audit_trails_enabled\"] else \"❌\"}')
+        print(f'Sensitive patterns monitored: {report[\"sensitive_patterns_monitored\"]}')
+        
+        if report['recommendations']:
+            print(f'\\n⚠️ Recommendations:')
+            for rec in report['recommendations']:
+                print(f'  - {rec}')
+        
+        # Check for critical compliance issues
+        if not report['secure_logging_active'] or not report['audit_trails_enabled']:
+            print('\\n❌ Critical security compliance issues detected')
+            exit(1)
+        else:
+            print('\\n✅ Security compliance validated')
+        "
+
+  notify-results:
+    needs: claude-readiness-tests
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'schedule'
+    
+    steps:
+    - name: Download reports
+      uses: actions/download-artifact@v3
+      with:
+        pattern: claude-readiness-report-*
+        merge-multiple: true
+    
+    - name: Summarize results
+      run: |
+        echo "📊 NIGHTLY CLAUDE READINESS SUMMARY" >> summary.txt
+        echo "=====================================" >> summary.txt
+        echo "Date: $(date)" >> summary.txt
+        echo "" >> summary.txt
+        
+        # Process each report
+        for report in claude-readiness-report-*.json; do
+          if [ -f "$report" ]; then
+            python_version=$(echo "$report" | sed 's/.*-py\([0-9.]*\)\.json/\1/')
+            status=$(jq -r '.status' "$report")
+            tests_passed=$(jq -r '.tests_passed' "$report")
+            tests_failed=$(jq -r '.tests_failed' "$report")
+            
+            echo "Python $python_version: $status ($tests_passed passed, $tests_failed failed)" >> summary.txt
+          fi
+        done
+        
+        echo "" >> summary.txt
+        echo "View full results: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> summary.txt
+        
+        cat summary.txt
+    
+    # Add notification to Slack/Teams/etc. here if needed
+    # - name: Notify team
+    #   if: failure()
+    #   uses: ...
+
+concurrency:
+  group: claude-readiness-${{ github.ref }}
+  cancel-in-progress: true 

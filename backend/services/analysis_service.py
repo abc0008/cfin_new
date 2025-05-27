@@ -212,8 +212,15 @@ class AnalysisService:
                 documents.append(doc)
                 loaded_docs_count += 1
                 
-                if doc.raw_text:
-                    aggregated_text += doc.raw_text + "\n\n"
+                # Use optimized text retrieval with Claude Files API caching
+                try:
+                    optimized_text = await self.claude_service.get_document_text(doc.id, self.document_repository)
+                    aggregated_text += optimized_text + "\n\n"
+                    logger.info(f"Using cached text for document {doc.id} in analysis ({len(optimized_text)} chars)")
+                except Exception as e:
+                    logger.warning(f"Failed to get cached text for document {doc.id}: {e}")
+                    if doc.raw_text:
+                        aggregated_text += doc.raw_text + "\n\n"
                 
                 # Aggregate PDF base64 content if needed by strategies (and if available)
                 if hasattr(doc, 'content_pdf_path') and doc.content_pdf_path: # Assuming PDF path is stored
