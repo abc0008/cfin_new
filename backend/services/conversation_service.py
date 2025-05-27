@@ -1064,8 +1064,33 @@ When analyzing financial documents, focus on:
             
             document_texts = valid_documents
             
+            # Optimize document texts using cached Files API content
+            optimized_document_texts = []
+            for i, doc in enumerate(document_texts):
+                doc_id = doc.get('id', f'doc_{i+1}')
+                
+                # Try to get cached text if document has an ID
+                if 'id' in doc:
+                    try:
+                        cached_text = await self.claude_service.get_document_text(
+                            doc['id'], 
+                            self.document_repository
+                        )
+                        # Create optimized document object
+                        optimized_doc = doc.copy()
+                        optimized_doc['raw_text'] = cached_text
+                        optimized_document_texts.append(optimized_doc)
+                        logger.info(f"Using cached text for document {doc['id']} ({len(cached_text)} chars)")
+                    except Exception as e:
+                        logger.warning(f"Failed to get cached text for document {doc['id']}: {e}")
+                        optimized_document_texts.append(doc)
+                else:
+                    optimized_document_texts.append(doc)
+            
+            document_texts = optimized_document_texts
+            
             # Log document information before sending
-            logger.info(f"Processing {len(document_texts)} documents with LangGraph")
+            logger.info(f"Processing {len(document_texts)} documents with optimized LangGraph")
             for i, doc in enumerate(document_texts):
                 doc_id = doc.get('id', f'doc_{i+1}')
                 has_content = 'raw_text' in doc and bool(doc.get('raw_text'))
