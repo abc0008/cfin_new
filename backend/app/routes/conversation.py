@@ -5,13 +5,15 @@ from datetime import datetime
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.message import Message, MessageRole, MessageRequest, ConversationState, ConversationCreateRequest, MessageResponse
+from models.message import ConversationCreateRequest, MessageRequest, MessageResponse, ConversationHistoryResponse
+from utils.dependencies import get_conversation_service, get_document_service
+from models.message import Message, MessageRole, ConversationState
 from models.document import ProcessedDocument, Citation
+from services.conversation_service import ConversationService
+from pdf_processing.api_service import ClaudeService
 from pdf_processing.document_service import DocumentService
 from repositories.document_repository import DocumentRepository
 from repositories.conversation_repository import ConversationRepository
-from services.conversation_service import ConversationService
-from cfin.backend.pdf_processing.api_service import ClaudeService
 from utils.database import get_db
 
 logger = logging.getLogger(__name__)

@@ -2,9 +2,10 @@ import json
 from typing import List, Dict, Any, Optional
 import logging
 from importlib.resources import files # Added for PlanPlanPlan.md item 1.1
+import uuid
 
 from .base_strategy import AnalysisStrategy
-from cfin.backend.pdf_processing.api_service import ClaudeService # Removed ALL_TOOLS_DICT import
+from pdf_processing.api_service import ClaudeService # Removed ALL_TOOLS_DICT import
 # ALL_TOOLS_DICT is no longer directly used here for passing to execute_tool_interaction_turn
 # from pdf_processing.claude_service import ClaudeService, ALL_TOOLS_DICT
 from models.database_models import Document

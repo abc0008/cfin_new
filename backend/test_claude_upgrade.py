@@ -7,12 +7,15 @@ Tests token headers, model routing, and Files API integration.
 import asyncio
 import logging
 import os
+import pytest
 from unittest.mock import Mock, patch, AsyncMock
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+@pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_claude_service_headers():
     """Test that ClaudeService includes the correct headers."""
     from pdf_processing.api_service import ClaudeService
@@ -31,6 +34,7 @@ async def test_claude_service_headers():
         assert "files-api-2025-04-14" in ANTHROPIC_BETA
         logger.info("✅ Beta flags test passed - both token-efficient and files-api flags present")
 
+@pytest.mark.asyncio
 async def test_model_router():
     """Test the model router chooses the right model."""
     from pdf_processing.model_router import choose_model
