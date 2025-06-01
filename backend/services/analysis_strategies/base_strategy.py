@@ -1,10 +1,18 @@
+#!/usr/bin/env python3
+"""
+Base class for analysis strategies.
+"""
+
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 
 from models.database_models import Document
 from models.visualization import ChartData, TableData
 from models.analysis import FinancialMetric
-from cfin.backend.pdf_processing.api_service import ClaudeService
+from pdf_processing.api_service import ClaudeService
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisStrategy(ABC):

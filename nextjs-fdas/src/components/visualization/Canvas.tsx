@@ -236,7 +236,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
         </div>
       </div>
 
-      <div className="p-4 overflow-y-auto max-h-[calc(100vh-280px)]">
+      <div className="p-4 overflow-y-auto max-h-[calc(100vh-200px)]">
         {currentTab === 'overview' ? (
           <div className="space-y-6">
             <MetricGrid 

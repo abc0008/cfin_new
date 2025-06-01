@@ -197,25 +197,45 @@ class PrivacyAwareLogger:
     def info(self, message: str, *args, **kwargs):
         """Log info message with automatic sanitization."""
         sanitized_message = _mask_sensitive_content(str(message))
-        sanitized_args = [_mask_sensitive_content(str(arg)) for arg in args]
+        # Only mask string arguments, preserve numeric types for formatting
+        sanitized_args = [
+            _mask_sensitive_content(str(arg)) if isinstance(arg, str) 
+            else arg 
+            for arg in args
+        ]
         self.logger.info(sanitized_message, *sanitized_args, **kwargs)
     
     def debug(self, message: str, *args, **kwargs):
         """Log debug message with automatic sanitization."""
         sanitized_message = _mask_sensitive_content(str(message))
-        sanitized_args = [_mask_sensitive_content(str(arg)) for arg in args]
+        # Only mask string arguments, preserve numeric types for formatting
+        sanitized_args = [
+            _mask_sensitive_content(str(arg)) if isinstance(arg, str) 
+            else arg 
+            for arg in args
+        ]
         self.logger.debug(sanitized_message, *sanitized_args, **kwargs)
     
     def warning(self, message: str, *args, **kwargs):
         """Log warning message with automatic sanitization."""
         sanitized_message = _mask_sensitive_content(str(message))
-        sanitized_args = [_mask_sensitive_content(str(arg)) for arg in args]
+        # Only mask string arguments, preserve numeric types for formatting
+        sanitized_args = [
+            _mask_sensitive_content(str(arg)) if isinstance(arg, str) 
+            else arg 
+            for arg in args
+        ]
         self.logger.warning(sanitized_message, *sanitized_args, **kwargs)
     
     def error(self, message: str, *args, **kwargs):
         """Log error message with automatic sanitization."""
         sanitized_message = _mask_sensitive_content(str(message))
-        sanitized_args = [_mask_sensitive_content(str(arg)) for arg in args]
+        # Only mask string arguments, preserve numeric types for formatting
+        sanitized_args = [
+            _mask_sensitive_content(str(arg)) if isinstance(arg, str) 
+            else arg 
+            for arg in args
+        ]
         self.logger.error(sanitized_message, *sanitized_args, **kwargs)
 
 # Privacy compliance check

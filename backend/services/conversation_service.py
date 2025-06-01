@@ -34,7 +34,7 @@ Interactions with other files:
    - Uses AnalysisRepository to store and retrieve analysis results
    - Manages persistence of financial analysis visualizations
 
-4. cfin/backend/pdf_processing/claude_service.py:
+4. cfin/backend/pdf_processing/api_service.py:
    - Uses ClaudeService for AI response generation and document analysis
    - Methods used: generate_response, process_pdf, extract_structured_financial_data
    - Primary interface for Claude AI capabilities
@@ -64,7 +64,7 @@ import asyncio
 from repositories.conversation_repository import ConversationRepository
 from repositories.document_repository import DocumentRepository
 from repositories.analysis_repository import AnalysisRepository
-from cfin.backend.pdf_processing.api_service import ClaudeService
+from pdf_processing.api_service import ClaudeService
 from models.database_models import Message, Conversation, Document, Citation, AnalysisBlock, User
 
 logger = logging.getLogger(__name__)
@@ -506,8 +506,6 @@ class ConversationService:
                             #             logger.info(f"Added document {doc_info['id']} with extracted text to context (length: {len(extracted_text)})")
                             #         else:
                             #             logger.warning(f"Could not extract text from PDF for document {doc_info['id']}")
-                            #     except Exception as pdf_error:
-                            #         logger.warning(f"Error extracting text from PDF for document {doc_info['id']}: {str(pdf_error)}")
                             else:
                                 logger.warning(f"No raw_text or PDF content available for document {doc_info['id']}")
                 except Exception as e:

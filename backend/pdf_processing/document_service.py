@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, BinaryIO, Any
 from pathlib import Path
 import asyncio
+import settings
 
 from models.document import (
     ProcessedDocument, 
@@ -98,8 +99,48 @@ class DocumentService:
             if not processed_document_model:
                 raise ValueError("Claude service returned None for processed_document_model")
             
-            # Use the Files API extracted text as the primary text
-            final_raw_text_to_store = full_text if full_text else true_full_raw_text
+            # Use the better text extraction (prefer longer, more complete text)
+            # Files API sometimes returns truncated results, so prefer the fuller extraction
+            if full_text and len(full_text) > 500:  # Files API extracted substantial content
+                final_raw_text_to_store = full_text
+                logger.info(f"Using Files API text extraction ({len(full_text)} chars)")
+            elif true_full_raw_text and len(true_full_raw_text) > len(full_text):
+                final_raw_text_to_store = true_full_raw_text  # Use Claude extraction as fallback
+                logger.info(f"Using Claude text extraction as fallback ({len(true_full_raw_text)} chars)")
+            else:
+                final_raw_text_to_store = full_text or true_full_raw_text  # Last resort
+                logger.warning(f"Using minimal text extraction ({len(final_raw_text_to_store)} chars)")
+            
+            # Check if we have cached file_id and can use Files API optimization
+            if doc.claude_file_id and doc.full_text:
+                logger.info(f"Using cached Files API file_id={doc.claude_file_id} for document {document_id}")
+                final_raw_text_to_store = doc.full_text
+                
+                # For cached files, we need to do analysis only (not full processing)
+                # Use the lightweight analysis approach to avoid redundant API calls
+                processed_document_model = await self.claude_service.analyze_pdf_content(
+                    pdf_data, filename, use_cached_file_id=doc.claude_file_id
+                )
+                citations_list = []  # Citations from cache if needed
+                
+            else:
+                logger.info(f"No cached file_id for document {document_id}, performing full processing")
+                # Only do full processing if we don't have cached content
+                true_full_raw_text, processed_document_model, citations_list = await self.claude_service.process_pdf(pdf_data, filename)
+                
+                if not processed_document_model:
+                    raise ValueError("Claude service returned None for processed_document_model")
+                
+                # Use the extraction result
+                final_raw_text_to_store = true_full_raw_text
+                logger.info(f"Using full processing extraction ({len(final_raw_text_to_store)} chars)")
+                
+                # Update document with new cached data
+                await self.document_repository.update_document(document_id, {
+                    "full_text": doc.full_text,
+                    "text_sha256": doc.text_sha256, 
+                    "claude_file_id": doc.claude_file_id
+                })
             
             # Determine document type from the processed model
             document_type_enum = DocumentType[processed_document_model.content_type.upper()] if processed_document_model.content_type else DocumentType.OTHER
@@ -114,13 +155,6 @@ class DocumentService:
                 raw_text=final_raw_text_to_store,
                 confidence_score=processed_document_model.confidence_score
             )
-            
-            # Update with Claude API optimization fields
-            await self.document_repository.update_document(document_id, {
-                "full_text": doc.full_text,
-                "text_sha256": doc.text_sha256,
-                "claude_file_id": doc.claude_file_id
-            })
             
             logger.info(f"Document {document_id} processed with Claude optimizations. File ID: {doc.claude_file_id}")
             
