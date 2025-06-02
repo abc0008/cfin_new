@@ -1086,75 +1086,44 @@ IMPORTANT INSTRUCTIONS:
                 logger.warning(f"Could not create document repository for binary access: {str(repo_error)}")
                 repository = None
 
-            # Process each document
+            # Process each document using native PDF support via Files API
             for i, doc in enumerate(documents):
                 doc_id = doc.get('id', f'doc_{i}')
                 doc_title = doc.get("title", doc.get("filename", f"Document {doc_id}"))
-                processed_pdf_successfully = False
+                processed_successfully = False
                 
-                # Check if this is a PDF document
-                is_pdf = False
-                if doc.get("mime_type") == "application/pdf" or doc.get("document_type") == "application/pdf" or (doc.get("filename", "").lower().endswith(".pdf")):
-                    is_pdf = True
-
-                # For PDFs, try to get binary content
-                if is_pdf:
-                    pdf_binary = None
-                    
-                    # First check if binary content is already in the document
-                    if "content" in doc and isinstance(doc.get("content"), bytes):
-                        pdf_binary = doc.get("content")
-                        logger.info(f"Using existing binary content for PDF document {doc_id}: {len(pdf_binary)} bytes")
-                    
-                    # If not, try to get it from repository
-                    elif repository:
-                        try:
-                            # Assuming get_document_content returns a dict with a 'content' key holding the binary
-                            pdf_doc_data = await repository.get_document_content(doc_id)
-                            if pdf_doc_data and "content" in pdf_doc_data and isinstance(pdf_doc_data["content"], bytes):
-                                pdf_binary = pdf_doc_data["content"]
-                                logger.info(f"Retrieved binary PDF data ({len(pdf_binary)} bytes) for document {doc_id} from repository")
-                            elif pdf_doc_data and "raw_text" in pdf_doc_data: # Check if repo returned text instead
-                                logger.info(f"Repository returned raw_text for PDF {doc_id} instead of binary. Will attempt text fallback if enabled.")
-                            else:
-                                logger.warning(f"Repository did not return usable binary content for PDF {doc_id}. Keys: {list(pdf_doc_data.keys()) if pdf_doc_data else 'None'}")
-                        except Exception as e:
-                            logger.warning(f"Could not retrieve binary data for document {doc_id} via repository: {str(e)}")
-                    
-                    # If we have binary PDF data, encode it as base64 for Claude
-                    if pdf_binary:
-                        try:
-                            import base64
-                            base64_data = base64.b64encode(pdf_binary).decode('utf-8')
-                            
-                            # Create the document block in Claude's format
-                            pdf_doc_block = {
-                                "type": "document",
-                                "title": doc_title,
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "application/pdf",
-                                    "data": base64_data
-                                }
-                            }
-                            
-                            user_content.append(pdf_doc_block)
-                            logger.info(f"Added PDF document {doc_id} with base64 encoding to content")
-                            processed_pdf_successfully = True # Mark as processed
-                        except Exception as e:
-                            logger.error(f"Error encoding PDF {doc_id} as base64: {str(e)}")
-                            # Do not set processed_pdf_successfully to true, will fall through if text fallback is allowed
-                    else:
-                        logger.warning(f"No binary data found for PDF {doc_id} after checking direct content and repository.")
+                # 🎯 PRIORITY 1: Use Claude Files API file_id (most efficient)
+                claude_file_id = doc.get('claude_file_id')
+                if claude_file_id:
+                    try:
+                        # Create file block using correct Files API format
+                        # According to Anthropic's Files API, files are referenced directly
+                        file_block = {
+                            "type": "file",
+                            "file_id": claude_file_id
+                        }
+                        
+                        user_content.append(file_block)
+                        logger.info(f"✅ Added document {doc_id} using Files API file_id: {claude_file_id}")
+                        processed_successfully = True
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Error using Files API file_id {claude_file_id} for document {doc_id}: {str(e)}")
+                        # Continue to fallback methods below
                 
-                # If it was a PDF and binary processing failed, skip text fallback for this PDF in simple_document_qa
-                if is_pdf and not processed_pdf_successfully:
-                    logger.warning(f"Failed to process PDF {doc_id} as binary for simple_document_qa. Skipping text fallback for this PDF.")
-                    continue # Skip to the next document
-
-                # Fallback to text for non-PDF documents OR if PDF processing failed (and text fallback for PDF was not skipped above)
-                # This block is now primarily for non-PDFs given the continue above for failed PDFs.
-                if not processed_pdf_successfully: # This condition means it's either not a PDF, or it's a PDF whose binary processing failed (and we didn't skip it)
+                # If Files API didn't work, skip text extraction entirely for PDFs
+                # This follows Anthropic's recommendation to use native PDF support
+                if not processed_successfully:
+                    # Check if this is a PDF document
+                    is_pdf = (doc.get("mime_type") == "application/pdf" or 
+                             doc.get("document_type") == "application/pdf" or 
+                             doc.get("filename", "").lower().endswith(".pdf"))
+                    
+                    if is_pdf:
+                        logger.warning(f"⚠️  PDF document {doc_id} without Files API file_id - skipping (use native PDF support)")
+                        continue
+                    
+                    # For non-PDF documents, fallback to text content
                     doc_content_text = None
                     source_field = "none"
                     
@@ -1166,28 +1135,26 @@ IMPORTANT INSTRUCTIONS:
                         source_field = "extracted_data.raw_text"
                     elif "text" in doc and isinstance(doc.get("text"), str):
                         doc_content_text = doc["text"]
-                        source_field = "text_field (string)"
-                    # Explicitly do NOT fall back to doc.get("content") as text here, as it might be unhandled binary. 
-                    # If it was a PDF, binary should have been handled above.
-                    # If it's another binary type, it shouldn't be treated as text.
+                        source_field = "text_field"
 
                     if doc_content_text and len(str(doc_content_text).strip()) > 0:
-                        logger.info(f"Using text from '{source_field}' for document {doc_id} ({len(doc_content_text)} chars)")
+                        logger.info(f"📄 Using text from '{source_field}' for non-PDF document {doc_id} ({len(doc_content_text)} chars)")
                         text_doc_block = {
                             "type": "document",
                             "title": doc_title,
                             "source": {
                                 "type": "text",
                                 "media_type": "text/plain",
-                                "data": str(doc_content_text) # Ensure it's a string
+                                "data": str(doc_content_text)
                             }
                         }
                         user_content.append(text_doc_block)
+                        processed_successfully = True
                     else:
-                        logger.warning(f"Could not find any usable text content for document {doc_id} (type: {'PDF' if is_pdf else 'non-PDF'}), skipping.")
+                        logger.warning(f"❌ Could not find any usable content for document {doc_id}")
             
             # If no documents were prepared, return an error message
-            if not any(item.get("type") == "document" for item in user_content):
+            if not any(item.get("type") in ["document", "file"] for item in user_content):
                 logger.warning("No documents were prepared for the Claude API")
                 return {
                     "content": "I couldn't process the document content. Please ensure the documents were properly uploaded and contain readable text.",
@@ -1222,7 +1189,8 @@ IMPORTANT INSTRUCTIONS:
             })
             
             # Log the API call
-            logger.info(f"Calling Anthropic API with {len(anthropic_messages)} messages and {len([item for item in user_content if item.get('type') == 'document'])} documents")
+            document_count = len([item for item in user_content if item.get('type') in ['document', 'file']])
+            logger.info(f"Calling Anthropic API with {len(anthropic_messages)} messages and {document_count} documents")
             
             # Use a model that supports citations
             model_name = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")

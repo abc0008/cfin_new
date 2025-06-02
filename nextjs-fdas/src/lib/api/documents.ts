@@ -466,6 +466,17 @@ export const documentsApi = {
   },
   
   /**
+   * Delete a document
+   */
+  async deleteDocument(documentId: string): Promise<void> {
+    try {
+      await apiService.delete(`/api/documents/${documentId}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
    * Uploads and verifies a document with progress tracking,
    * ensuring it has valid financial data
    */
