@@ -85,9 +85,9 @@ export function ChatInterface({
     if (message.role === 'system' && message.content === 'AI is thinking...') {
       return (
         <div key={message.id} className="flex justify-start">
-          <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-100 text-gray-900 flex items-center">
-            <Loader2 className="h-5 w-5 text-indigo-600 animate-spin mr-2" />
-            <span>Analyzing document...</span>
+          <div className="max-w-[80%] rounded-lg px-4 py-2 bg-muted text-muted-foreground flex items-center">
+            <Loader2 className="h-5 w-5 text-primary animate-spin mr-2" />
+            <span className="font-avenir-pro">Analyzing document...</span>
           </div>
         </div>
       );
@@ -99,12 +99,12 @@ export function ChatInterface({
         className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
       >
         <div 
-          className={`max-w-[80%] rounded-lg px-4 py-3 ${
+          className={`max-w-[80%] rounded-lg px-4 py-3 font-avenir-pro ${
             message.role === 'user' 
-              ? 'bg-indigo-600 text-white' 
+              ? 'bg-primary text-primary-foreground' 
               : message.role === 'system' 
-                ? 'bg-gray-100 text-gray-900 italic' 
-                : 'bg-white border border-gray-200 text-gray-900'
+                ? 'bg-muted text-muted-foreground italic' 
+                : 'bg-card border border-border text-foreground shadow-sm'
           }`}
         >
           <MessageRenderer 
@@ -117,38 +117,38 @@ export function ChatInterface({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b">
-        <h2 className="text-lg font-semibold">Claude Assistant</h2>
-        <p className="text-sm text-gray-600">
+    <div className="flex flex-col h-full bg-background">
+      <div className="p-4 border-b border-border bg-card">
+        <h2 className="text-lg font-avenir-pro-demi text-foreground">Claude Assistant</h2>
+        <p className="text-sm font-avenir-pro text-muted-foreground">
           Ask questions about your financial documents
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/20">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 p-6">
-            <FileText className="h-12 w-12 mb-4 text-gray-400" />
-            <h3 className="font-medium text-lg text-gray-900 mb-1">No messages yet</h3>
-            <p className="mb-4">Start a conversation by sending a message below.</p>
+          <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-6">
+            <FileText className="h-12 w-12 mb-4 text-muted-foreground/40" />
+            <h3 className="font-avenir-pro-demi text-lg text-foreground mb-1">No messages yet</h3>
+            <p className="mb-4 font-avenir-pro">Start a conversation by sending a message below.</p>
             
-            <div className="text-sm text-left w-full max-w-md space-y-2">
-              <p className="font-medium">Try asking:</p>
+            <div className="text-sm text-left w-full max-w-md space-y-2 font-avenir-pro">
+              <p className="font-avenir-pro-demi text-foreground">Try asking:</p>
               <button 
                 onClick={() => setInputValue("What is the company's revenue for last quarter?")}
-                className="p-2 bg-white border rounded-md text-left w-full hover:bg-gray-50"
+                className="p-2 bg-card border border-border rounded-md text-left w-full hover:bg-muted/30 transition-colors text-foreground"
               >
                 What is the company's revenue for last quarter?
               </button>
               <button 
                 onClick={() => setInputValue("Calculate the current ratio from the balance sheet.")}
-                className="p-2 bg-white border rounded-md text-left w-full hover:bg-gray-50"
+                className="p-2 bg-card border border-border rounded-md text-left w-full hover:bg-muted/30 transition-colors text-foreground"
               >
                 Calculate the current ratio from the balance sheet.
               </button>
               <button 
                 onClick={() => setInputValue("How has the gross margin changed over time?")}
-                className="p-2 bg-white border rounded-md text-left w-full hover:bg-gray-50"
+                className="p-2 bg-card border border-border rounded-md text-left w-full hover:bg-muted/30 transition-colors text-foreground"
               >
                 How has the gross margin changed over time?
               </button>
@@ -159,16 +159,16 @@ export function ChatInterface({
         )}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-white border rounded-lg rounded-bl-none p-4 max-w-[80%] flex items-center">
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              <span className="text-sm text-gray-500">Claude is thinking...</span>
+            <div className="bg-card border border-border rounded-lg rounded-bl-none p-4 max-w-[80%] flex items-center shadow-sm">
+              <Loader2 className="h-4 w-4 animate-spin mr-2 text-primary" />
+              <span className="text-sm text-muted-foreground font-avenir-pro">Claude is thinking...</span>
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t">
+      <div className="p-4 border-t border-border bg-card">
         <form onSubmit={handleSubmit} className="flex items-end space-x-2">
           <div className="flex-1 relative">
             <textarea
@@ -180,12 +180,12 @@ export function ChatInterface({
               }}
               onKeyDown={handleKeyDown}
               placeholder="Type your message..."
-              className="w-full border rounded-md p-3 pr-10 max-h-[150px] min-h-[44px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="fdas-textarea font-avenir-pro max-h-[150px] min-h-[44px] resize-none"
               disabled={isSubmitting}
             />
             {activeDocuments && activeDocuments.length > 0 && (
-              <div className="absolute bottom-full mb-1 left-0 text-xs text-gray-500">
-                <span className="bg-gray-100 px-1 py-0.5 rounded">
+              <div className="absolute bottom-full mb-1 left-0 text-xs text-muted-foreground font-avenir-pro">
+                <span className="bg-muted px-1 py-0.5 rounded">
                   Using {activeDocuments.length} document{activeDocuments.length !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -194,7 +194,7 @@ export function ChatInterface({
           <button
             type="submit"
             disabled={!inputValue.trim() || isSubmitting}
-            className="bg-blue-500 text-white p-3 rounded-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed h-[44px] w-[44px] flex items-center justify-center"
+            className="bg-primary text-primary-foreground p-3 rounded-full hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed h-[44px] w-[44px] flex items-center justify-center transition-colors"
           >
             {isSubmitting ? (
               <Loader2 className="h-5 w-5 animate-spin" />

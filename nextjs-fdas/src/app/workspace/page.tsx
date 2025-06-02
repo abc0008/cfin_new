@@ -249,89 +249,79 @@ export default function Workspace() {
             id: `msg-${Date.now()}`,
             sessionId: sessionId,
             role: 'system',
-            content: `Error performing initial analysis for "${selectedDocument?.metadata?.filename || 'the selected document'}": ${errorMsg}`,
+            content: `Error performing initial analysis: ${errorMsg}`,
             timestamp: new Date().toISOString(),
-            referencedDocuments: [selectedDocument.metadata.id], // selectedDocument is defined here
+            referencedDocuments: [selectedDocument.metadata.id],
             referencedAnalyses: [],
           };
           return [...prev, newSystemMessage];
         });
-        setAnalysisError(errorMsg); 
+        setAnalysisError(errorMsg);
       } finally {
         setAnalysisLoading(false);
       }
     };
-    
-    if (selectedDocument && sessionId) { // Ensure sessionId is also available
-      runAnalysis();
-    }
-  // Add handleAnalysisResult to dependencies if it's stable (e.g., memoized with useCallback)
-  // For now, omitting it to prevent potential infinite loops if it's redefined on every render
-  // and uses state that changes frequently. If issues arise, wrap handleAnalysisResult with useCallback.
-  }, [selectedDocument, sessionId, analysisResults]);
+
+    runAnalysis();
+  }, [selectedDocument]);
 
   const handleSendMessage = async (messageText: string) => {
     if (!sessionId) {
-      console.error("No valid session ID available");
-      const errorMessage = {
-        id: `system-${Date.now()}`,
-        role: 'system',
-        content: 'Error: No active session. Please refresh the page.',
-        timestamp: new Date().toISOString(),
-        metadata: {
-          referencedDocuments: [],
-          referencedAnalyses: []
-        }
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      console.warn('No session ID available - cannot send message');
       return;
     }
 
+    setIsLoading(true);
+
+    // Immediately add user message to chat
+    const userMessage: Message = {
+      id: `msg-${Date.now()}`,
+      sessionId: sessionId,
+      role: 'user',
+      content: messageText,
+      timestamp: new Date().toISOString(),
+      referencedDocuments: selectedDocument ? [selectedDocument.metadata.id] : [],
+      referencedAnalyses: [],
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+
     try {
-      // Show user message immediately
-      const userMessage = {
-        id: `user-${Date.now()}`,
-        role: 'user',
-        content: messageText,
+      let response;
+      if (selectedDocument) {
+        response = await conversationApi.sendMessage(
+          sessionId, 
+          messageText, 
+          [selectedDocument.metadata.id]
+        );
+      } else {
+        response = await conversationApi.sendMessage(sessionId, messageText);
+      }
+
+      // Add assistant response to chat
+      setMessages(prev => [...prev, {
+        id: `msg-${Date.now()}`,
+        sessionId: sessionId,
+        role: 'assistant',
+        content: response.response,
         timestamp: new Date().toISOString(),
-        metadata: {
-          referencedDocuments: selectedDocument ? [selectedDocument.metadata.id] : [],
-          referencedAnalyses: []
-        }
-      };
-      
-      // Add the user message
-      setMessages(prev => [...prev, userMessage]);
-      
-      // Set loading state
-      setIsLoading(true);
-      
-      const documentIds = selectedDocument ? [selectedDocument.metadata.id] : [];
-      
-      // Get response from the actual API
-      const response = await conversationApi.sendMessage(
-        sessionId,
-        messageText,
-        documentIds
-      );
-      
-      // Add the AI response to messages
-      setMessages(prev => [...prev, response]);
+        referencedDocuments: response.referenced_documents || [],
+        referencedAnalyses: response.referenced_analyses || [],
+        citationReferences: response.citation_references || [],
+        analysis_blocks: response.analysis_blocks || [],
+      }]);
+
     } catch (error) {
-      console.error("Error sending message:", error);
-      // Add error message to chat
-      const errorMessage = {
-        id: `system-${Date.now()}`,
+      console.error('Error sending message:', error);
+      setMessages(prev => [...prev, {
+        id: `msg-${Date.now()}`,
+        sessionId: sessionId,
         role: 'system',
-        content: `Error sending message: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: 'Error sending message. Please try again.',
         timestamp: new Date().toISOString(),
-        metadata: {
-          referencedDocuments: [],
-          referencedAnalyses: []
-        }
-      };
-      
-      setMessages(prev => [...prev, errorMessage]);
+        referencedDocuments: [],
+        referencedAnalyses: [],
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -340,62 +330,45 @@ export default function Workspace() {
   const handleUploadSuccess = (document: ProcessedDocument) => {
     setSelectedDocument(document);
     setShowUploadForm(false);
-    
-    // Add a system message about the successful upload
-    const uploadSuccessMessage = {
-      id: `system-${Date.now()}`,
-      sessionId: sessionId || 'demo-session',
-      timestamp: new Date().toISOString(),
+    setMessages(prev => [...prev, {
+      id: `msg-${Date.now()}`,
+      sessionId: sessionId,
       role: 'system',
-      content: `Successfully uploaded: ${document.metadata.filename}`,
+      content: `Document "${document.metadata.filename}" uploaded successfully. Starting analysis...`,
+      timestamp: new Date().toISOString(),
       referencedDocuments: [document.metadata.id],
-      referencedAnalyses: []
-    };
-    
-    setMessages((prev: any) => [...prev, uploadSuccessMessage]);
+      referencedAnalyses: [],
+    }]);
   };
 
   const handleUploadError = (error: Error) => {
-    // Add an error message to the chat
-    const errorMessage = {
-      id: `system-${Date.now()}`,
-      sessionId: sessionId || 'demo-session',
-      timestamp: new Date().toISOString(),
+    setMessages(prev => [...prev, {
+      id: `msg-${Date.now()}`,
+      sessionId: sessionId,
       role: 'system',
-      content: `Error uploading document: ${error.message}`,
+      content: `Upload failed: ${error.message}`,
+      timestamp: new Date().toISOString(),
       referencedDocuments: [],
-      referencedAnalyses: []
-    };
-    
-    setMessages((prev: any) => [...prev, errorMessage]);
+      referencedAnalyses: [],
+    }]);
   };
 
-  // Handle citation clicks from analysis or chat
   const handleCitationClick = (highlightId: string) => {
     setHighlightId(highlightId);
-    setActiveTab('document'); // Switch to document tab to show the citation
+    setActiveTab('document');
   };
 
-  // Add this new function to run manual analysis
   const runManualAnalysis = async (documentId: string, analysisType: string, knowledgeBase?: string, userQuery?: string) => {
-    if (!documentId) return;
-    
     setAnalysisLoading(true);
     setAnalysisError(null);
-    
+
     try {
-      // Setup parameters with custom knowledge base and query if provided
-      const parameters: Record<string, any> = {};
-      if (knowledgeBase) parameters.knowledge_base = knowledgeBase;
-      if (userQuery) parameters.user_query = userQuery;
-      
       const result = await analysisApi.runAnalysis(
         [documentId],
         analysisType,
-        parameters
+        { knowledgeBase, userQuery }
       );
-      
-      // Add the new result and update messages
+
       setAnalysisResults(prevResults => {
         const analysisResultToUpdate = result as AnalysisResult;
         
@@ -488,10 +461,10 @@ export default function Workspace() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-indigo-50 to-white">
+    <div className="flex flex-col h-full bg-gradient-to-b from-background to-muted/20">
       <div className="container mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold text-indigo-700 mb-2">Analysis Workspace</h1>
-        <p className="text-gray-600 mb-6">
+        <h1 className="text-2xl font-avenir-pro-demi text-primary mb-2">Analysis Workspace</h1>
+        <p className="text-muted-foreground font-avenir-pro mb-6">
           Upload financial documents, ask questions, and analyze the data through interactive visualizations.
         </p>
       </div>
@@ -499,13 +472,13 @@ export default function Workspace() {
       {/* Main workspace area */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 px-4 pb-6">
         {/* Left side: Chat Interface */}
-        <div className="bg-white rounded-xl shadow-md flex flex-col h-[calc(100vh-180px)]">
-          <div className="p-4 border-b border-gray-100 bg-indigo-50 rounded-t-xl">
-            <h2 className="text-lg font-semibold text-indigo-700 flex items-center">
+        <div className="bg-card rounded-xl shadow-md flex flex-col h-[calc(100vh-180px)] border border-border">
+          <div className="p-4 border-b border-border bg-muted/30 rounded-t-xl">
+            <h2 className="text-lg font-avenir-pro-demi text-foreground flex items-center">
               <FileSearch className="h-5 w-5 mr-2" />
               Interactive Chat
             </h2>
-            <p className="text-sm text-gray-600">Ask questions about your financial documents</p>
+            <p className="text-sm text-muted-foreground font-avenir-pro">Ask questions about your financial documents</p>
           </div>
           <div className="flex-1 overflow-hidden">
             <ChatInterface 
@@ -518,15 +491,15 @@ export default function Workspace() {
         </div>
 
         {/* Right side: Document View / Analysis */}
-        <div className="bg-white rounded-xl shadow-md flex flex-col h-[calc(100vh-180px)]">
+        <div className="bg-card rounded-xl shadow-md flex flex-col h-[calc(100vh-180px)] border border-border">
           {/* Tab navigation */}
-          <div className="border-b border-gray-100 bg-indigo-50 rounded-t-xl">
+          <div className="border-b border-border bg-muted/30 rounded-t-xl">
             <Tabs defaultValue="document" className="w-full">
-              <TabsList className="grid grid-cols-2 p-2">
+              <TabsList className="grid grid-cols-2 p-2 bg-transparent">
                 <TabsTrigger 
                   value="document" 
                   onClick={() => setActiveTab('document')}
-                  className="data-[state=active]:bg-white data-[state=active]:text-indigo-700"
+                  className="data-[state=active]:bg-background data-[state=active]:text-primary font-avenir-pro"
                 >
                   <div className="flex items-center">
                     <FileText className="h-4 w-4 mr-1.5" />
@@ -536,7 +509,7 @@ export default function Workspace() {
                 <TabsTrigger 
                   value="analysis" 
                   onClick={() => setActiveTab('analysis')}
-                  className="data-[state=active]:bg-white data-[state=active]:text-indigo-700"
+                  className="data-[state=active]:bg-background data-[state=active]:text-primary font-avenir-pro"
                 >
                   <div className="flex items-center">
                     <BarChart2 className="h-4 w-4 mr-1.5" />
@@ -547,7 +520,7 @@ export default function Workspace() {
               <TabsContent value="document" className="h-[calc(100vh-13rem)] p-0">
                 {showUploadForm ? (
                   <div className="p-6">
-                    <h2 className="text-xl font-semibold text-indigo-700 mb-4">Upload Document</h2>
+                    <h2 className="text-xl font-avenir-pro-demi text-primary mb-4">Upload Document</h2>
                     <UploadForm 
                       onUploadSuccess={handleUploadSuccess}
                       onUploadError={handleUploadError}
@@ -555,7 +528,7 @@ export default function Workspace() {
                     />
                     <button
                       onClick={() => setShowUploadForm(false)}
-                      className="mt-4 text-sm text-indigo-500 hover:text-indigo-700"
+                      className="mt-4 text-sm text-muted-foreground hover:text-foreground font-avenir-pro transition-colors"
                     >
                       Cancel
                     </button>
@@ -578,16 +551,16 @@ export default function Workspace() {
                 ) : (
                   <div className="h-full flex items-center justify-center">
                     <div className="text-center p-6 max-w-md">
-                      <div className="bg-indigo-100 p-3 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                        <FileUp className="h-8 w-8 text-indigo-600" />
+                      <div className="bg-primary/10 p-3 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                        <FileUp className="h-8 w-8 text-primary" />
                       </div>
-                      <h3 className="text-lg font-semibold text-indigo-700 mb-2">No document to display</h3>
-                      <p className="text-gray-600 mb-6">
+                      <h3 className="text-lg font-avenir-pro-demi text-primary mb-2">No document to display</h3>
+                      <p className="text-muted-foreground font-avenir-pro mb-6">
                         Upload a financial document to start analyzing it with our AI-powered tools.
                       </p>
                       <button
                         onClick={() => setShowUploadForm(true)}
-                        className="inline-flex items-center bg-indigo-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+                        className="inline-flex items-center bg-primary text-primary-foreground px-6 py-3 rounded-lg text-sm font-avenir-pro-demi hover:bg-primary/90 transition-colors shadow-sm"
                       >
                         <Upload className="h-5 w-5 mr-2" />
                         Upload Document
@@ -599,7 +572,7 @@ export default function Workspace() {
               </TabsContent>
               <TabsContent value="analysis" className="h-[calc(100vh-13rem)] p-0 flex flex-col">
                 {selectedDocument && (
-                  <div className="p-4 border-b">
+                  <div className="p-4 border-b border-border">
                     <AnalysisControls 
                       isLoading={analysisLoading}
                       onRunAnalysis={(analysisType, knowledgeBase, userQuery) => {

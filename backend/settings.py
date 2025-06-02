@@ -8,7 +8,7 @@ ANTHROPIC_BETA = ",".join([
 
 # Claude model IDs  
 MODEL_HAIKU = "claude-3-5-haiku-20241022"  # Fast and cheap for basic extraction WITH PDF support
-MODEL_SONNET = "claude-3-5-sonnet-20241022"  # Higher token limit: 80K vs 40K input tokens/min
+MODEL_SONNET = "claude-3-5-sonnet-20241022" # Was claude-3-5-sonnet-20241022 Higher token limit: 80K vs 40K input tokens/min
 
 # Processing mode: 'fast' uses Haiku, 'detailed' uses Sonnet
 # Can be overridden by CLAUDE_PROCESSING_MODE environment variable

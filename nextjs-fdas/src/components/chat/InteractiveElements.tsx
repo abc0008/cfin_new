@@ -35,14 +35,14 @@ export const SuggestionChips = ({ suggestions }: { suggestions: SuggestionAction
         <button
           key={index}
           onClick={suggestion.action}
-          className={`inline-flex items-center px-3 py-1 rounded-md text-sm transition-colors ${
+          className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-avenir-pro transition-colors ${
             suggestion.variant === 'primary'
-              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
               : suggestion.variant === 'outline'
-              ? 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+              ? 'border border-border text-foreground hover:bg-muted'
               : suggestion.variant === 'secondary'
-              ? 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-              : 'bg-white border border-gray-200 text-gray-800 hover:bg-gray-50'
+              ? 'bg-secondary text-secondary-foreground hover:bg-secondary/90'
+              : 'bg-card border border-border text-foreground hover:bg-muted'
           }`}
         >
           {suggestion.icon && <span className="mr-1.5">{suggestion.icon}</span>}
@@ -58,19 +58,25 @@ export const ExpandableContent = ({ summary, children, defaultExpanded = false }
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
-    <div className="mt-2 border border-gray-200 rounded-md overflow-hidden">
+    <div className="mt-2 border border-border rounded-md overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-2 text-left bg-gray-50 hover:bg-gray-100 flex justify-between items-center"
+        className="w-full px-4 py-2 text-left bg-muted hover:bg-muted/80 flex justify-between items-center font-avenir-pro transition-colors"
       >
-        <span className="font-medium">{summary}</span>
+        <span className="font-avenir-pro-demi text-foreground">{summary}</span>
         {isExpanded ? (
-          <ChevronUp className="h-4 w-4 text-gray-500" />
+          <ChevronUp className="h-4 w-4 text-muted-foreground" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-gray-500" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         )}
       </button>
-      {isExpanded && <div className="p-4 bg-white">{children}</div>}
+      {isExpanded && (
+        <div className="p-4 bg-card">
+          <div className="font-avenir-pro text-foreground">
+            {children}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -87,11 +93,11 @@ export const MessageFeedback = ({ messageId, onFeedback }: FeedbackProps) => {
 
   return (
     <div className="flex items-center space-x-2 mt-2">
-      <span className="text-xs text-gray-500">Was this helpful?</span>
+      <span className="text-xs text-muted-foreground font-avenir-pro">Was this helpful?</span>
       <button
         onClick={() => handleFeedback(true)}
-        className={`p-1 rounded-md ${
-          feedback === 'positive' ? 'bg-green-100 text-green-600' : 'text-gray-400 hover:text-gray-600'
+        className={`p-1 rounded-md transition-colors ${
+          feedback === 'positive' ? 'bg-secondary/20 text-secondary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
         }`}
         aria-label="Thumbs up"
       >
@@ -99,8 +105,8 @@ export const MessageFeedback = ({ messageId, onFeedback }: FeedbackProps) => {
       </button>
       <button
         onClick={() => handleFeedback(false)}
-        className={`p-1 rounded-md ${
-          feedback === 'negative' ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:text-gray-600'
+        className={`p-1 rounded-md transition-colors ${
+          feedback === 'negative' ? 'bg-destructive/20 text-destructive' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
         }`}
         aria-label="Thumbs down"
       >
@@ -127,11 +133,11 @@ export const CopyToClipboard = ({ text }: { text: string }) => {
   return (
     <button
       onClick={handleCopy}
-      className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+      className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
       aria-label="Copy to clipboard"
     >
       {copied ? (
-        <CheckCircle2 className="h-4 w-4 text-green-500" />
+        <CheckCircle2 className="h-4 w-4 text-secondary" />
       ) : (
         <Copy className="h-4 w-4" />
       )}
@@ -144,7 +150,7 @@ export const AnalysisAction = ({ documentIds, onRequestAnalysis }: AnalysisActio
   return (
     <button
       onClick={() => onRequestAnalysis(documentIds)}
-      className="mt-3 inline-flex items-center px-3 py-1.5 rounded-md text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+      className="mt-3 inline-flex items-center px-3 py-1.5 rounded-md text-sm font-avenir-pro bg-accent/10 text-accent hover:bg-accent/20 border border-accent/20 transition-colors"
     >
       <BarChart className="h-4 w-4 mr-1.5" />
       Generate Financial Analysis

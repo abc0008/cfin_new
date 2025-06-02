@@ -34,15 +34,15 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
   };
   
   return (
-    <div className="w-full p-4 border rounded-lg bg-white shadow-sm">
+    <div className="w-full p-4 border border-border rounded-lg bg-card shadow-sm">
       <div className="flex flex-col space-y-4">
         <div className="flex justify-between items-center">
-          <h2 className="text-lg font-medium">Analysis Controls</h2>
+          <h2 className="text-lg font-avenir-pro-demi text-foreground">Analysis Controls</h2>
           
           <Button
             onClick={handleRunAnalysis}
             disabled={isLoading}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             {isLoading ? 'Running Analysis...' : 'Run Analysis'}
           </Button>
@@ -50,11 +50,11 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
         
         <div className="flex flex-wrap gap-4">
           <div className="w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-avenir-pro-demi text-foreground mb-1">
               Analysis Type
             </label>
             <select
-              className="w-full p-2 border rounded-md"
+              className="w-full p-2 border border-border rounded-md bg-background text-foreground font-avenir-pro focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
               value={analysisType}
               onChange={(e) => setAnalysisType(e.target.value)}
               disabled={isLoading}
@@ -71,10 +71,10 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
         <Collapsible 
           open={isAdvancedOpen} 
           onOpenChange={setIsAdvancedOpen}
-          className="border rounded-md p-2"
+          className="border border-border rounded-md p-2"
         >
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" className="w-full flex justify-between items-center">
+            <Button variant="ghost" className="w-full flex justify-between items-center font-avenir-pro hover:bg-muted">
               <div className="flex items-center">
                 <Settings className="h-4 w-4 mr-2" />
                 <span>Advanced Options</span>
@@ -88,7 +88,7 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
           </CollapsibleTrigger>
           <CollapsibleContent className="pt-2 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-avenir-pro-demi text-foreground mb-1">
                 Knowledge Base (Optional)
               </label>
               <Textarea
@@ -96,15 +96,15 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
                 value={knowledgeBase}
                 onChange={(e) => setKnowledgeBase(e.target.value)}
                 disabled={isLoading}
-                className="min-h-[100px]"
+                className="min-h-[100px] font-avenir-pro"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1 font-avenir-pro">
                 Provide domain-specific knowledge to enhance the analysis.
               </p>
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-avenir-pro-demi text-foreground mb-1">
                 Custom Query (Optional)
               </label>
               <Textarea
@@ -112,9 +112,9 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
                 value={userQuery}
                 onChange={(e) => setUserQuery(e.target.value)}
                 disabled={isLoading}
-                className="min-h-[100px]"
+                className="min-h-[100px] font-avenir-pro"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1 font-avenir-pro">
                 Specify a custom question to analyze in the document.
               </p>
             </div>

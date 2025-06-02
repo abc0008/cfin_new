@@ -1,7 +1,7 @@
 import React from 'react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { ChartData } from '@/types/visualization';
-import { CHART_COLORS } from './chartColors';
+import { PIE_CHART_COLORS } from './chartColors';
 
 interface PieChartProps {
   data: ChartData;
@@ -14,24 +14,26 @@ const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%' 
 
   if (!chartData || chartData.length === 0) {
     return (
-      <div className="flex items-center justify-center p-8 bg-gray-50 rounded-lg min-h-[300px]">
-        <p role="status" className="text-gray-500">No pie chart data available</p>
+      <div className="flex items-center justify-center p-8 bg-muted/20 rounded-lg min-h-[300px]">
+        <p role="status" className="text-muted-foreground font-avenir-pro">No pie chart data available</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full">
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">{config.title}</h3>
+    <div className="w-full bg-card rounded-lg shadow-sm border border-border p-6">
+      {/* Header */}
+      <div className="mb-6">
+        <h3 className="font-avenir-pro-demi text-xl text-foreground tracking-tighter">{config.title}</h3>
         {config.subtitle && (
-          <p className="text-sm text-gray-500">{config.subtitle}</p>
+          <p className="font-avenir-pro-light text-sm text-muted-foreground mt-1">{config.subtitle}</p>
         )}
         {config.description && (
-          <p className="text-sm text-gray-500 mt-1">{config.description}</p>
+          <p className="font-avenir-pro text-sm text-muted-foreground mt-2">{config.description}</p>
         )}
       </div>
 
+      {/* Chart */}
       <figure style={{ width, height }}>
         <ResponsiveContainer>
           <RechartsPieChart>
@@ -41,24 +43,62 @@ const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%' 
               nameKey="name"
               cx="50%"
               cy="50%"
-              outerRadius={80}
-              label
+              outerRadius={120}
+              innerRadius={40}
+              paddingAngle={2}
+              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+              labelLine={false}
+              className="font-avenir-pro text-xs"
             >
               {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]}
+                  stroke="rgba(255, 255, 255, 0.8)"
+                  strokeWidth={2}
+                />
               ))}
             </Pie>
-            {config.showLegend && <Legend />}
-            <Tooltip />
+            {config.showLegend && (
+              <Legend 
+                verticalAlign="bottom" 
+                height={36}
+                wrapperStyle={{ 
+                  paddingTop: '20px',
+                  fontFamily: 'Avenir Pro, sans-serif',
+                  fontSize: '14px'
+                }}
+              />
+            )}
+            <Tooltip 
+              contentStyle={{
+                backgroundColor: 'hsl(var(--card))',
+                border: '1px solid hsl(var(--border))',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                fontFamily: 'Avenir Pro, sans-serif',
+                fontSize: '14px',
+              }}
+              labelStyle={{
+                fontFamily: 'Avenir Pro, sans-serif',
+                fontWeight: '600',
+                color: 'hsl(var(--foreground))'
+              }}
+            />
           </RechartsPieChart>
         </ResponsiveContainer>
       </figure>
 
+      {/* Footer */}
       {config.footer && (
-        <p className="text-sm text-gray-500 mt-4">{config.footer}</p>
+        <div className="mt-6 pt-4 border-t border-border">
+          <p className="font-avenir-pro text-sm text-muted-foreground">{config.footer}</p>
+        </div>
       )}
       {config.totalLabel && (
-        <p className="text-sm font-medium text-gray-700 mt-2">{config.totalLabel}</p>
+        <div className="mt-4">
+          <p className="font-avenir-pro-demi text-sm text-foreground">{config.totalLabel}</p>
+        </div>
       )}
     </div>
   );

@@ -970,3 +970,263 @@ Follow these guidelines:
         except Exception as e:
             logger.exception(f"Error in file-based document type analysis: {e}")
             return DocumentContentType.OTHER, []
+
+    async def analyze_with_visualization_tools(
+        self,
+        document_text: str,
+        user_query: str,
+        knowledge_base: Optional[str] = None,
+        file_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Analyze document with visualization tools using multi-turn conversation.
+        This method provides a single-entry point for conversation service to use
+        visualization tools similar to how analysis strategies work.
+        
+        Args:
+            document_text: Combined document text for analysis
+            user_query: User's question/request
+            knowledge_base: Optional knowledge base context
+            file_id: Optional Claude file ID for reference
+            
+        Returns:
+            Dict with analysis_text and visualizations (charts, tables)
+        """
+        try:
+            logger.info(f"Starting analyze_with_visualization_tools for query: '{user_query[:100]}...'")
+            
+            # Build initial messages
+            initial_messages = []
+            
+            # Add file reference if available
+            if file_id:
+                initial_messages.append({
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "document",
+                            "source": {"type": "file", "file_id": file_id}
+                        },
+                        {
+                            "type": "text", 
+                            "text": f"Document context and user query:\n\n{user_query}"
+                        }
+                    ]
+                })
+            else:
+                # Use text content
+                context = f"Financial Document Content:\n{document_text}\n\nUser Query: {user_query}"
+                initial_messages.append({
+                    "role": "user",
+                    "content": context
+                })
+            
+            # Initialize conversation tracking
+            conversation_messages = initial_messages.copy()
+            accumulated_text = ""
+            accumulated_charts = []
+            accumulated_tables = []
+            accumulated_metrics = []
+            
+            max_turns = 5  # Limit iterations
+            
+            for turn in range(max_turns):
+                logger.info(f"Visualization analysis turn {turn + 1}/{max_turns}")
+                
+                # Execute tool interaction turn
+                api_response = await self.execute_tool_interaction_turn(
+                    system_prompt=FINANCIAL_ANALYSIS_SYSTEM_PROMPT,
+                    messages=conversation_messages,
+                    tools=self.tools_for_api,
+                    max_tokens=4000,
+                    temperature=0.7
+                )
+                
+                # Process response content
+                assistant_content_blocks = []
+                tool_results_for_next_turn = []
+                contains_tool_use = False
+                
+                if api_response.content:
+                    for block in api_response.content:
+                        if block.type == "text":
+                            accumulated_text += block.text + "\n"
+                            assistant_content_blocks.append({
+                                "type": "text",
+                                "text": block.text
+                            })
+                        elif block.type == "tool_use":
+                            contains_tool_use = True
+                            tool_name = block.name
+                            tool_input = block.input
+                            tool_use_id = block.id
+                            
+                            logger.info(f"Processing tool {tool_name} (ID: {tool_use_id})")
+                            
+                            # Add tool_use block to assistant content
+                            assistant_content_blocks.append({
+                                "type": "tool_use",
+                                "id": tool_use_id,
+                                "name": tool_name,
+                                "input": tool_input
+                            })
+                            
+                            # Process the tool
+                            try:
+                                from utils import tool_processing
+                                processed_data = tool_processing.process_visualization_input(
+                                    tool_name, tool_input, tool_use_id
+                                )
+                                
+                                if processed_data:
+                                    # Collect processed data
+                                    if tool_name == "generate_graph_data":
+                                        accumulated_charts.append(processed_data)
+                                    elif tool_name == "generate_table_data":
+                                        accumulated_tables.append(processed_data)
+                                    elif tool_name == "generate_financial_metric":
+                                        accumulated_metrics.append(processed_data)
+                                    
+                                    # Prepare tool result for next turn
+                                    tool_results_for_next_turn.append({
+                                        "type": "tool_result",
+                                        "tool_use_id": tool_use_id,
+                                        "content": json.dumps(processed_data)
+                                    })
+                                else:
+                                    tool_results_for_next_turn.append({
+                                        "type": "tool_result", 
+                                        "tool_use_id": tool_use_id,
+                                        "content": "Tool processed but returned no data.",
+                                        "is_error": True
+                                    })
+                                    
+                            except Exception as e:
+                                logger.error(f"Error processing tool {tool_name}: {e}")
+                                tool_results_for_next_turn.append({
+                                    "type": "tool_result",
+                                    "tool_use_id": tool_use_id, 
+                                    "content": f"Error: {str(e)}",
+                                    "is_error": True
+                                })
+                
+                # Add assistant response to conversation
+                conversation_messages.append({
+                    "role": "assistant",
+                    "content": assistant_content_blocks
+                })
+                
+                # Add tool results for next turn if any
+                if tool_results_for_next_turn:
+                    conversation_messages.append({
+                        "role": "user",
+                        "content": tool_results_for_next_turn
+                    })
+                
+                # Check if we should continue
+                if api_response.stop_reason in ["stop_sequence", "end_turn"] or not contains_tool_use:
+                    logger.info(f"Visualization analysis completed: {api_response.stop_reason}")
+                    break
+                    
+                if turn == max_turns - 1:
+                    logger.warning(f"Reached maximum turns ({max_turns}) for visualization analysis")
+                    break
+            
+            # Return structured result
+            result = {
+                "analysis_text": accumulated_text.strip(),
+                "visualizations": {
+                    "charts": accumulated_charts,
+                    "tables": accumulated_tables
+                },
+                "metrics": accumulated_metrics
+            }
+            
+            logger.info(f"Visualization analysis completed: {len(accumulated_charts)} charts, {len(accumulated_tables)} tables, {len(accumulated_metrics)} metrics")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in analyze_with_visualization_tools: {e}", exc_info=True)
+            return {
+                "analysis_text": f"Error during analysis: {str(e)}",
+                "visualizations": {"charts": [], "tables": []},
+                "metrics": []
+            }
+
+    async def generate_response_with_langgraph(
+        self,
+        question: str,
+        document_texts: List[Dict[str, Any]],
+        conversation_history: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate a response using LangGraph service for document Q&A with citations.
+        This method provides the interface expected by the conversation service.
+        
+        Args:
+            question: User's question
+            document_texts: List of document text dictionaries
+            conversation_history: Previous conversation messages
+            
+        Returns:
+            Dict with content and citations
+        """
+        try:
+            logger.info(f"Generating LangGraph response for question: '{question[:100]}...'")
+            
+            # Check if LangGraph service is available
+            if not self.langgraph_service:
+                logger.warning("LangGraph service not available, falling back to basic response")
+                # Fall back to basic Claude response
+                system_prompt = """You are a financial document analysis assistant. 
+                Analyze the provided financial documents and answer the user's question accurately.
+                
+                Documents:
+                """
+                
+                for i, doc in enumerate(document_texts):
+                    if 'raw_text' in doc:
+                        system_prompt += f"\n\nDocument {i+1}: {doc.get('title', 'Untitled')}\n{doc['raw_text'][:2000]}..."
+                
+                messages = conversation_history or []
+                messages.append({"role": "user", "content": question})
+                
+                response = await self.generate_response(
+                    system_prompt=system_prompt,
+                    messages=messages
+                )
+                
+                return {
+                    "content": response,
+                    "citations": []
+                }
+            
+            # Use LangGraph service for document Q&A
+            logger.info("Using LangGraph service for document Q&A")
+            result = await self.langgraph_service.simple_document_qa(
+                question=question,
+                documents=document_texts,
+                conversation_history=conversation_history
+            )
+            
+            logger.info(f"LangGraph returned result with {len(result.get('citations', []))} citations")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in generate_response_with_langgraph: {e}", exc_info=True)
+            # Fall back to basic response on error
+            try:
+                basic_response = await self.generate_response(
+                    system_prompt="You are a financial document analysis assistant.",
+                    messages=[{"role": "user", "content": question}]
+                )
+                return {
+                    "content": basic_response,
+                    "citations": []
+                }
+            except Exception as fallback_error:
+                logger.error(f"Fallback response also failed: {fallback_error}")
+                return {
+                    "content": "I apologize, but I'm unable to process your request at this time. Please try again later.",
+                    "citations": []
+                }
