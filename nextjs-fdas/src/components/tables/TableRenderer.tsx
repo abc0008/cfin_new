@@ -62,8 +62,8 @@ export default function TableRenderer({
   
   const { config, data: tableData } = data;
   
-  // Use columns from TableData or from TableConfig if provided there
-  const columns = data.columns || config.columns || [];
+  // Use columns from TableConfig
+  const columns = config.columns || [];
   
   // Calculate pagination if enabled
   const rowsPerPage = config.pageSize || 10;
