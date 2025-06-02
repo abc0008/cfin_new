@@ -17,7 +17,7 @@ export default function MetricGrid({ metrics, title, subtitle, onMetricClick }: 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
   // Extract unique categories from metrics
-  const categories = [...new Set(metrics.map(m => m.category).filter(Boolean))] as string[];
+  const categories = Array.from(new Set(metrics.map(m => m.category).filter(Boolean))) as string[];
   
   // Filter metrics by selected category
   const filteredMetrics = selectedCategory
