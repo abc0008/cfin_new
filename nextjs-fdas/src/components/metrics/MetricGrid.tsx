@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { FinancialMetric } from '@/types/visualization';
+import { FinancialMetric, MetricCitation } from '@/types';
 import MetricCard from './MetricCard';
 
 interface MetricGridProps {
   metrics: FinancialMetric[];
   title?: string;
   subtitle?: string;
-  onMetricClick?: (metric: FinancialMetric) => void;
+  onMetricClick?: (citation: MetricCitation) => void;
 }
 
 /**
@@ -69,7 +69,11 @@ export default function MetricGrid({ metrics, title, subtitle, onMetricClick }: 
             <MetricCard
               key={`${metric.name}-${index}`}
               metric={metric}
-              onClick={onMetricClick ? () => onMetricClick(metric) : undefined}
+              onClick={
+                metric.citation && onMetricClick
+                  ? () => onMetricClick(metric.citation as MetricCitation)
+                  : undefined
+              }
             />
           ))}
         </div>
