@@ -120,6 +120,12 @@ export interface ConversationMetadata {
   session_id?: string; // For backward compatibility with backend response
 }
 
+export interface MetricCitation {
+  highlightId: string;
+  documentId: string;
+  page?: number;
+}
+
 export interface FinancialMetric {
   category: string;
   name: string;
@@ -127,6 +133,7 @@ export interface FinancialMetric {
   value: number;
   unit: string;
   isEstimated?: boolean;
+  citation?: MetricCitation;
 }
 
 // Added for Story # (Resolving linter error)

@@ -200,11 +200,13 @@ export const AnalysisBlock: React.FC<AnalysisBlockProps> = ({
             <DollarSign className="h-4 w-4 mr-1 text-blue-600" />
             Key Financial Metrics
           </h4>
-          <MetricGrid 
+          <MetricGrid
             metrics={block.metrics}
-            onMetricClick={(metric) => {
-              // Optional: Add any click handler for metrics
-              console.log('Metric clicked:', metric);
+            onMetricClick={(citation) => {
+              console.log('Metric clicked:', citation);
+              if (onCitationClick) {
+                onCitationClick(citation.highlightId);
+              }
             }}
           />
         </div>
