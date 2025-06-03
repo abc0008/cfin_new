@@ -14,7 +14,11 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 
 from langgraph.graph import StateGraph, END
-from langgraph.prebuilt.tool_executor import ToolExecutor
+try:
+    # Newer langgraph versions removed ToolExecutor. Attempt local fallback.
+    from langgraph.prebuilt.tool_executor import ToolExecutor  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - library compatibility layer
+    from .tool_executor import ToolExecutor
 from langgraph.graph.message import add_messages
 
 from models.document import Citation
