@@ -18,11 +18,19 @@ interface AreaChartProps {
   data: ChartData;
   height?: number | string;
   width?: number | string;
+  onDataPointClick?: (dataPoint: any) => void;
 }
 
-const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%' }) => {
+const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%', onDataPointClick }) => {
   const { config, data: chartData } = data;
   const dataKeys = chartData.length > 0 ? Object.keys(chartData[0]).filter(key => key !== 'name') : [];
+
+  const handleAreaClick = (event: any) => {
+    const payload = event?.payload;
+    if (payload?.citation && onDataPointClick) {
+      onDataPointClick(payload);
+    }
+  };
 
   if (!chartData || chartData.length === 0) {
     return (
@@ -144,7 +152,8 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
                   fillOpacity={1}
                   stackId={config.stacked ? 'stack' : undefined}
                   dot={config.showDots ?? false}
-                  activeDot={{ r: 6, stroke: color.stroke, strokeWidth: 2 }}
+                  activeDot={{ r: 6, stroke: color.stroke, strokeWidth: 2, onClick: handleAreaClick }}
+                  onClick={handleAreaClick}
                 />
               );
             })}

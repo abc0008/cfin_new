@@ -18,15 +18,23 @@ interface LineChartProps {
   data: ChartData;
   height?: number | string;
   width?: number | string;
+  onDataPointClick?: (dataPoint: any) => void;
 }
 
 /**
  * LineChart component for rendering trends and time series data
  * Uses Recharts library for rendering the chart
  */
-export default function LineChart({ data, height = 400, width = '100%' }: LineChartProps) {
+export default function LineChart({ data, height = 400, width = '100%', onDataPointClick }: LineChartProps) {
   const { config, chartConfig, data: rawDataPointsFromBackend } = data;
   let processedData = rawDataPointsFromBackend;
+
+  const handleLineClick = (event: any) => {
+    const payload = event?.payload;
+    if (payload?.citation && onDataPointClick) {
+      onDataPointClick(payload);
+    }
+  };
 
   // Determine the key for the category axis (X-axis)
   // Prefer xAxisKey from config, fallback to a sanitized xAxisLabel, or default to 'category' or 'date'
@@ -67,7 +75,8 @@ export default function LineChart({ data, height = 400, width = '100%' }: LineCh
         stroke={CHART_COLORS[index % CHART_COLORS.length] || '#8884d8'}
         strokeWidth={2}
         dot={{ r: 3, strokeWidth: 1 }}
-        activeDot={{ r: 5, strokeWidth: 1 }}
+        activeDot={{ r: 5, strokeWidth: 1, onClick: handleLineClick }}
+        onClick={handleLineClick}
       />
     );
   });
