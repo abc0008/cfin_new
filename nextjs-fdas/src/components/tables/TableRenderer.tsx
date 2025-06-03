@@ -9,6 +9,8 @@ interface TableRendererProps {
   loading?: boolean;
   error?: Error | null;
   className?: string;
+  /** Callback when a table row citation is clicked */
+  onCitationClick?: (highlightId: string) => void;
 }
 
 /**
@@ -20,7 +22,8 @@ export default function TableRenderer({
   width = '100%',
   loading,
   error,
-  className = ''
+  className = '',
+  onCitationClick
 }: TableRendererProps) {
   const [currentPage, setCurrentPage] = useState(0);
   
@@ -156,7 +159,15 @@ export default function TableRenderer({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {currentRows.map((row, rowIndex) => (
-              <tr key={`row-${rowIndex}`} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+              <tr
+                key={`row-${rowIndex}`}
+                className={`${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${row?.citation?.highlightId ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+                onClick={() => {
+                  if (onCitationClick && row?.citation?.highlightId) {
+                    onCitationClick(row.citation.highlightId);
+                  }
+                }}
+              >
                 {/* Row number if enabled */}
                 {config.showRowNumbers && (
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">

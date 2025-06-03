@@ -157,6 +157,24 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
 
   const visualizationData = processAnalysisResults(analysisResults, messages);
 
+  const handleMetricCitationClick = (metric: FinancialMetric) => {
+    if (onCitationClick && (metric as any).highlightId) {
+      onCitationClick((metric as any).highlightId);
+    }
+  };
+
+  const handleChartPointClick = (point: any) => {
+    if (onCitationClick && point?.citation?.highlightId) {
+      onCitationClick(point.citation.highlightId);
+    }
+  };
+
+  const handleTableCitationClick = (row: any) => {
+    if (onCitationClick && row?.citation?.highlightId) {
+      onCitationClick(row.citation.highlightId);
+    }
+  };
+
   if (loading) {
     return (
       <div role="status" aria-label="Loading visualizations" className="flex items-center justify-center p-8 bg-muted/20 rounded-lg min-h-[600px]">
@@ -239,22 +257,32 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
       <div className="p-4 overflow-y-auto max-h-[calc(100vh-200px)]">
         {currentTab === 'overview' ? (
           <div className="space-y-6">
-            <MetricGrid 
+            <MetricGrid
               metrics={visualizationData.metrics || []}
               title="Key Performance Indicators"
+              onCitationClick={handleMetricCitationClick}
             />
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {visualizationData.charts && visualizationData.charts.length > 0 && (
-                <ChartRenderer data={visualizationData.charts[0]} />
+                <ChartRenderer
+                  data={visualizationData.charts[0]}
+                  onCitationClick={handleChartPointClick}
+                />
               )}
               {visualizationData.charts && visualizationData.charts.length > 1 && (
-                <ChartRenderer data={visualizationData.charts[1]} />
+                <ChartRenderer
+                  data={visualizationData.charts[1]}
+                  onCitationClick={handleChartPointClick}
+                />
               )}
             </div>
             
             {visualizationData.tables && visualizationData.tables.length > 0 && (
-              <TableRenderer data={visualizationData.tables[0]} />
+              <TableRenderer
+                data={visualizationData.tables[0]}
+                onCitationClick={handleTableCitationClick}
+              />
             )}
             
             {/* Display Analysis Text if available */}
@@ -274,15 +302,21 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             aria-labelledby={`${currentTab}-tab`}
             className="grid grid-cols-1 lg:grid-cols-2 gap-4"
           >
-            {currentTab === 'charts' ? 
+            {currentTab === 'charts' ?
               (visualizationData.charts || []).map((chart, index) => (
                 <div key={index} className="col-span-1">
-                  <ChartRenderer data={chart} />
+                  <ChartRenderer
+                    data={chart}
+                    onCitationClick={handleChartPointClick}
+                  />
                 </div>
               )) :
               (visualizationData.tables || []).map((table, index) => (
                 <div key={index} className="col-span-1">
-                  <TableRenderer data={table} />
+                  <TableRenderer
+                    data={table}
+                    onCitationClick={handleTableCitationClick}
+                  />
                 </div>
               ))
             }

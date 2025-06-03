@@ -7,13 +7,18 @@ interface MetricGridProps {
   title?: string;
   subtitle?: string;
   onMetricClick?: (metric: FinancialMetric) => void;
+  /**
+   * Callback fired when a metric with a citation is clicked.
+   * The metric object is expected to contain a `highlightId` property.
+   */
+  onCitationClick?: (highlightId: string) => void;
 }
 
 /**
  * MetricGrid component for organizing multiple metrics in a responsive grid layout
  * Includes filtering by category
  */
-export default function MetricGrid({ metrics, title, subtitle, onMetricClick }: MetricGridProps) {
+export default function MetricGrid({ metrics, title, subtitle, onMetricClick, onCitationClick }: MetricGridProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
   // Extract unique categories from metrics
@@ -69,7 +74,14 @@ export default function MetricGrid({ metrics, title, subtitle, onMetricClick }: 
             <MetricCard
               key={`${metric.name}-${index}`}
               metric={metric}
-              onClick={onMetricClick ? () => onMetricClick(metric) : undefined}
+              onClick={() => {
+                if (onMetricClick) {
+                  onMetricClick(metric);
+                }
+                if (onCitationClick && (metric as any).highlightId) {
+                  onCitationClick((metric as any).highlightId);
+                }
+              }}
             />
           ))}
         </div>

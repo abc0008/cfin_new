@@ -11,19 +11,31 @@ interface ChartRendererProps {
   data: ChartData;
   className?: string;
   onDataPointClick?: (dataPoint: any) => void;
+  /** Callback when a chart point citation is clicked */
+  onCitationClick?: (highlightId: string) => void;
 }
 
 /**
  * ChartRenderer component acts as a pure dispatcher for different chart types
  * It renders the appropriate chart component based on the chartType in the data
  */
-const ChartRenderer: React.FC<ChartRendererProps> = ({ 
-  data, 
+const ChartRenderer: React.FC<ChartRendererProps> = ({
+  data,
   className = '',
-  onDataPointClick
+  onDataPointClick,
+  onCitationClick
 }) => {
   // Extract chart type from data
   const { chartType } = data;
+
+  const handleDataPointClick = (point: any) => {
+    if (onDataPointClick) {
+      onDataPointClick(point);
+    }
+    if (onCitationClick && point && point.citation && point.citation.highlightId) {
+      onCitationClick(point.citation.highlightId);
+    }
+  };
 
   // Render the appropriate chart component based on chartType
   switch (chartType) {
@@ -59,10 +71,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
             </div>
           )}
           <div className="relative h-[300px]">
-            <EnhancedChart 
+            <EnhancedChart
               data={data.data}
               chartType={chartType}
-              onDataPointClick={onDataPointClick}
+              onDataPointClick={handleDataPointClick}
               height={300}
               xAxisTitle={data.config?.xAxisLabel}
               yAxisTitle={data.config?.yAxisLabel}
