@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TableData, TableColumn } from '@/types/visualization';
+import { Citation } from '@/types';
 import { formatValue } from '@/utils/formatters';
 
 interface TableRendererProps {
@@ -9,6 +10,7 @@ interface TableRendererProps {
   loading?: boolean;
   error?: Error | null;
   className?: string;
+  onCellClick?: (citation: Citation) => void;
 }
 
 /**
@@ -20,7 +22,8 @@ export default function TableRenderer({
   width = '100%',
   loading,
   error,
-  className = ''
+  className = '',
+  onCellClick
 }: TableRendererProps) {
   const [currentPage, setCurrentPage] = useState(0);
   
@@ -165,16 +168,30 @@ export default function TableRenderer({
                 )}
                 
                 {/* Cell data */}
-                {columns.map((column, colIndex) => (
-                  <td
-                    key={`cell-${rowIndex}-${colIndex}`}
-                    className={`px-3 py-4 whitespace-nowrap text-sm text-gray-500 ${
-                      column.align ? `text-${column.align}` : ''
-                    }`}
-                  >
-                    {formatCell(row[column.key], column)}
-                  </td>
-                ))}
+                {columns.map((column, colIndex) => {
+                  const cell = row[column.key];
+                  const citation = cell && typeof cell === 'object' && 'citation' in cell ? cell.citation : undefined;
+                  const value = cell && typeof cell === 'object' && 'value' in cell ? cell.value : cell;
+                  return (
+                    <td
+                      key={`cell-${rowIndex}-${colIndex}`}
+                      className={`px-3 py-4 whitespace-nowrap text-sm text-gray-500 ${
+                        column.align ? `text-${column.align}` : ''
+                      }`}
+                    >
+                      {citation && onCellClick ? (
+                        <button
+                          className="citation-link"
+                          onClick={() => onCellClick(citation)}
+                        >
+                          {formatCell(value, column)}
+                        </button>
+                      ) : (
+                        formatCell(value, column)
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
             
