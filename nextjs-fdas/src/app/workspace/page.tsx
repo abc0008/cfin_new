@@ -472,7 +472,7 @@ export default function Workspace() {
       {/* Main workspace area */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 px-4 pb-6">
         {/* Left side: Chat Interface */}
-        <div className="bg-card rounded-xl shadow-md flex flex-col h-[calc(100vh-180px)] border border-border col-span-1">
+        <div className="bg-card rounded-xl shadow-md flex flex-col min-h-[calc(100vh-12rem)] overflow-auto border border-border col-span-1 flex-1">
           <div className="py-1 px-2 border-b border-border bg-muted/30 rounded-t-xl">
             <h2 className="text-base font-avenir-pro-demi text-foreground flex items-center">
               <FileSearch className="h-5 w-5 mr-2" />
@@ -491,7 +491,7 @@ export default function Workspace() {
         </div>
 
         {/* Right side: Document View / Analysis */}
-        <div className="bg-card rounded-xl shadow-md flex flex-col h-[calc(100vh-180px)] border border-border col-span-2">
+        <div className="bg-card rounded-xl shadow-md flex flex-col min-h-[calc(100vh-12rem)] overflow-auto border border-border col-span-2 flex-1">
           {/* Tab navigation */}
           <div className="border-b border-border bg-muted/30 rounded-t-xl">
             <Tabs defaultValue="document" className="w-full">
