@@ -1,11 +1,12 @@
 import json
-from typing import List, Dict, Any, Optional
+import uuid
 import logging
+from typing import List, Dict, Any, Optional
 import re # Added for PlanPlanPlan.md item 1.2
 
 from models.analysis import FinancialMetric
 from .base_strategy import AnalysisStrategy
-from cfin.backend.pdf_processing.api_service import ClaudeService
+from pdf_processing.api_service import ClaudeService
 from models.database_models import Document
 from models.visualization import ChartData, TableData
 from utils import tool_processing

@@ -123,6 +123,11 @@ class Document(Base):
     periods = Column(JSON, default=lambda: [])
     extracted_data = Column(JSON, default=lambda: {})
     
+    # Claude API optimization fields
+    full_text = Column(Text)  # Cached full text from Claude extraction
+    text_sha256 = Column(String(64))  # SHA256 hash of full_text for deduplication
+    claude_file_id = Column(String(40))  # Claude Files API file ID
+    
     # Relationships
     user = relationship("User", back_populates="documents")
     citations = relationship("Citation", back_populates="document", cascade="all, delete-orphan")

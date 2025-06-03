@@ -34,7 +34,7 @@ Interactions with other files:
    - Uses AnalysisRepository to store and retrieve analysis results
    - Manages persistence of financial analysis visualizations
 
-4. cfin/backend/pdf_processing/claude_service.py:
+4. cfin/backend/pdf_processing/api_service.py:
    - Uses ClaudeService for AI response generation and document analysis
    - Methods used: generate_response, process_pdf, extract_structured_financial_data
    - Primary interface for Claude AI capabilities
@@ -64,7 +64,7 @@ import asyncio
 from repositories.conversation_repository import ConversationRepository
 from repositories.document_repository import DocumentRepository
 from repositories.analysis_repository import AnalysisRepository
-from cfin.backend.pdf_processing.api_service import ClaudeService
+from pdf_processing.api_service import ClaudeService
 from models.database_models import Message, Conversation, Document, Citation, AnalysisBlock, User
 
 logger = logging.getLogger(__name__)
@@ -506,8 +506,6 @@ class ConversationService:
                             #             logger.info(f"Added document {doc_info['id']} with extracted text to context (length: {len(extracted_text)})")
                             #         else:
                             #             logger.warning(f"Could not extract text from PDF for document {doc_info['id']}")
-                            #     except Exception as pdf_error:
-                            #         logger.warning(f"Error extracting text from PDF for document {doc_info['id']}: {str(pdf_error)}")
                             else:
                                 logger.warning(f"No raw_text or PDF content available for document {doc_info['id']}")
                 except Exception as e:
@@ -584,18 +582,29 @@ class ConversationService:
             # Use specialized visualization tools flow
             logger.info(f"Using visualization tools approach for conversation {conversation_id}")
             
-            # Combine document texts into a single string for analysis
+            # Extract file_id from first document if available (for Claude Files API optimization)
+            file_id = None
             combined_doc_text = ""
+            
             for doc in document_texts:
+                # Try to get file_id from extracted_data
+                if "extracted_data" in doc and isinstance(doc["extracted_data"], dict):
+                    if "file_id" in doc["extracted_data"] and doc["extracted_data"]["file_id"]:
+                        file_id = doc["extracted_data"]["file_id"]
+                        logger.info(f"Using cached file_id {file_id} for visualization analysis")
+                        break  # Use first available file_id
+                
+                # Combine text as fallback
                 if "raw_text" in doc:
                     combined_doc_text += f"\n\n{doc['raw_text']}"
             
-            logger.info(f"Calling Claude with visualization tools for query: '{content[:50]}...'")
+            logger.info(f"Calling Claude with visualization tools for query: '{content[:50]}...', file_id={file_id}")
             
-            # Call Claude with visualization tools
+            # Call Claude with visualization tools (preferring file_id if available)
             result = await self.claude_service.analyze_with_visualization_tools(
                 document_text=combined_doc_text,
-                user_query=content
+                user_query=content,
+                file_id=file_id
             )
             
             # Extract analysis text and visualization data
@@ -1064,18 +1073,50 @@ When analyzing financial documents, focus on:
             
             document_texts = valid_documents
             
-            # Log document information before sending
-            logger.info(f"Processing {len(document_texts)} documents with LangGraph")
+            # Optimize document texts using Claude Files API file_id (no text extraction needed)
+            optimized_document_texts = []
             for i, doc in enumerate(document_texts):
                 doc_id = doc.get('id', f'doc_{i+1}')
-                has_content = 'raw_text' in doc and bool(doc.get('raw_text'))
-                content_length = len(doc.get('raw_text', '')) if has_content else 0
-                logger.info(f"Document {i+1}: ID={doc_id}, has_content={has_content}, length={content_length}")
                 
-                # Add a preview of content for debugging
-                if has_content and content_length > 0:
-                    content_preview = doc.get('raw_text', '')[:100] + "..." if content_length > 100 else doc.get('raw_text', '')
-                    logger.info(f"Document {i+1} content preview: {content_preview}")
+                # Get file_id from document database for Files API
+                if 'id' in doc:
+                    try:
+                        db_doc = await self.document_repository.get_document(doc['id'])
+                        if db_doc and db_doc.claude_file_id:
+                            # Create optimized document object with file_id for native PDF support
+                            optimized_doc = doc.copy()
+                            optimized_doc['claude_file_id'] = db_doc.claude_file_id
+                            optimized_doc['filename'] = db_doc.filename
+                            # Remove raw_text since we'll use native PDF support via file_id
+                            optimized_doc.pop('raw_text', None)
+                            optimized_document_texts.append(optimized_doc)
+                            logger.info(f"Using Files API file_id {db_doc.claude_file_id} for document {doc['id']} (native PDF support)")
+                        else:
+                            logger.warning(f"No claude_file_id found for document {doc['id']}, falling back to text")
+                            optimized_document_texts.append(doc)
+                    except Exception as e:
+                        logger.warning(f"Failed to get file_id for document {doc['id']}: {e}")
+                        optimized_document_texts.append(doc)
+                else:
+                    optimized_document_texts.append(doc)
+            
+            document_texts = optimized_document_texts
+            
+            # Log document information before sending
+            logger.info(f"Processing {len(document_texts)} documents with native PDF support via Files API")
+            for i, doc in enumerate(document_texts):
+                doc_id = doc.get('id', f'doc_{i+1}')
+                has_file_id = 'claude_file_id' in doc and bool(doc.get('claude_file_id'))
+                has_raw_text = 'raw_text' in doc and bool(doc.get('raw_text'))
+                filename = doc.get('filename', 'unknown')
+                
+                if has_file_id:
+                    logger.info(f"Document {i+1}: ID={doc_id}, filename={filename}, using Files API file_id={doc['claude_file_id']}")
+                elif has_raw_text:
+                    content_length = len(doc.get('raw_text', ''))
+                    logger.info(f"Document {i+1}: ID={doc_id}, filename={filename}, using raw_text fallback ({content_length} chars)")
+                else:
+                    logger.warning(f"Document {i+1}: ID={doc_id}, filename={filename}, no file_id or raw_text available")
             
             # Generate response with LangGraph
             logger.info("Using LangGraph for basic response generation with documents")

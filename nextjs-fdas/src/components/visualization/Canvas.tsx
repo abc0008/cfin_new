@@ -36,7 +36,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
   //   (Further check needed if these two helpers are used elsewhere before full removal)
 
   // Process analysis results into visualization data
-  const processAnalysisResults = useCallback((results: AnalysisResult[], msgs: any[] = []) => {
+  const processAnalysisResults = useCallback((results: AnalysisResult[], msgs: any[]) => {
     // Check for analysis_blocks in messages first
     if (msgs.length > 0) {
       console.log(`Checking ${msgs.length} messages for visualization data...`);
@@ -159,10 +159,10 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
 
   if (loading) {
     return (
-      <div role="status" aria-label="Loading visualizations" className="flex items-center justify-center p-8 bg-gray-50 rounded-lg min-h-[600px]">
+      <div role="status" aria-label="Loading visualizations" className="flex items-center justify-center p-8 bg-muted/20 rounded-lg min-h-[600px]">
         <div className="animate-pulse flex flex-col items-center">
-          <div className="h-8 w-40 bg-gray-200 rounded mb-4" />
-          <div className="h-80 w-full bg-gray-200 rounded" />
+          <div className="h-8 w-40 bg-muted rounded mb-4" />
+          <div className="h-80 w-full bg-muted rounded" />
         </div>
       </div>
     );
@@ -170,10 +170,10 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
 
   if (error) {
     return (
-      <div role="alert" className="flex items-center justify-center p-8 bg-red-50 rounded-lg min-h-[600px]">
-        <div className="text-red-500 text-center">
-          <h3 className="font-semibold mb-2">Error loading visualizations</h3>
-          <p className="text-sm">{error.toString()}</p>
+      <div role="alert" className="flex items-center justify-center p-8 bg-destructive/10 rounded-lg min-h-[600px]">
+        <div className="text-destructive text-center">
+          <h3 className="font-avenir-pro-demi mb-2">Error loading visualizations</h3>
+          <p className="text-sm font-avenir-pro">{error.toString()}</p>
         </div>
       </div>
     );
@@ -184,24 +184,24 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
        (!visualizationData.tables || visualizationData.tables.length === 0) && 
        (!visualizationData.metrics || visualizationData.metrics.length === 0))) {
     return (
-      <div role="status" aria-label="No data" className="flex items-center justify-center p-8 bg-gray-50 rounded-lg min-h-[600px]">
-        <p className="text-gray-500">No visualization data available. Try asking a question that requires charts or tables.</p>
+      <div role="status" aria-label="No data" className="flex items-center justify-center p-8 bg-muted/20 rounded-lg min-h-[600px]">
+        <p className="text-muted-foreground font-avenir-pro">No visualization data available. Try asking a question that requires charts or tables.</p>
       </div>
     );
   }
 
   return (
-    <div role="main" className="w-full rounded-lg bg-white shadow-sm">
-      <div className="border-b border-gray-200">
+    <div role="main" className="w-full rounded-lg bg-card shadow-sm">
+      <div className="border-b border-border">
         <div role="tablist" className="flex space-x-4 px-4">
           <button
             role="tab"
             aria-selected={currentTab === 'overview'}
             aria-controls="overview-panel"
-            className={`py-4 px-1 text-sm font-medium ${
+            className={`py-4 px-1 text-sm font-avenir-pro-demi transition-colors ${
               currentTab === 'overview'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground hover:border-border'
             }`}
             onClick={() => setCurrentTab('overview')}
           >
@@ -211,10 +211,10 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             role="tab"
             aria-selected={currentTab === 'charts'}
             aria-controls="charts-panel"
-            className={`py-4 px-1 text-sm font-medium ${
+            className={`py-4 px-1 text-sm font-avenir-pro-demi transition-colors ${
               currentTab === 'charts'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground hover:border-border'
             }`}
             onClick={() => setCurrentTab('charts')}
           >
@@ -224,10 +224,10 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             role="tab"
             aria-selected={currentTab === 'tables'}
             aria-controls="tables-panel"
-            className={`py-4 px-1 text-sm font-medium ${
+            className={`py-4 px-1 text-sm font-avenir-pro-demi transition-colors ${
               currentTab === 'tables'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground hover:border-border'
             }`}
             onClick={() => setCurrentTab('tables')}
           >
@@ -236,7 +236,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
         </div>
       </div>
 
-      <div className="p-4 overflow-y-auto max-h-[calc(100vh-280px)]">
+      <div className="p-4 overflow-y-auto max-h-[calc(100vh-200px)]">
         {currentTab === 'overview' ? (
           <div className="space-y-6">
             <MetricGrid 
@@ -259,31 +259,31 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             
             {/* Display Analysis Text if available */}
             {visualizationData.analysisText && (
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg shadow-sm border border-gray-200">
-                <h4 className="text-md font-semibold text-gray-700 mb-2">Textual Summary</h4>
-                <p className="text-sm text-gray-600 whitespace-pre-wrap">
+              <div className="mt-6 p-4 bg-muted/30 rounded-lg shadow-sm border border-border">
+                <h4 className="text-md font-avenir-pro-demi text-foreground mb-2">Textual Summary</h4>
+                <p className="text-sm font-avenir-pro text-muted-foreground whitespace-pre-wrap">
                   {visualizationData.analysisText}
                 </p>
               </div>
             )}
           </div>
         ) : (
-        <div
-          role="tabpanel"
-          id={`${currentTab}-panel`}
-          aria-labelledby={`${currentTab}-tab`}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-4"
-        >
+          <div
+            role="tabpanel"
+            id={`${currentTab}-panel`}
+            aria-labelledby={`${currentTab}-tab`}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-4"
+          >
             {currentTab === 'charts' ? 
               (visualizationData.charts || []).map((chart, index) => (
-            <div key={index} className="col-span-1">
+                <div key={index} className="col-span-1">
                   <ChartRenderer data={chart} />
-            </div>
+                </div>
               )) :
               (visualizationData.tables || []).map((table, index) => (
                 <div key={index} className="col-span-1">
                   <TableRenderer data={table} />
-        </div>
+                </div>
               ))
             }
           </div>

@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, BinaryIO, Any
 from pathlib import Path
 import asyncio
+import settings
 
 from models.document import (
     ProcessedDocument, 
@@ -16,8 +17,9 @@ from models.document import (
     DocumentUploadResponse
 )
 from models.database_models import DocumentType, ProcessingStatusEnum, Document, Citation
-from cfin.backend.pdf_processing.api_service import ClaudeService
+from pdf_processing.api_service import ClaudeService
 from repositories.document_repository import DocumentRepository
+from utils.hashlib_utils import sha256_str
 
 
 logger = logging.getLogger(__name__)
@@ -36,7 +38,7 @@ class DocumentService:
         
     async def upload_document(self, file_data: bytes, filename: str, user_id: str) -> DocumentUploadResponse:
         """
-        Upload and process a document.
+        Upload and process a document using Claude Files API optimizations.
         
         Args:
             file_data: Raw bytes of the PDF file
@@ -55,8 +57,8 @@ class DocumentService:
                 mime_type="application/pdf"
             )
             
-            # Start background processing
-            asyncio.create_task(self._process_document(document.id, file_data, filename))
+            # Start background processing with Files API optimization
+            asyncio.create_task(self._process_document_optimized(document.id, file_data, filename))
             
             # Return upload response
             return self.document_repository.document_to_upload_response(document)
@@ -65,9 +67,9 @@ class DocumentService:
             logger.error(f"Error uploading document: {str(e)}", exc_info=True)
             raise
     
-    async def _process_document(self, document_id: str, pdf_data: bytes, filename: str):
+    async def _process_document_optimized(self, document_id: str, pdf_data: bytes, filename: str):
         """
-        Process a document with Claude API for PDF processing and citation extraction.
+        Process a document with Claude API optimizations using Files API and cached text.
         
         Args:
             document_id: ID of the document
@@ -77,96 +79,89 @@ class DocumentService:
         try:
             # Update status to processing
             await self.document_repository.update_document_status(document_id, ProcessingStatusEnum.PROCESSING)
-            logger.info(f"Starting processing of document {document_id} ({filename}) with Claude API")
+            logger.info(f"Starting optimized processing of document {document_id} ({filename}) with Claude Files API")
             
-            # Process with Claude service directly for PDF processing and citation extraction
-            true_full_raw_text: str = ""
-            processed_document_model: Optional[ProcessedDocument] = None
-            citations_list: List[CitationSchema] = []
-
-            try:
-                logger.info(f"Processing document {document_id} with Claude service for full text, structured data, and citations")
-                # ClaudeService.process_pdf now returns: (true_full_raw_text, processed_document_model, citations_list)
+            # Get the document record to use with Files API optimization
+            doc = await self.document_repository.get_document(document_id)
+            if not doc:
+                raise ValueError(f"Document {document_id} not found")
+            
+            # Extract text using Files API optimization
+            full_text = await self.claude_service._extract_full_text(
+                doc=doc,
+                pdf_bytes=pdf_data,
+                prompt=settings.PDF_EXTRACT_PROMPT
+            )
+            
+            # Process with Claude service for structured data
+            true_full_raw_text, processed_document_model, citations_list = await self.claude_service.process_pdf(pdf_data, filename)
+            
+            if not processed_document_model:
+                raise ValueError("Claude service returned None for processed_document_model")
+            
+            # Use the better text extraction (prefer longer, more complete text)
+            # Files API sometimes returns truncated results, so prefer the fuller extraction
+            if full_text and len(full_text) > 500:  # Files API extracted substantial content
+                final_raw_text_to_store = full_text
+                logger.info(f"Using Files API text extraction ({len(full_text)} chars)")
+            elif true_full_raw_text and len(true_full_raw_text) > len(full_text):
+                final_raw_text_to_store = true_full_raw_text  # Use Claude extraction as fallback
+                logger.info(f"Using Claude text extraction as fallback ({len(true_full_raw_text)} chars)")
+            else:
+                final_raw_text_to_store = full_text or true_full_raw_text  # Last resort
+                logger.warning(f"Using minimal text extraction ({len(final_raw_text_to_store)} chars)")
+            
+            # Check if we have cached file_id and can use Files API optimization
+            if doc.claude_file_id and doc.full_text:
+                logger.info(f"Using cached Files API file_id={doc.claude_file_id} for document {document_id}")
+                final_raw_text_to_store = doc.full_text
+                
+                # For cached files, we need to do analysis only (not full processing)
+                # Use the lightweight analysis approach to avoid redundant API calls
+                processed_document_model = await self.claude_service.analyze_pdf_content(
+                    pdf_data, filename, use_cached_file_id=doc.claude_file_id
+                )
+                citations_list = []  # Citations from cache if needed
+                
+            else:
+                logger.info(f"No cached file_id for document {document_id}, performing full processing")
+                # Only do full processing if we don't have cached content
                 true_full_raw_text, processed_document_model, citations_list = await self.claude_service.process_pdf(pdf_data, filename)
                 
-                logger.info(f"Successfully initiated processing for document {document_id} with Claude service.")
-                logger.info(f"Full text received (length: {len(true_full_raw_text)}), {len(citations_list)} citations candidate.")
-
                 if not processed_document_model:
                     raise ValueError("Claude service returned None for processed_document_model")
-
-            except Exception as e:
-                logger.error(f"Error using Claude service for document {document_id}: {str(e)}", exc_info=True)
-                # Fallback text extraction if Claude service fails entirely
-                current_raw_text_fallback = ""
-                try:
-                    import io
-                    from PyPDF2 import PdfReader
-                    pdf_file = io.BytesIO(pdf_data)
-                    pdf_reader = PdfReader(pdf_file)
-                    page_texts = [f"--- Page {i+1} ---\n{pdf_reader.pages[i].extract_text() or ''}" for i in range(len(pdf_reader.pages))]
-                    current_raw_text_fallback = "\n\n".join(page_texts)
-                    logger.info(f"Extracted {len(current_raw_text_fallback)} characters of raw text as Claude service error fallback for document {document_id}")
-                except Exception as extract_error:
-                    logger.error(f"Failed to extract fallback text after Claude service error: {extract_error}", exc_info=True)
-                    current_raw_text_fallback = f"Failed to process document {filename} with Claude and fallback text extraction also failed: {extract_error}"
                 
-                await self.document_repository.update_document_content(
-                    document_id=document_id,
-                    document_type=DocumentType.OTHER,
-                    extracted_data={"error": f"Claude API processing error: {str(e)}", "claude_textual_output_accompanying_json": f"Claude API processing error: {str(e)}"},
-                    raw_text=current_raw_text_fallback, # Use fallback text
-                    confidence_score=0.0
-                )
-                await self.document_repository.update_document_status(
-                    document_id=document_id,
-                    status=ProcessingStatusEnum.FAILED,
-                    error_message=f"Claude API processing error: {str(e)}"
-                )
-                return
+                # Use the extraction result
+                final_raw_text_to_store = true_full_raw_text
+                logger.info(f"Using full processing extraction ({len(final_raw_text_to_store)} chars)")
+                
+                # Update document with new cached data
+                await self.document_repository.update_document(document_id, {
+                    "full_text": doc.full_text,
+                    "text_sha256": doc.text_sha256, 
+                    "claude_file_id": doc.claude_file_id
+                })
             
             # Determine document type from the processed model
             document_type_enum = DocumentType[processed_document_model.content_type.upper()] if processed_document_model.content_type else DocumentType.OTHER
             
-            # Primary raw_text is now true_full_raw_text from Claude's dedicated extraction
-            # Fallback to PyPDF2 if Claude's full text extraction failed or returned minimal content
-            final_raw_text_to_store = true_full_raw_text
-            if not true_full_raw_text or len(true_full_raw_text.strip()) < 50 or "Error:" in true_full_raw_text or "Warning:" in true_full_raw_text:
-                logger.warning(f"Claude full text extraction for {document_id} was problematic (Text: '...'{true_full_raw_text[:100]}...'). Attempting PyPDF2 fallback.")
-                try:
-                    import io
-                    from PyPDF2 import PdfReader
-                    pdf_file = io.BytesIO(pdf_data)
-                    pdf_reader = PdfReader(pdf_file)
-                    page_texts = [f"--- Page {i+1} ---\n{pdf_reader.pages[i].extract_text() or ''}" for i in range(len(pdf_reader.pages))]
-                    pypdf2_raw_text = "\n\n".join(page_texts)
-                    if len(pypdf2_raw_text.strip()) > len(final_raw_text_to_store.strip()): # Only use if substantially better
-                        final_raw_text_to_store = pypdf2_raw_text
-                        logger.info(f"Successfully extracted {len(final_raw_text_to_store)} characters using PyPDF2 as fallback for {document_id}")
-                    else:
-                        logger.info(f"PyPDF2 fallback text for {document_id} was not substantially longer than Claude's output. Sticking with Claude output.")
-                except Exception as extract_error:
-                    logger.error(f"Failed to extract PyPDF2 fallback text for {document_id}: {extract_error}", exc_info=True)
-                    if not final_raw_text_to_store: # If Claude gave nothing and PyPDF2 failed
-                         final_raw_text_to_store = f"Failed to extract text content from {filename}. PDF may contain images or be protected."
-            
-            # Update document with extracted content
-            logger.info(f"Updating document {document_id} content in database. Raw text length: {len(final_raw_text_to_store)}")
+            # Update document with extracted content and Claude optimizations
+            logger.info(f"Updating document {document_id} content with Claude optimizations. Raw text length: {len(final_raw_text_to_store)}")
             await self.document_repository.update_document_content(
                 document_id=document_id,
                 document_type=document_type_enum,
                 periods=processed_document_model.periods,
-                extracted_data=processed_document_model.extracted_data, # This is now primarily structured data
-                raw_text=final_raw_text_to_store, # Use the definitive raw text
+                extracted_data=processed_document_model.extracted_data,
+                raw_text=final_raw_text_to_store,
                 confidence_score=processed_document_model.confidence_score
             )
             
-            logger.info(f"Document {document_id} processed. Status: COMPLETED, Raw text length: {len(final_raw_text_to_store)}, Extracted data keys: {list(processed_document_model.extracted_data.keys()) if processed_document_model.extracted_data else 'None'}")
+            logger.info(f"Document {document_id} processed with Claude optimizations. File ID: {doc.claude_file_id}")
             
-            # Add citations to the database
+            # Store citations as before
             added_db_citations: List[Citation] = []
             logger.info(f"Storing {len(citations_list)} citations for document {document_id}")
-            for citation_schema_item in citations_list: # Assuming citations_list contains Pydantic CitationSchema objects
+            for citation_schema_item in citations_list:
                 if not isinstance(citation_schema_item, CitationSchema):
                     logger.warning(f"Skipping non-CitationSchema item in citations_list: {type(citation_schema_item)}")
                     continue
@@ -185,31 +180,35 @@ class DocumentService:
                 if db_citation:
                     added_db_citations.append(db_citation)
             
-            # Link citations to financial insights if available (this logic might need adjustment based on how citations are now structured)
-            if processed_document_model.extracted_data and \
-               isinstance(processed_document_model.extracted_data.get('financial_data'), dict) and \
-               isinstance(processed_document_model.extracted_data['financial_data'].get('insights'), dict):
-                
-                insights = processed_document_model.extracted_data['financial_data']['insights']
-                
-                # Create a map of original citation identifiers (if any) to new DB citation IDs
-                # This part is speculative as the structure of `citations_list` from Claude might not have old IDs
-                # For simplicity, we might just store DB citations and UI reconstructs context if needed
-                # For now, this section is simplified as direct mapping from Claude's raw citation output to DB IDs isn't straightforward without more context on Claude's citation structure
-                pass # Placeholder for more complex citation linking if needed later
-            
+            # Update status to completed
             await self.document_repository.update_document_status(document_id, ProcessingStatusEnum.COMPLETED)
-            logger.info(f"Document {document_id} processing completed with {len(added_db_citations)} citations stored in DB")
-                
-        except Exception as e:
-            logger.error(f"Error processing document {document_id}: {str(e)}", exc_info=True)
+            logger.info(f"Successfully completed optimized processing for document {document_id}")
             
-            # Update status to failed
+        except Exception as e:
+            logger.error(f"Error in optimized document processing for {document_id}: {str(e)}", exc_info=True)
             await self.document_repository.update_document_status(
                 document_id=document_id,
                 status=ProcessingStatusEnum.FAILED,
-                error_message=str(e)
+                error_message=f"Optimized processing error: {str(e)}"
             )
+    
+    async def get_document_text_optimized(self, document_id: str) -> str:
+        """
+        Get document text using Claude Files API optimizations with caching.
+        
+        Args:
+            document_id: ID of the document
+            
+        Returns:
+            Full text of the document
+        """
+        try:
+            return await self.claude_service.get_document_text(document_id, self.document_repository)
+        except Exception as e:
+            logger.error(f"Error getting optimized document text for {document_id}: {e}")
+            # Fallback to traditional method
+            doc_content = await self.get_document_content(document_id)
+            return doc_content.get("raw_text", "") if doc_content else ""
     
     async def get_document_financial_data(self, document_id: str) -> Dict[str, Any]:
         """

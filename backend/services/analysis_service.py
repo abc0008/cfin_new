@@ -51,7 +51,7 @@ from anthropic.types import Message, TextBlock, ToolUseBlock # Moved import
 
 from repositories.analysis_repository import AnalysisRepository
 from repositories.document_repository import DocumentRepository
-from cfin.backend.pdf_processing.api_service import ClaudeService, ALL_TOOLS_DICT
+from pdf_processing.api_service import ClaudeService, ALL_TOOLS_DICT
 from pdf_processing.financial_agent import FinancialAnalysisAgent
 from models.database_models import AnalysisResult, Document
 from utils.visualization_helpers import (
@@ -74,15 +74,18 @@ logger = logging.getLogger(__name__)
 KW_FREQ_ENABLED = False 
 
 # System prompts for Story #2
-BASIC_FINANCIAL_SYSTEM_PROMPT = """You are an AI financial analyst. Your task is to provide a concise textual summary of key financial highlights from the provided document excerpts.
+BASIC_FINANCIAL_SYSTEM_PROMPT = """You are an AI financial analyst. Your task is to analyze the provided financial document and extract key insights.
+
+The PDF document is automatically available to you through Claude's native PDF support, which provides both text and visual understanding of tables, charts, and financial data.
+
 You MUST perform the following actions in this exact order:
-1. Call the `generate_financial_metric` tool exactly twice to extract two different key financial metrics.
-2. Call the `generate_table_data` tool exactly once to present a summary table of important figures.
-3. Call the `generate_graph_data` tool at least once to visualize a key trend or comparison relevant to the extracted data.
-4. Provide a brief overall textual summary based on the document and the tool results.
-Adhere strictly to the Pydantic models provided in the tool descriptions for tool inputs.
-Ensure your final textual summary is concise and directly answers the user's query if provided, incorporating the extracted metrics, table, and chart.
-"""
+1. Analyze the financial document to identify key metrics and data
+2. Call the `generate_financial_metric` tool exactly twice to highlight two important financial metrics
+3. Call the `generate_table_data` tool exactly once to create a table with at least 3 relevant metrics
+4. Call the `generate_graph_data` tool exactly once to create a visualization of the data
+5. Provide a concise summary (2-3 paragraphs) explaining the financial insights and trends
+
+Use the actual financial data from the document. If specific metrics are not available, state this clearly."""
 
 SENTIMENT_ANALYSIS_SYSTEM_PROMPT = """You are an AI sentiment analysis expert. Your task is to analyze the sentiment of the provided text.
 You MUST perform the following actions in this exact order:
@@ -212,8 +215,15 @@ class AnalysisService:
                 documents.append(doc)
                 loaded_docs_count += 1
                 
-                if doc.raw_text:
-                    aggregated_text += doc.raw_text + "\n\n"
+                # Use optimized text retrieval with Claude Files API caching
+                try:
+                    optimized_text = await self.claude_service.get_document_text(doc.id, self.document_repository)
+                    aggregated_text += optimized_text + "\n\n"
+                    logger.info(f"Using cached text for document {doc.id} in analysis ({len(optimized_text)} chars)")
+                except Exception as e:
+                    logger.warning(f"Failed to get cached text for document {doc.id}: {e}")
+                    if doc.raw_text:
+                        aggregated_text += doc.raw_text + "\n\n"
                 
                 # Aggregate PDF base64 content if needed by strategies (and if available)
                 if hasattr(doc, 'content_pdf_path') and doc.content_pdf_path: # Assuming PDF path is stored
@@ -229,6 +239,20 @@ class AnalysisService:
                         pass
                     except Exception as e:
                         logger.error(f"Error encoding PDF for document {doc.id}: {e}")
+
+                # Get PDF content for Claude's native PDF support
+                try:
+                    # Get the PDF binary content from storage
+                    pdf_content = await self.document_repository.storage_service.get_file(f"{doc.id}.pdf")
+                    if pdf_content:
+                        # Convert to base64 for Claude API
+                        pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
+                        pdf_base64_contents.append(pdf_base64)
+                        logger.info(f"Loaded PDF content for document {doc.id}: {len(pdf_content)} bytes")
+                    else:
+                        logger.warning(f"No PDF content found for document {doc.id}")
+                except Exception as e:
+                    logger.error(f"Error loading PDF content for document {doc.id}: {e}")
 
             if loaded_docs_count == 0:
                 logger.error(f"No valid documents could be loaded for analysis {analysis_id} with IDs: {document_ids}.")
@@ -297,12 +321,41 @@ class AnalysisService:
 
             elif analysis_type == "basic_financial":
                 logger.info(f"Executing basic_financial analysis for analysis {analysis_id}")
+                
+                # Build initial message with PDF content using Claude's native PDF support
+                content_blocks = []
+                
+                # Add PDF documents using Claude's native PDF support
+                if pdf_base64_contents:
+                    logger.info(f"Using {len(pdf_base64_contents)} PDF documents with Claude's native PDF support")
+                    for i, pdf_base64 in enumerate(pdf_base64_contents):
+                        content_blocks.append({
+                            "type": "document",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "application/pdf",
+                                "data": pdf_base64
+                            }
+                        })
+                    # Add a text prompt after the PDFs
+                    prompt_text = "Please analyze the financial documents provided above."
+                    if query:
+                        prompt_text += f"\n\nUser query: {query}"
+                    content_blocks.append({"type": "text", "text": prompt_text})
+                else:
+                    # Fallback to text if no PDFs available
+                    logger.warning("No PDF content available, falling back to text")
+                    content_blocks.append({
+                        "type": "text", 
+                        "text": aggregated_text if aggregated_text else "No document content available."
+                    })
+                    if query:
+                        content_blocks.append({"type": "text", "text": f"User query: {query}"})
+                
                 # Initial message from user to assistant
                 current_messages: List[Dict[str, Any]] = [
-                    {"role": "user", "content": [{"type": "text", "text": aggregated_text if aggregated_text else "No document text available."}]}
+                    {"role": "user", "content": content_blocks}
                 ]
-                if query:
-                    current_messages[0]["content"].append({"type": "text", "text": f"User query: {query}"}) # type: ignore
 
                 # Store all assistant responses that include text or final (non-tool_use) content blocks
                 final_assistant_responses_content: List[Dict[str, Any]] = []

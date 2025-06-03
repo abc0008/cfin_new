@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, patch, MagicMock, Mock
 from typing import Dict, List, Any
 
 import asyncio
-from cfin.backend.pdf_processing.api_service import ClaudeService
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
+from pdf_processing.api_service import ClaudeService
 from models.document import ProcessedDocument, DocumentContentType, DocumentMetadata, ProcessingStatus
 from models.tools import ChartGenerationTool, TableGenerationTool
 

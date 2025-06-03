@@ -1,0 +1,12 @@
+Mulberry: #8f0f56  rgb(143, 15, 86) 
+Lust: #e5241d  rgb(229, 36, 29)
+Hobgoblin: #02a88e  rgb(2, 168, 142)
+Tamahagane:  #3c3e3e  rgb(60, 62, 62)
+Mt. Rushmore: #828282  rgb(130, 130, 130)
+Pigeon: #acafaf  rgb(172, 175, 175)
+Caribbean Blue: #00bed5  rgb(0, 190, 213)
+
+Background - White Smoke: #f6f6f6 rgb(246, 246, 246)
+Header Text Color - Nero: #242424  rgb(36, 36, 36)
+Normal Text Color - Smokescreen: #595959  rgb(89, 89, 89)
+Chart Text Color - White: #ffffff  rgb(255, 255, 255)
