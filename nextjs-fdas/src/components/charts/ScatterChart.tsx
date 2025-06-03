@@ -19,13 +19,21 @@ interface ScatterChartProps {
   data: ChartData;
   height?: number | string;
   width?: number | string;
+  onDataPointClick?: (dataPoint: any) => void;
 }
 
 /**
  * Scatter Chart component for visualizing correlation between two variables
  */
-export default function ScatterChart({ data, height = 400, width = '100%' }: ScatterChartProps) {
+export default function ScatterChart({ data, height = 400, width = '100%', onDataPointClick }: ScatterChartProps) {
   const { config, data: chartData, chartConfig } = data;
+
+  const handlePointClick = (event: any) => {
+    const payload = event?.payload;
+    if (payload?.citation && onDataPointClick) {
+      onDataPointClick(payload);
+    }
+  };
   
   if (!chartData || chartData.length === 0) {
     return (
@@ -102,11 +110,12 @@ export default function ScatterChart({ data, height = 400, width = '100%' }: Sca
             <ReferenceLine x={0} stroke="#666" />
             <ReferenceLine y={0} stroke="#666" />
             
-            <Scatter 
-              name={config.title || "Data"} 
-              data={chartData} 
+            <Scatter
+              name={config.title || "Data"}
+              data={chartData}
               fill={CHART_COLORS[0]}
               aria-label={`Scatter plot points for ${config.title || 'data'}`}
+              onClick={handlePointClick}
             />
           </RechartsScatterChart>
         </ResponsiveContainer>

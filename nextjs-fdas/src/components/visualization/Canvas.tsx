@@ -22,6 +22,12 @@ interface CanvasProps {
 const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading, error, onCitationClick }) => {
   const [currentTab, setCurrentTab] = useState<'overview' | 'charts' | 'tables'>('overview');
 
+  const handleDataPointClick = (dataPoint: any) => {
+    if (dataPoint && dataPoint.citation && onCitationClick) {
+      onCitationClick(dataPoint.citation.highlightId);
+    }
+  };
+
   // NOTE: The following extensive regex-based extraction functions (extractFinancialDataFromMessages and its helpers)
   // have been removed as Canvas.tsx now relies solely on structured data (analysis_blocks or visualizationData)
   // from upstream sources (messages or analysisResults). This simplifies Canvas.tsx and removes brittle regex parsing.
@@ -252,10 +258,10 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {visualizationData.charts && visualizationData.charts.length > 0 && (
-                <ChartRenderer data={visualizationData.charts[0]} />
+                <ChartRenderer data={visualizationData.charts[0]} onDataPointClick={handleDataPointClick} />
               )}
               {visualizationData.charts && visualizationData.charts.length > 1 && (
-                <ChartRenderer data={visualizationData.charts[1]} />
+                <ChartRenderer data={visualizationData.charts[1]} onDataPointClick={handleDataPointClick} />
               )}
             </div>
             
@@ -286,7 +292,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             {currentTab === 'charts' ? 
               (visualizationData.charts || []).map((chart, index) => (
                 <div key={index} className="col-span-1">
-                  <ChartRenderer data={chart} />
+                  <ChartRenderer data={chart} onDataPointClick={handleDataPointClick} />
                 </div>
               )) :
               (visualizationData.tables || []).map((table, index) => (
