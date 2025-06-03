@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { AnalysisResult } from '@/types';
+import { AnalysisResult, Citation } from '@/types';
 import { ChartData, TableData, VisualizationData, FinancialMetric } from '@/types/visualization';
 import ChartRenderer from '../charts/ChartRenderer';
 import TableRenderer from '../tables/TableRenderer';
@@ -157,6 +157,12 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
 
   const visualizationData = processAnalysisResults(analysisResults, messages);
 
+  const handleCellClick = useCallback((citation: Citation) => {
+    if (onCitationClick) {
+      onCitationClick(citation.highlightId);
+    }
+  }, [onCitationClick]);
+
   if (loading) {
     return (
       <div role="status" aria-label="Loading visualizations" className="flex items-center justify-center p-8 bg-muted/20 rounded-lg min-h-[600px]">
@@ -254,7 +260,10 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             </div>
             
             {visualizationData.tables && visualizationData.tables.length > 0 && (
-              <TableRenderer data={visualizationData.tables[0]} />
+              <TableRenderer
+                data={visualizationData.tables[0]}
+                onCellClick={onCitationClick ? handleCellClick : undefined}
+              />
             )}
             
             {/* Display Analysis Text if available */}
@@ -282,7 +291,10 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
               )) :
               (visualizationData.tables || []).map((table, index) => (
                 <div key={index} className="col-span-1">
-                  <TableRenderer data={table} />
+                  <TableRenderer
+                    data={table}
+                    onCellClick={onCitationClick ? handleCellClick : undefined}
+                  />
                 </div>
               ))
             }
