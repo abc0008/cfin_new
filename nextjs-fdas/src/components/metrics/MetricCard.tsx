@@ -1,19 +1,11 @@
 import React from 'react';
 import { formatValue, formatChange, getTrend } from '@/utils/formatters';
+import type { FinancialMetric, MetricCitation } from '@/types';
 
 interface MetricCardProps {
-  metric: {
-    name: string;
-    value: number;
-    unit?: string;
-    percentChange?: number;
-    previousValue?: number;
-    trend?: 'up' | 'down' | 'neutral';
-    category?: string;
-    description?: string;
-  };
+  metric: FinancialMetric;
   className?: string;
-  onClick?: () => void;
+  onClick?: (citation: MetricCitation) => void;
 }
 
 /**
@@ -92,9 +84,13 @@ export default function MetricCard({ metric, className = '', onClick }: MetricCa
   };
   
   return (
-    <div 
-      className={`metric-card ${className} ${onClick ? 'cursor-pointer hover:shadow-md' : ''}`}
-      onClick={onClick}
+    <div
+      className={`metric-card ${className} ${metric.citation && onClick ? 'cursor-pointer hover:shadow-md' : ''}`}
+      onClick={() => {
+        if (metric.citation && onClick) {
+          onClick(metric.citation);
+        }
+      }}
     >
       <div className="flex justify-between items-start">
         <h3 className="metric-card-title">{metric.name}</h3>
