@@ -99,7 +99,7 @@ export function ChatInterface({
         className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
       >
         <div 
-          className={`max-w-[80%] rounded-lg px-4 py-3 font-avenir-pro ${
+          className={`max-w-[80%] rounded-lg px-4 py-3 font-avenir-pro text-sm ${
             message.role === 'user' 
               ? 'bg-primary text-primary-foreground' 
               : message.role === 'system' 
@@ -118,37 +118,37 @@ export function ChatInterface({
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <div className="p-4 border-b border-border bg-card">
-        <h2 className="text-lg font-avenir-pro-demi text-foreground">Claude Assistant</h2>
-        <p className="text-sm font-avenir-pro text-muted-foreground">
+      <div className="py-1 px-2 border-b border-border bg-card">
+        <h2 className="text-base font-avenir-pro-demi text-foreground">Claude Assistant</h2>
+        <p className="text-xs font-avenir-pro text-muted-foreground">
           Ask questions about your financial documents
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/20">
+      <div className="flex-1 overflow-y-auto py-1 px-2 space-y-4 bg-muted/20 text-xs">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-6">
             <FileText className="h-12 w-12 mb-4 text-muted-foreground/40" />
-            <h3 className="font-avenir-pro-demi text-lg text-foreground mb-1">No messages yet</h3>
-            <p className="mb-4 font-avenir-pro">Start a conversation by sending a message below.</p>
+            <h3 className="font-avenir-pro-demi text-base text-foreground mb-1">No messages yet</h3>
+            <p className="mb-4 font-avenir-pro text-xs">Start a conversation by sending a message below.</p>
             
             <div className="text-sm text-left w-full max-w-md space-y-2 font-avenir-pro">
               <p className="font-avenir-pro-demi text-foreground">Try asking:</p>
               <button 
                 onClick={() => setInputValue("What is the company's revenue for last quarter?")}
-                className="p-2 bg-card border border-border rounded-md text-left w-full hover:bg-muted/30 transition-colors text-foreground"
+                className="p-1 bg-card border border-border rounded-md text-left w-full hover:bg-muted/30 transition-colors text-foreground text-xs"
               >
                 What is the company's revenue for last quarter?
               </button>
               <button 
                 onClick={() => setInputValue("Calculate the current ratio from the balance sheet.")}
-                className="p-2 bg-card border border-border rounded-md text-left w-full hover:bg-muted/30 transition-colors text-foreground"
+                className="p-1 bg-card border border-border rounded-md text-left w-full hover:bg-muted/30 transition-colors text-foreground text-xs"
               >
                 Calculate the current ratio from the balance sheet.
               </button>
               <button 
                 onClick={() => setInputValue("How has the gross margin changed over time?")}
-                className="p-2 bg-card border border-border rounded-md text-left w-full hover:bg-muted/30 transition-colors text-foreground"
+                className="p-1 bg-card border border-border rounded-md text-left w-full hover:bg-muted/30 transition-colors text-foreground text-xs"
               >
                 How has the gross margin changed over time?
               </button>
@@ -168,7 +168,7 @@ export function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t border-border bg-card">
+      <div className="py-1 px-2 border-t border-border bg-card">
         <form onSubmit={handleSubmit} className="flex items-end space-x-2">
           <div className="flex-1 relative">
             <textarea

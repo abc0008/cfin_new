@@ -462,7 +462,7 @@ export default function Workspace() {
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-background to-muted/20">
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-0">
         <h1 className="text-2xl font-avenir-pro-demi text-primary mb-2">Analysis Workspace</h1>
         <p className="text-muted-foreground font-avenir-pro mb-6">
           Upload financial documents, ask questions, and analyze the data through interactive visualizations.
@@ -470,15 +470,15 @@ export default function Workspace() {
       </div>
 
       {/* Main workspace area */}
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 px-4 pb-6">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 px-4 pb-6">
         {/* Left side: Chat Interface */}
-        <div className="bg-card rounded-xl shadow-md flex flex-col h-[calc(100vh-180px)] border border-border">
-          <div className="p-4 border-b border-border bg-muted/30 rounded-t-xl">
-            <h2 className="text-lg font-avenir-pro-demi text-foreground flex items-center">
+        <div className="bg-card rounded-xl shadow-md flex flex-col h-[calc(100vh-180px)] border border-border col-span-1">
+          <div className="py-1 px-2 border-b border-border bg-muted/30 rounded-t-xl">
+            <h2 className="text-base font-avenir-pro-demi text-foreground flex items-center">
               <FileSearch className="h-5 w-5 mr-2" />
               Interactive Chat
             </h2>
-            <p className="text-sm text-muted-foreground font-avenir-pro">Ask questions about your financial documents</p>
+            <p className="text-xs text-muted-foreground font-avenir-pro">Ask questions about your financial documents</p>
           </div>
           <div className="flex-1 overflow-hidden">
             <ChatInterface 
@@ -491,7 +491,7 @@ export default function Workspace() {
         </div>
 
         {/* Right side: Document View / Analysis */}
-        <div className="bg-card rounded-xl shadow-md flex flex-col h-[calc(100vh-180px)] border border-border">
+        <div className="bg-card rounded-xl shadow-md flex flex-col h-[calc(100vh-180px)] border border-border col-span-2">
           {/* Tab navigation */}
           <div className="border-b border-border bg-muted/30 rounded-t-xl">
             <Tabs defaultValue="document" className="w-full">
