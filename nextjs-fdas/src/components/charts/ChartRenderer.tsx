@@ -28,23 +28,23 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   // Render the appropriate chart component based on chartType
   switch (chartType) {
     case 'bar':
-      return <BarChart data={data} />;
+      return <BarChart data={data} onDataPointClick={onDataPointClick} />;
     
     case 'multiBar':
-      return <BarChart data={data} />;
+      return <BarChart data={data} onDataPointClick={onDataPointClick} />;
     
     case 'line':
-      return <LineChart data={data} />;
+      return <LineChart data={data} onDataPointClick={onDataPointClick} />;
     
     case 'pie':
-      return <PieChart data={data} />;
+      return <PieChart data={data} onDataPointClick={onDataPointClick} />;
     
     case 'area':
     case 'stackedArea':
-      return <AreaChart data={data} />;
+      return <AreaChart data={data} onDataPointClick={onDataPointClick} />;
     
     case 'scatter':
-      return <ScatterChart data={data} />;
+      return <ScatterChart data={data} onDataPointClick={onDataPointClick} />;
     
     default:
       // Fallback to EnhancedChart for any other chart types

@@ -7,10 +7,18 @@ interface PieChartProps {
   data: ChartData;
   height?: number | string;
   width?: number | string;
+  onDataPointClick?: (dataPoint: any) => void;
 }
 
-const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%' }) => {
+const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%', onDataPointClick }) => {
   const { config, data: chartData } = data;
+
+  const handleSliceClick = (event: any) => {
+    const payload = event?.payload;
+    if (payload?.citation && onDataPointClick) {
+      onDataPointClick(payload);
+    }
+  };
 
   if (!chartData || chartData.length === 0) {
     return (
@@ -49,6 +57,7 @@ const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%' 
               label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
               labelLine={false}
               className="font-avenir-pro text-xs"
+              onClick={handleSliceClick}
             >
               {chartData.map((entry, index) => (
                 <Cell 

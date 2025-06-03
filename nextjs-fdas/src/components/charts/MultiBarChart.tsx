@@ -18,11 +18,19 @@ interface MultiBarChartProps {
   data: ChartData;
   height?: number | string;
   width?: number | string;
+  onDataPointClick?: (dataPoint: any) => void;
 }
 
-const MultiBarChart: React.FC<MultiBarChartProps> = ({ data, height = 400, width = '100%' }) => {
+const MultiBarChart: React.FC<MultiBarChartProps> = ({ data, height = 400, width = '100%', onDataPointClick }) => {
   const { config, data: chartData } = data;
   const dataKeys = chartData.length > 0 ? Object.keys(chartData[0]).filter(key => key !== 'name') : [];
+
+  const handleBarClick = (event: any) => {
+    const payload = event?.payload;
+    if (payload?.citation && onDataPointClick) {
+      onDataPointClick(payload);
+    }
+  };
 
   if (!chartData || chartData.length === 0) {
     return (
@@ -128,6 +136,7 @@ const MultiBarChart: React.FC<MultiBarChartProps> = ({ data, height = 400, width
                 radius={[4, 4, 0, 0]}
                 maxBarSize={60}
                 stackId={config.stacked ? 'stack' : undefined}
+                onClick={handleBarClick}
               />
             ))}
           </BarChart>
