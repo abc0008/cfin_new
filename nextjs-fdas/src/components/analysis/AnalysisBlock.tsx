@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { DollarSign, ExternalLink, TrendingUp, Zap } from 'lucide-react';
-import { EnhancedChart, ChartType as EnhancedChartType } from '../visualization/EnhancedChart';
+import { EnhancedChart } from '../visualization/EnhancedChart';
 import { FinancialInsight, TrendAnalysis } from '@/types/enhanced';
 import { ChartType, FinancialMetric } from '@/types/visualization';
 import { BarChart2, Clipboard, PieChart, Filter, History } from 'lucide-react';
@@ -239,7 +239,7 @@ export const AnalysisBlock: React.FC<AnalysisBlockProps> = ({
           <div className="h-64">
             <EnhancedChart
               data={block.chartData}
-              chartType={block.chartType as EnhancedChartType}
+              chartType={block.chartType as ChartType}
               onDataPointClick={handleDataPointClick}
               insightData={block.insights}
               trendData={block.trends}

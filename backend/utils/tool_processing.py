@@ -51,12 +51,81 @@ def process_chart_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
     if not all(key in tool_input for key in ["chartType", "config", "data", "chartConfig"]):
         raise ToolSchemaValidationError(f"Chart input missing required keys (chartType, config, data, chartConfig). Input: {tool_input}")
     processed_chart = tool_input.copy()
+    
+    # Fix Claude sending JSON strings instead of actual lists/dicts
+    if "data" in processed_chart:
+        data = processed_chart["data"]
+        if isinstance(data, str):
+            try:
+                # Clean up the JSON string - strip whitespace and handle malformed JSON
+                cleaned_data = data.strip()
+                
+                # Handle common malformed JSON patterns from Claude
+                if cleaned_data.endswith(']}') and cleaned_data.count('[') == 1:
+                    # Fix extra ]} at the end (should just be ])
+                    cleaned_data = cleaned_data[:-2] + ']'
+                elif cleaned_data.endswith('}]') and not cleaned_data.endswith('"}]'):
+                    # Sometimes Claude sends }] instead of ]
+                    pass  # This is actually correct
+                
+                # Parse JSON string to actual list
+                processed_chart["data"] = json.loads(cleaned_data)
+                logger.info(f"Successfully parsed chart data from JSON string to list ({len(processed_chart['data'])} items)")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse chart data JSON string: {e}. Original data: {data}")
+                # Try to extract JSON array from the string using regex as fallback
+                try:
+                    import re
+                    # Look for array pattern in the string
+                    match = re.search(r'\[.*?\]', data, re.DOTALL)
+                    if match:
+                        clean_json = match.group(0)
+                        processed_chart["data"] = json.loads(clean_json)
+                        logger.info(f"Successfully parsed chart data using regex fallback ({len(processed_chart['data'])} items)")
+                    else:
+                        raise ToolSchemaValidationError(f"Could not extract valid JSON array from chart data: {data}")
+                except Exception as fallback_error:
+                    logger.error(f"Regex fallback also failed: {fallback_error}")
+                    raise ToolSchemaValidationError(f"Invalid JSON in chart data: {str(e)}", original_exception=e)
+    
+    # Similarly handle chartConfig if it's a JSON string
+    if "chartConfig" in processed_chart:
+        chart_config = processed_chart["chartConfig"]
+        if isinstance(chart_config, str):
+            try:
+                # Clean up the JSON string - strip whitespace and handle malformed JSON
+                cleaned_config = chart_config.strip()
+                
+                # Handle common malformed JSON patterns for objects
+                if cleaned_config.endswith('}}') and cleaned_config.count('{') >= 1:
+                    # Fix extra } at the end (should just be })
+                    cleaned_config = cleaned_config[:-1]
+                
+                processed_chart["chartConfig"] = json.loads(cleaned_config)
+                logger.info("Successfully parsed chart chartConfig from JSON string to dict")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse chart chartConfig JSON string: {e}. Original data: {chart_config}")
+                # Try to extract JSON object from the string using regex as fallback
+                try:
+                    import re
+                    # Look for object pattern in the string
+                    match = re.search(r'\{.*\}', chart_config, re.DOTALL)
+                    if match:
+                        clean_json = match.group(0)
+                        processed_chart["chartConfig"] = json.loads(clean_json)
+                        logger.info("Successfully parsed chart chartConfig using regex fallback")
+                    else:
+                        raise ToolSchemaValidationError(f"Could not extract valid JSON object from chartConfig: {chart_config}")
+                except Exception as fallback_error:
+                    logger.error(f"ChartConfig regex fallback also failed: {fallback_error}")
+                    raise ToolSchemaValidationError(f"Invalid JSON in chart chartConfig: {str(e)}", original_exception=e)
+    
     config = processed_chart.get("config", {})
     if "description" not in config or config["description"] is None:
         config["description"] = config.get("title", "")
     processed_chart["config"] = config
 
-    # Transform data structure
+    # Transform data structure to match frontend expectations
     original_data = processed_chart.get("data", [])
     chart_type = processed_chart.get("chartType")
     chart_config_settings = processed_chart.get("chartConfig", {})
@@ -73,69 +142,99 @@ def process_chart_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
     
     series_keys = list(chart_config_settings.keys())
 
-    if chart_type in ["bar", "line", "scatter", "area"] and len(series_keys) == 1:
-        # Single series bar, line, scatter, or area chart
-        y_axis_data_key = series_keys[0]
-        for item in original_data:
-            if x_axis_key in item and y_axis_data_key in item:
-                transformed_data.append({
-                    "x": item[x_axis_key],
-                    "y": item[y_axis_data_key]
-                })
-            else:
-                logger.warning(f"Missing x ('{x_axis_key}') or y ('{y_axis_data_key}') key in item: {item} for single series {chart_type}")
-    elif chart_type == "pie":
-        # Pie chart: data items usually have a name (x_axis_key) and a value (first key in chart_config_settings or a common key like 'value')
-        # The Zod schema ChartDataItemSchema expects 'x' and 'y'.
-        # Let's assume the y-value key is the first one found in chart_config_settings if only one, or 'value' if present in data item.
-        y_value_key = None
-        if len(series_keys) == 1:
-            y_value_key = series_keys[0]
-
-        for item in original_data:
-            current_y_key = y_value_key
-            if not current_y_key:
-                # Try to find a 'value' key or the first numeric key other than x_axis_key
-                possible_y_keys = [k for k, v in item.items() if k != x_axis_key and isinstance(v, (int, float))]
-                if 'value' in possible_y_keys:
-                    current_y_key = 'value'
-                elif possible_y_keys:
-                    current_y_key = possible_y_keys[0]
-            
-            if x_axis_key in item and current_y_key and current_y_key in item:
-                transformed_data.append({
-                    "x": item[x_axis_key],
-                    "y": item[current_y_key]
-                })
-            else:
-                logger.warning(f"Pie chart: Missing x ('{x_axis_key}') or deduced y key ('{current_y_key}') in item: {item}")
-
-    elif chart_type in ["bar", "multiBar", "stackedArea"] and len(series_keys) > 1:
-        # Potentially a multi-series chart (e.g., multiBar, or bar that should be multiBar)
-        # If original type was 'bar' but we have multiple series, treat as 'multiBar'
-        if chart_type == "bar":
-            logger.info(f"Chart type 'bar' with multiple series_keys ({series_keys}) being treated as 'multiBar'.")
-            processed_chart["chartType"] = "multiBar" # Update chartType
+    # Transform data to ChartDataItem format (x, y) that the Pydantic model expects
+    if isinstance(original_data, list) and len(original_data) > 0:
+        first_item = original_data[0]
         
-        for series_key in series_keys:
-            series_name = chart_config_settings[series_key].get("label", series_key)
-            current_series_data = []
-            for item in original_data:
-                if x_axis_key in item and series_key in item:
-                    current_series_data.append({
-                        "x": item[x_axis_key],
-                        "y": item[series_key]
+        # Check if data is already in {x, y} format
+        if isinstance(first_item, dict) and 'x' in first_item and 'y' in first_item:
+            logger.info(f"Chart data already in {{x, y}} format")
+            transformed_data = original_data
+                
+        else:
+            # Transform data to {x, y} format required by ChartDataItem model
+            logger.info(f"Transforming chart data to {{x, y}} format required by ChartDataItem model")
+            
+            if chart_type in ["bar", "line", "scatter", "area"] and len(series_keys) == 1:
+                # Single series chart - transform to {x, y} format
+                metric_key = series_keys[0]
+                for item in original_data:
+                    if x_axis_key in item and metric_key in item:
+                        transformed_data.append({
+                            "x": item[x_axis_key],  # Always use 'x' for ChartDataItem
+                            "y": item[metric_key]   # Always use 'y' for ChartDataItem
+                        })
+                    else:
+                        logger.warning(f"Missing x ('{x_axis_key}') or y ('{metric_key}') key in item: {item} for single series {chart_type}")
+                logger.info(f"Transformed {len(transformed_data)} items for single series {chart_type} chart")
+                
+            elif chart_type == "pie":
+                # Pie chart: transform to {x, y} format where x is the category and y is the value
+                y_value_key = None
+                if len(series_keys) == 1:
+                    y_value_key = series_keys[0]
+
+                for item in original_data:
+                    current_y_key = y_value_key
+                    if not current_y_key:
+                        # Try to find a 'value' key or the first numeric key other than x_axis_key
+                        possible_y_keys = [k for k, v in item.items() if k != x_axis_key and isinstance(v, (int, float))]
+                        if 'value' in possible_y_keys:
+                            current_y_key = 'value'
+                        elif possible_y_keys:
+                            current_y_key = possible_y_keys[0]
+                    
+                    if x_axis_key in item and current_y_key and current_y_key in item:
+                        transformed_data.append({
+                            "x": item[x_axis_key],      # Always use 'x' for ChartDataItem
+                            "y": item[current_y_key]    # Always use 'y' for ChartDataItem
+                        })
+                    else:
+                        logger.warning(f"Pie chart: Missing x ('{x_axis_key}') or deduced y key ('{current_y_key}') in item: {item}")
+                logger.info(f"Transformed {len(transformed_data)} items for pie chart")
+
+            elif chart_type in ["bar", "multiBar", "stackedArea"] and len(series_keys) > 1:
+                # Multi-series chart - create PydanticMultiSeriesChartDataItem format
+                # If original type was 'bar' but we have multiple series, treat as 'multiBar'
+                if chart_type == "bar":
+                    logger.info(f"Chart type 'bar' with multiple series_keys ({series_keys}) being treated as 'multiBar'.")
+                    processed_chart["chartType"] = "multiBar" # Update chartType
+                
+                for series_key in series_keys:
+                    series_name = chart_config_settings[series_key].get("label", series_key)
+                    current_series_data = []
+                    for item in original_data:
+                        if x_axis_key in item and series_key in item:
+                            current_series_data.append({
+                                "x": item[x_axis_key],  # Always use 'x' for ChartDataItem
+                                "y": item[series_key]   # Always use 'y' for ChartDataItem
+                            })
+                        else:
+                            logger.warning(f"Missing x ('{x_axis_key}') or series key ('{series_key}') in item: {item} for multi-series chart")
+                    transformed_data.append({
+                        "name": series_name,
+                        "data": current_series_data
                     })
+                logger.info(f"Transformed {len(transformed_data)} series for multi-series {chart_type} chart")
+                
+            else:
+                # Fallback: try to intelligently transform unknown chart types
+                logger.warning(f"Unhandled chart data transformation for chartType '{chart_type}' with series_keys {series_keys}. Attempting intelligent transformation.")
+                if len(series_keys) == 1:
+                    # Treat as single series
+                    metric_key = series_keys[0]
+                    for item in original_data:
+                        if x_axis_key in item and metric_key in item:
+                            transformed_data.append({
+                                "x": item[x_axis_key],
+                                "y": item[metric_key]
+                            })
                 else:
-                    logger.warning(f"Missing x ('{x_axis_key}') or series key ('{series_key}') in item: {item} for multi-series chart")
-            transformed_data.append({
-                "name": series_name,
-                "data": current_series_data
-            })
+                    # Keep original if no transformation logic applies
+                    transformed_data = original_data
     else:
-        # Fallback or unhandled chart type / series_keys combination
-        logger.warning(f"Unhandled chart data transformation for chartType '{chart_type}' with series_keys {series_keys}. Using original data.")
-        transformed_data = original_data # Keep original if no specific transformation logic applies
+        # No data to transform
+        transformed_data = original_data
 
     processed_chart["data"] = transformed_data
 
@@ -160,6 +259,53 @@ def process_table_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
     if current_table_type not in allowed_table_types:
         logger.warning(f"Invalid tableType '{current_table_type}' received from Claude. Defaulting to 'comparison'. Input: {tool_input}")
         processed_table["tableType"] = "comparison"
+    
+    # Fix Claude sending JSON strings instead of actual lists
+    if "data" in processed_table:
+        data = processed_table["data"]
+        if isinstance(data, str):
+            try:
+                # Clean up the JSON string - strip whitespace and handle malformed JSON
+                cleaned_data = data.strip()
+                
+                # Handle common malformed JSON patterns from Claude
+                if cleaned_data.endswith(']}') and cleaned_data.count('[') == 1:
+                    # Fix extra ]} at the end (should just be ])
+                    cleaned_data = cleaned_data[:-2] + ']'
+                elif cleaned_data.endswith('}]') and not cleaned_data.endswith('"}]'):
+                    # Sometimes Claude sends }] instead of ]
+                    pass  # This is actually correct
+                
+                # Parse JSON string to actual list
+                processed_table["data"] = json.loads(cleaned_data)
+                logger.info(f"Successfully parsed table data from JSON string to list ({len(processed_table['data'])} items)")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse table data JSON string: {e}. Original data: {data}")
+                # Try to extract JSON array from the string using regex as fallback
+                try:
+                    import re
+                    # Look for array pattern in the string
+                    match = re.search(r'\[.*?\]', data, re.DOTALL)
+                    if match:
+                        clean_json = match.group(0)
+                        processed_table["data"] = json.loads(clean_json)
+                        logger.info(f"Successfully parsed table data using regex fallback ({len(processed_table['data'])} items)")
+                    else:
+                        raise ToolSchemaValidationError(f"Could not extract valid JSON array from table data: {data}")
+                except Exception as fallback_error:
+                    logger.error(f"Regex fallback also failed: {fallback_error}")
+                    raise ToolSchemaValidationError(f"Invalid JSON in table data: {str(e)}", original_exception=e)
+    
+    # Similarly handle chartConfig if it's a JSON string
+    if "chartConfig" in processed_table:
+        chart_config = processed_table["chartConfig"]
+        if isinstance(chart_config, str):
+            try:
+                processed_table["chartConfig"] = json.loads(chart_config)
+                logger.info("Successfully parsed chartConfig from JSON string to dict")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse chartConfig JSON string: {e}. Data: {chart_config}")
+                raise ToolSchemaValidationError(f"Invalid JSON in chartConfig: {str(e)}", original_exception=e)
     
     try:
         config = processed_table.get("config", {})

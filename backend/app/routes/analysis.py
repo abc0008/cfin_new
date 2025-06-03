@@ -9,8 +9,7 @@ import json
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
 
-from models.analysis import AnalysisRequest, AnalysisResult
-from models.analysis import AnalysisApiResponse, VisualizationDataResponse
+from models.analysis import AnalysisRequest, AnalysisResult, AnalysisApiResponse, VisualizationDataResponse
 from models.analysis import FinancialMetric, FinancialRatio, ComparativePeriod
 from models.visualization import VisualizationData, ChartData, TableData
 from models.document import ProcessedDocument
@@ -19,10 +18,14 @@ from repositories.document_repository import DocumentRepository
 from repositories.analysis_repository import AnalysisRepository
 from services.analysis_service import AnalysisService
 from pdf_processing.document_service import DocumentService
-from cfin.backend.pdf_processing.api_service import ClaudeService
+from utils.dependencies import (
+    get_conversation_service, 
+    get_analysis_service, 
+    get_document_service
+)
+from pdf_processing.api_service import ClaudeService
 from pdf_processing.langchain_service import LangChainService
 from utils.database import get_db
-from utils.response import handle_exception, create_error_response, get_error_type_from_status, add_cors_headers
 
 # Configure more verbose logging
 logger = logging.getLogger(__name__)

@@ -1,94 +1,134 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
- 
+
+/* Avenir Pro Font Faces */
+@font-face {
+  font-family: 'Avenir Pro';
+  src: url('https://fonts.gstatic.com/l/font?kit=AvenirLTProDemi') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Avenir Pro Light';
+  src: url('https://fonts.gstatic.com/l/font?kit=AvenirLTProLight') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 20 14.3% 4.1%;
+    /* Professional color scheme using full brand palette */
+    /* Clean white backgrounds */
+    --background: 0 0% 100%; /* Pure white for clean presentation style */
+    --foreground: 215 6% 14%; /* Nero #242424 for professional text */
  
     --card: 0 0% 100%;
-    --card-foreground: 20 14.3% 4.1%;
+    --card-foreground: 215 6% 14%; /* Nero */
  
     --popover: 0 0% 100%;
-    --popover-foreground: 20 14.3% 4.1%;
+    --popover-foreground: 215 6% 14%; /* Nero */
  
-    --primary: 24 9.8% 10%;
-    --primary-foreground: 60 9.1% 97.8%;
+    /* Primary - Professional deep red/mulberry */
+    --primary: 334 81% 31%; /* #8f0f56 - Mulberry */
+    --primary-foreground: 0 0% 100%;
  
-    --secondary: 60 4.8% 95.9%;
-    --secondary-foreground: 24 9.8% 10%;
+    /* Secondary - Professional teal */
+    --secondary: 174 82% 35%; /* #02a88e - Hobgoblin */
+    --secondary-foreground: 0 0% 100%;
  
-    --muted: 60 4.8% 95.9%;
-    --muted-foreground: 25 5.3% 44.7%;
+    /* Muted - Using brand Pigeon gray */
+    --muted: 200 3% 85%; /* #acafaf - Pigeon (converted to HSL) */
+    --muted-foreground: 0 0% 35%; /* #595959 - Smokescreen */
  
-    --accent: 60 4.8% 95.9%;
-    --accent-foreground: 24 9.8% 10%;
+    /* Accent - Professional blue */
+    --accent: 186 100% 42%; /* #00bed5 - Caribbean Blue */
+    --accent-foreground: 0 0% 100%;
  
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 60 9.1% 97.8%;
+    /* Destructive - Lust red for alerts and important actions */
+    --destructive: 4 86% 52%; /* #e5241d - Lust */
+    --destructive-foreground: 0 0% 100%;
  
-    --border: 20 5.9% 90%;
-    --input: 20 5.9% 90%;
-    --ring: 20 14.3% 4.1%;
+    /* Professional borders using brand colors */
+    --border: 200 3% 85%; /* Pigeon for subtle borders */
+    --input: 0 0% 88%; /* Slightly darker for inputs */
+    --ring: 334 81% 31%; /* Mulberry for focus */
  
-    --radius: 0.5rem;
+    /* Brand-specific semantic colors */
+    --brand-lust: 4 86% 52%; /* #e5241d - For warnings, errors, urgent actions */
+    --brand-mt-rushmore: 0 0% 51%; /* #828282 - For secondary text and elements */
+    --brand-pigeon: 200 3% 85%; /* #acafaf - For borders and subtle backgrounds */
+    --brand-tamahagane: 200 2% 24%; /* #3c3e3e - For dark elements */
+    --brand-white-smoke: 0 0% 96%; /* #f6f6f6 - For light backgrounds */
+ 
+    --radius: 0.375rem; /* Reduced for cleaner look */
 
-    /* Chart colors - needed for visualizations */
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --chart-6: 245 58% 51%;
-    --chart-7: 329.8 100% 56.3%;
-    --chart-8: 194.7 100% 42.7%;
-    --chart-up: 142.1 76.2% 36.3%;
-    --chart-down: 0 84.2% 60.2%;
-    --chart-neutral: 215.4 16.3% 46.9%;
+    /* Chart colors - incorporating full brand palette */
+    --chart-1: 334 81% 31%; /* Mulberry - primary data */
+    --chart-2: 174 82% 35%; /* Hobgoblin - secondary data */
+    --chart-3: 186 100% 42%; /* Caribbean Blue - accent data */
+    --chart-4: 4 86% 52%; /* Lust - negative/alert data */
+    --chart-5: 200 2% 24%; /* Tamahagane - dark data */
+    --chart-6: 0 0% 51%; /* Mt. Rushmore - medium data */
+    --chart-7: 200 3% 85%; /* Pigeon - light data */
+    --chart-8: 334 81% 40%; /* Lighter mulberry variation */
+    --chart-up: 174 82% 35%; /* Hobgoblin for positive trends */
+    --chart-down: 4 86% 52%; /* Lust for negative trends */
+    --chart-neutral: 0 0% 51%; /* Mt. Rushmore for neutral */
   }
  
   .dark {
-    --background: 20 14.3% 4.1%;
-    --foreground: 60 9.1% 97.8%;
+    /* Dark mode with professional appearance */
+    --background: 0 0% 7%; /* Very dark background */
+    --foreground: 0 0% 95%;
  
-    --card: 20 14.3% 4.1%;
-    --card-foreground: 60 9.1% 97.8%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 95%;
  
-    --popover: 20 14.3% 4.1%;
-    --popover-foreground: 60 9.1% 97.8%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 95%;
  
-    --primary: 60 9.1% 97.8%;
-    --primary-foreground: 24 9.8% 10%;
+    --primary: 334 81% 45%; /* Adjusted mulberry for dark mode */
+    --primary-foreground: 0 0% 100%;
  
-    --secondary: 12 6.5% 15.1%;
-    --secondary-foreground: 60 9.1% 97.8%;
+    --secondary: 174 82% 40%; /* Adjusted hobgoblin */
+    --secondary-foreground: 0 0% 100%;
  
-    --muted: 12 6.5% 15.1%;
-    --muted-foreground: 24 5.4% 63.9%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 70%;
  
-    --accent: 12 6.5% 15.1%;
-    --accent-foreground: 60 9.1% 97.8%;
+    --accent: 186 100% 50%; /* Caribbean blue */
+    --accent-foreground: 0 0% 100%;
  
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 60 9.1% 97.8%;
+    --destructive: 4 86% 60%; /* Adjusted lust for dark mode */
+    --destructive-foreground: 0 0% 100%;
  
-    --border: 12 6.5% 15.1%;
-    --input: 12 6.5% 15.1%;
-    --ring: 24 5.7% 82.9%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 334 81% 45%;
 
-    /* Chart colors - dark mode versions */
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --chart-6: 245 70% 60%;
-    --chart-7: 329.8 95% 62%;
-    --chart-8: 194.7 95% 55%;
-    --chart-up: 142.1 76.2% 45%;
-    --chart-down: 0 84.2% 65%;
-    --chart-neutral: 215 20.2% 65.1%;
+    /* Brand colors for dark mode */
+    --brand-lust: 4 86% 60%;
+    --brand-mt-rushmore: 0 0% 60%;
+    --brand-pigeon: 0 0% 30%;
+    --brand-tamahagane: 0 0% 15%;
+    --brand-white-smoke: 0 0% 10%;
+
+    /* Dark mode chart colors */
+    --chart-1: 334 81% 55%;
+    --chart-2: 174 82% 45%;
+    --chart-3: 186 100% 55%;
+    --chart-4: 4 86% 65%; /* Lust */
+    --chart-5: 0 0% 25%; /* Tamahagane */
+    --chart-6: 0 0% 60%; /* Mt. Rushmore */
+    --chart-7: 0 0% 35%; /* Pigeon */
+    --chart-8: 334 81% 50%;
+    --chart-up: 174 82% 50%;
+    --chart-down: 4 86% 65%;
+    --chart-neutral: 0 0% 60%;
   }
 }
  
@@ -97,46 +137,85 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-avenir-pro;
+    letter-spacing: -0.01em;
+  }
+  
+  /* Typography hierarchy */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-avenir-pro-demi;
+    letter-spacing: -0.02em;
+  }
+  
+  .text-light {
+    @apply font-avenir-pro-light;
+  }
+  
+  .text-demi {
+    @apply font-avenir-pro-demi;
   }
 }
 
-/* Chart component styles */
+/* Brand color utility classes */
+.text-brand-lust { color: hsl(var(--brand-lust)); }
+.bg-brand-lust { background-color: hsl(var(--brand-lust)); }
+.border-brand-lust { border-color: hsl(var(--brand-lust)); }
+
+.text-brand-mt-rushmore { color: hsl(var(--brand-mt-rushmore)); }
+.bg-brand-mt-rushmore { background-color: hsl(var(--brand-mt-rushmore)); }
+.border-brand-mt-rushmore { border-color: hsl(var(--brand-mt-rushmore)); }
+
+.text-brand-pigeon { color: hsl(var(--brand-pigeon)); }
+.bg-brand-pigeon { background-color: hsl(var(--brand-pigeon)); }
+.border-brand-pigeon { border-color: hsl(var(--brand-pigeon)); }
+
+.text-brand-tamahagane { color: hsl(var(--brand-tamahagane)); }
+.bg-brand-tamahagane { background-color: hsl(var(--brand-tamahagane)); }
+.border-brand-tamahagane { border-color: hsl(var(--brand-tamahagane)); }
+
+.bg-brand-white-smoke { background-color: hsl(var(--brand-white-smoke)); }
+
+/* Professional component styles */
 .chart-container {
-  @apply w-full h-full mb-4 rounded-lg overflow-hidden p-2;
+  @apply w-full h-full mb-6 rounded-lg overflow-hidden shadow-sm bg-card border-brand-pigeon;
 }
 
 .chart-header {
-  @apply mb-3;
+  @apply mb-4 p-4 border-b border-brand-pigeon;
 }
 
 .chart-title {
-  @apply text-lg font-semibold;
+  @apply text-xl font-avenir-pro-demi text-foreground;
+  letter-spacing: -0.02em;
+}
+
+.chart-subtitle {
+  @apply text-sm text-brand-mt-rushmore font-avenir-pro-light mt-1;
 }
 
 .chart-description {
-  @apply text-sm text-gray-500;
+  @apply text-sm text-brand-mt-rushmore mt-2;
 }
 
 .chart-footer {
-  @apply mt-2 text-xs text-gray-500 italic;
+  @apply mt-4 p-4 text-xs text-brand-mt-rushmore border-t border-brand-pigeon;
 }
 
 .recharts-responsive-container {
-  @apply rounded-lg overflow-hidden;
+  @apply rounded-lg;
 }
 
 .recharts-tooltip-wrapper {
-  @apply !shadow-lg;
+  @apply !shadow-xl;
 }
 
 .recharts-default-tooltip {
-  @apply !bg-white dark:!bg-gray-800 !border-gray-200 dark:!border-gray-600 !shadow-md !p-2;
+  @apply !bg-card !border-brand-pigeon !shadow-lg !p-3 !rounded-lg;
 }
 
-/* Table component styles */
+/* Professional table styles */
 .data-table-container {
-  @apply w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700;
+  @apply w-full overflow-hidden rounded-lg border-brand-pigeon shadow-sm bg-card;
 }
 
 .data-table {
@@ -144,15 +223,15 @@
 }
 
 .data-table-header {
-  @apply bg-gray-100 dark:bg-gray-800 text-left;
+  @apply bg-brand-white-smoke text-left border-b border-brand-pigeon;
 }
 
 .data-table-header th {
-  @apply px-4 py-2 font-medium text-gray-600 dark:text-gray-300;
+  @apply px-6 py-4 font-avenir-pro-demi text-sm text-brand-tamahagane;
 }
 
 .data-table-row {
-  @apply border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700;
+  @apply border-b border-brand-pigeon hover:bg-brand-white-smoke/50 transition-colors;
 }
 
 .data-table-row:last-child {
@@ -160,135 +239,230 @@
 }
 
 .data-table-cell {
-  @apply px-4 py-2;
+  @apply px-6 py-4 text-sm text-foreground font-avenir-pro;
 }
 
 .data-table-footer {
-  @apply text-xs text-gray-500 mt-2 italic;
+  @apply px-6 py-4 text-xs text-brand-mt-rushmore border-t border-brand-pigeon bg-brand-white-smoke/30;
 }
 
-/* PDF viewer styles */
+/* Enhanced metric cards with brand colors */
+.metric-card {
+  @apply p-6 rounded-lg border-brand-pigeon bg-card shadow-sm hover:shadow-md transition-all duration-200 hover:border-primary/20;
+}
+
+.metric-card:hover {
+  @apply transform hover:scale-105;
+}
+
+.metric-card-title {
+  @apply text-sm font-avenir-pro text-brand-mt-rushmore mb-2;
+}
+
+.metric-card-value {
+  @apply text-2xl font-avenir-pro-demi text-foreground;
+  letter-spacing: -0.02em;
+}
+
+.metric-card-change {
+  @apply text-sm font-avenir-pro mt-2 flex items-center;
+}
+
+/* Enhanced buttons with brand colors */
+.btn-primary {
+  @apply px-6 py-3 rounded-lg bg-primary text-primary-foreground font-avenir-pro-demi hover:bg-primary/90 focus:ring-2 focus:ring-primary/20 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5;
+}
+
+.btn-secondary {
+  @apply px-6 py-3 rounded-lg bg-secondary text-secondary-foreground font-avenir-pro-demi hover:bg-secondary/90 focus:ring-2 focus:ring-secondary/20 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5;
+}
+
+.btn-outline {
+  @apply px-6 py-3 rounded-lg border-2 border-brand-pigeon bg-transparent text-foreground font-avenir-pro-demi hover:bg-brand-white-smoke hover:border-primary/20 focus:ring-2 focus:ring-primary/20 transition-all duration-200;
+}
+
+.btn-destructive {
+  @apply px-6 py-3 rounded-lg bg-brand-lust text-white font-avenir-pro-demi hover:bg-brand-lust/90 focus:ring-2 focus:ring-brand-lust/20 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5;
+}
+
+/* PDF Highlighter with brand colors */
 .PdfHighlighter {
   @apply h-full w-full;
 }
 
 .Highlight {
-  @apply cursor-pointer transition-colors;
+  @apply cursor-pointer;
 }
 
 .Highlight--ai {
-  @apply bg-yellow-300 bg-opacity-40;
+  background-color: hsl(var(--accent) / 0.3);
 }
 
 .Highlight--user {
-  @apply bg-indigo-300 bg-opacity-40;
+  background-color: hsl(var(--brand-lust) / 0.3);
 }
 
 .Highlight__part {
-  @apply transition-colors;
+  @apply transition-all duration-200;
 }
 
 .Highlight--ai .Highlight__part {
-  @apply bg-yellow-300 bg-opacity-40 hover:bg-yellow-400 hover:bg-opacity-50;
+  background-color: hsl(var(--accent) / 0.3);
 }
 
 .Highlight--user .Highlight__part {
-  @apply bg-indigo-300 bg-opacity-40 hover:bg-indigo-400 hover:bg-opacity-50;
+  background-color: hsl(var(--brand-lust) / 0.3);
 }
 
 .Highlight__popup {
-  @apply absolute bg-white shadow-lg p-3 rounded-md border border-gray-200 max-w-xs z-50;
+  @apply bg-card border-brand-pigeon shadow-xl rounded-lg p-3;
 }
 
 .Highlight__popup-comment {
-  @apply text-sm;
+  @apply text-sm text-foreground font-avenir-pro;
 }
 
 .Highlight__popup-buttons {
-  @apply flex justify-end mt-2 gap-2;
+  @apply mt-2 flex gap-2;
 }
 
-/* Typing indicator */
+/* Enhanced typing indicator */
 .typing-indicator {
-  @apply flex items-center space-x-1;
+  @apply flex space-x-1 p-3;
 }
 
 .typing-indicator span {
-  @apply bg-gray-400 rounded-full h-2 w-2 animate-pulse;
+  @apply h-2 w-2 bg-brand-mt-rushmore rounded-full animate-pulse;
 }
 
 .typing-indicator span:nth-child(1) {
-  animation-delay: 0ms;
+  animation-delay: 0s;
 }
 
 .typing-indicator span:nth-child(2) {
-  animation-delay: 200ms;
+  animation-delay: 0.2s;
 }
 
 .typing-indicator span:nth-child(3) {
-  animation-delay: 400ms;
+  animation-delay: 0.4s;
 }
 
-/* Custom scrollbar */
+/* Enhanced scrollbar with brand colors */
 ::-webkit-scrollbar {
-  @apply w-2 h-2;
+  @apply w-2;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-100 rounded-full;
+  @apply bg-brand-white-smoke;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded-full hover:bg-gray-400 transition-colors;
+  @apply bg-brand-pigeon rounded-full;
 }
 
-/* Citation styles */
+::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--brand-mt-rushmore));
+}
+
+/* Enhanced form elements */
+.fdas-input {
+  @apply w-full px-4 py-3 rounded-lg border-brand-pigeon bg-background text-foreground font-avenir-pro placeholder:text-brand-mt-rushmore focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200;
+}
+
+.fdas-textarea {
+  @apply w-full px-4 py-3 rounded-lg border-brand-pigeon bg-background text-foreground font-avenir-pro placeholder:text-brand-mt-rushmore focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 resize-none;
+}
+
+.fdas-select {
+  @apply w-full px-4 py-3 rounded-lg border-brand-pigeon bg-background text-foreground font-avenir-pro focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 appearance-none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23828282' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+/* Citation links with brand colors */
 .citation-link {
-  @apply inline-flex items-center px-1 py-0.5 rounded bg-yellow-200 text-yellow-800 hover:bg-yellow-300 
-  hover:text-yellow-900 transition-colors cursor-pointer text-sm;
+  @apply text-primary hover:text-primary/80 underline decoration-primary/30 hover:decoration-primary/60 transition-all duration-200 font-avenir-pro;
 }
 
 .citation-icon {
-  @apply ml-0.5 h-3 w-3 shrink-0;
+  @apply text-brand-lust hover:text-brand-lust/80 transition-colors duration-200;
 }
 
-/* Analysis block styles */
+/* Analysis blocks with brand colors */
 .analysis-block {
-  @apply bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden;
+  @apply rounded-lg border-brand-pigeon bg-brand-white-smoke/30 p-4 mb-4;
 }
 
 .analysis-block-header {
-  @apply px-4 py-3 border-b border-gray-200 flex justify-between items-center;
+  @apply font-avenir-pro-demi text-foreground mb-2 border-b border-brand-pigeon pb-2;
 }
 
 .analysis-block-content {
-  @apply p-4;
+  @apply text-foreground font-avenir-pro;
 }
 
+/* Analysis insights with brand color hierarchy */
 .analysis-insight {
-  @apply p-3 rounded-md mb-2;
+  @apply px-3 py-2 rounded-lg font-avenir-pro text-sm;
 }
 
 .analysis-insight-high {
-  @apply bg-blue-50 border-l-4 border-blue-500;
+  @apply bg-brand-lust/10 text-brand-lust border border-brand-lust/20;
 }
 
 .analysis-insight-medium {
-  @apply bg-indigo-50 border-l-4 border-indigo-400;
+  @apply bg-primary/10 text-primary border border-primary/20;
 }
 
 .analysis-insight-low {
-  @apply bg-gray-50 border-l-4 border-gray-300;
+  @apply bg-brand-mt-rushmore/10 text-brand-mt-rushmore border border-brand-mt-rushmore/20;
 }
 
+/* Trend indicators using brand colors */
 .trend-indicator-up {
-  @apply text-green-600;
+  @apply text-secondary font-avenir-pro-demi flex items-center;
 }
 
 .trend-indicator-down {
-  @apply text-red-600;
+  @apply text-brand-lust font-avenir-pro-demi flex items-center;
 }
 
 .trend-indicator-stable {
-  @apply text-gray-600;
+  @apply text-brand-mt-rushmore font-avenir-pro-demi flex items-center;
+}
+
+/* Film roll animation for play button - triggers on hover */
+.film-roll {
+  transition: transform 0.3s ease;
+}
+
+.film-roll-container:hover .film-roll {
+  animation: filmRoll 0.6s ease-in-out infinite;
+}
+
+@keyframes filmRoll {
+  0%, 100% { 
+    transform: translateX(0) rotateZ(0deg); 
+  }
+  25% { 
+    transform: translateX(-3px) rotateZ(-5deg); 
+  }
+  50% { 
+    transform: translateX(3px) rotateZ(5deg); 
+  }
+  75% { 
+    transform: translateX(-2px) rotateZ(-3deg); 
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }

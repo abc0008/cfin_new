@@ -229,14 +229,14 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
   return (
     <div className="space-y-4">
       {error && (
-        <div className="p-4 border border-red-200 rounded-md flex items-start space-x-2 bg-red-50 text-red-800">
+        <div className="p-4 border border-destructive rounded-md flex items-start space-x-2 bg-destructive/10 text-destructive">
           <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <div className="text-sm font-medium">{error}</div>
             {isUploading === false && file && (
               <button 
                 onClick={retryUpload}
-                className="mt-2 inline-flex items-center text-xs font-medium text-red-700 hover:text-red-900"
+                className="mt-2 inline-flex items-center text-xs font-medium text-destructive hover:text-destructive/80"
               >
                 <RefreshCw className="h-3 w-3 mr-1" /> Try again
               </button>
@@ -246,21 +246,21 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
       )}
       
       {warning && !error && (
-        <div className="p-4 border border-yellow-200 rounded-md flex items-start space-x-2 bg-yellow-50 text-yellow-800">
+        <div className="p-4 border border-brand-lust-border rounded-md flex items-start space-x-2 bg-brand-lust bg-opacity-10 text-brand-lust">
           <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
           <div className="text-sm">{warning}</div>
         </div>
       )}
       
       {uploadComplete && !error && !isUploading && (
-        <div className="p-4 border border-green-200 rounded-md flex items-start space-x-2 bg-green-50 text-green-800">
+        <div className="p-4 border border-secondary rounded-md flex items-start space-x-2 bg-secondary/10 text-secondary">
           <CheckCircle2 className="h-5 w-5 flex-shrink-0 mt-0.5" />
           <div className="text-sm">Document uploaded and processed successfully!</div>
         </div>
       )}
       
       <div 
-        className={`flex flex-col items-center p-6 border-2 ${isDragging ? 'border-blue-400 bg-blue-50' : 'border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100'} rounded-md transition-colors`}
+        className={`flex flex-col items-center p-6 border-2 ${isDragging ? 'border-primary bg-primary/10' : 'border-dashed border-muted bg-background hover:bg-muted/30'} rounded-md transition-colors`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -268,9 +268,9 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
       >
         {!file ? (
           <>
-            <File className="h-8 w-8 text-gray-400 mb-2" />
-            <p className="text-sm text-gray-500 mb-4">Drag and drop your PDF or click to browse</p>
-            <label className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-blue-500 text-white hover:bg-blue-600 h-10 px-4 py-2">
+            <File className="h-8 w-8 text-muted-foreground mb-2" />
+            <p className="text-sm text-muted-foreground mb-4">Drag and drop your PDF or click to browse</p>
+            <label className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
               <Upload className="mr-2 h-4 w-4" />
               Select PDF
               <input 
@@ -287,22 +287,22 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
         ) : (
           <div className="w-full space-y-4">
             <div className="flex items-center">
-              <File className="h-6 w-6 text-blue-500 mr-2" />
+              <File className="h-6 w-6 text-primary mr-2" />
               <div className="text-sm font-medium flex-1 truncate">{file.name}</div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted-foreground">
                 {(file.size / 1024 / 1024).toFixed(2)} MB
               </div>
             </div>
             
             {isUploading ? (
               <div className="space-y-2">
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-muted rounded-full h-2">
                   <div 
-                    className="bg-blue-500 h-full rounded-full transition-all duration-300 ease-in-out" 
+                    className="bg-primary h-full rounded-full transition-all duration-300 ease-in-out" 
                     style={{ width: `${progress}%` }}
                   ></div>
                 </div>
-                <div className="flex justify-between text-xs text-gray-500">
+                <div className="flex justify-between text-xs text-muted-foreground">
                   <span>
                     {progress < 75 ? 'Uploading...' : 
                      progress < 90 ? 'Processing...' : 
@@ -316,7 +316,7 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
                 <button
                   type="button"
                   onClick={cancelUpload}
-                  className="flex-1 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm px-4 py-2"
+                  className="flex-1 border border-input bg-background text-foreground hover:bg-muted rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-sm px-4 py-2"
                 >
                   Cancel
                 </button>
@@ -324,7 +324,7 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
                   type="button"
                   onClick={handleUpload}
                   disabled={isUploading}
-                  className="flex-1 bg-blue-500 text-white hover:bg-blue-600 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none text-sm px-4 py-2 flex items-center justify-center"
+                  className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none text-sm px-4 py-2 flex items-center justify-center"
                 >
                   {isUploading ? (
                     <>
@@ -340,20 +340,20 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
       </div>
       
       {isUploading && (
-        <div className="text-xs text-gray-500 italic">
+        <div className="text-xs text-muted-foreground italic">
           {progress < 75 ? (
             <div>Uploading your document... {Math.round(progress)}% complete</div>
           ) : progress < 90 ? (
             <div>Processing your document. This may take a minute...</div>
           ) : (
-            <div className="text-blue-600 font-medium">
+            <div className="text-primary font-medium">
               Verifying financial data extraction...
             </div>
           )}
         </div>
       )}
       
-      <div className="text-xs text-gray-500">
+      <div className="text-xs text-muted-foreground">
         <p>Supported file types: PDF (max size: 10MB)</p>
       </div>
     </div>

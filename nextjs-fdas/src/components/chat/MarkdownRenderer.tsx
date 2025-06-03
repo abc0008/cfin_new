@@ -16,7 +16,7 @@ import {
 import type { ComponentPropsWithoutRef } from 'react';
 import { Components } from 'react-markdown';
 import { useRouter } from 'next/navigation';
-import { FinancialTermsDetector, processFinancialTerms } from './FinancialTerms';
+import { processFinancialTerms, FinancialTerms } from './FinancialTerms';
 import { processMessageReferences } from './MessageReference';
 
 interface MarkdownRendererProps {
@@ -346,7 +346,7 @@ export function MarkdownRenderer({
       </ReactMarkdown>
       
       {/* Add financial terms detector if enabled */}
-      {enableFinancialTerms && <FinancialTermsDetector content={content} />}
+      {enableFinancialTerms && <FinancialTerms text={content} />}
       
       {/* Render suggestion chips if provided */}
       {suggestions.length > 0 && (

@@ -25,9 +25,9 @@ export default function ComparativePeriodDisplay({
   defaultMetric
 }: ComparativePeriodDisplayProps) {
   // Get all unique metric names across all periods
-  const allMetricNames = [...new Set(
+  const allMetricNames = Array.from(new Set(
     data.flatMap(period => period.metrics.map(metric => metric.name))
-  )];
+  ));
   
   // Set default selected metric or use the first one
   const [selectedMetric, setSelectedMetric] = useState<string>(

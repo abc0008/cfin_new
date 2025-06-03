@@ -79,11 +79,12 @@ export interface TableColumn {
 export interface TableConfig {
   title: string;
   description?: string;
-  columns: {
-    key: string;
-    label: string;
-    format?: 'text' | 'number' | 'currency' | 'percentage' | 'date';
-  }[];
+  subtitle?: string;
+  columns: TableColumn[];
+  pageSize?: number;
+  pagination?: boolean;
+  showRowNumbers?: boolean;
+  footer?: string;
 }
 
 // Table data structure

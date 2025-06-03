@@ -33,19 +33,46 @@ export function DocumentList({
       
       const response = await documentsApi.listDocuments(currentPage, pageSize);
       
-      // If loading the first page, replace the list
-      if (currentPage === 1) {
-        setDocuments(response.documents);
+      // Handle response - it might be an array directly or an object with documents property
+      let documentsList: DocumentMetadata[] = [];
+      let documentsTotal: number = 0;
+      
+      if (Array.isArray(response)) {
+        // Response is directly an array of documents
+        documentsList = response as DocumentMetadata[];
+        documentsTotal = response.length;
+      } else if (response && typeof response === 'object' && 'documents' in response) {
+        // Response is an object with documents and total properties
+        documentsList = Array.isArray((response as any).documents) ? (response as any).documents : [];
+        documentsTotal = typeof (response as any).total === 'number' ? (response as any).total : documentsList.length;
       } else {
-        // Otherwise append to the existing list
-        setDocuments(prev => [...prev, ...response.documents]);
+        console.warn('Unexpected response format from listDocuments:', response);
+        documentsList = [];
+        documentsTotal = 0;
       }
       
-      setTotal(response.total);
-      setHasMore(response.total > currentPage * pageSize);
+      // If loading the first page, replace the list
+      if (currentPage === 1) {
+        setDocuments(documentsList);
+      } else {
+        // Otherwise append to the existing list
+        setDocuments(prev => [...(prev || []), ...documentsList]);
+      }
+      
+      setTotal(documentsTotal);
+      setHasMore(documentsTotal > currentPage * pageSize);
       setIsLoading(false);
+      
+      // Update the document count in the dashboard metric card
+      const documentCountElement = document.getElementById('document-count');
+      if (documentCountElement) {
+        documentCountElement.textContent = documentsTotal.toString();
+      }
+      
     } catch (err) {
+      console.error('Error fetching documents:', err);
       setError(err instanceof Error ? err.message : 'Failed to load documents');
+      setDocuments([]); // Ensure documents is always an array
       setIsLoading(false);
     }
   };
@@ -73,13 +100,21 @@ export function DocumentList({
       try {
         await documentsApi.deleteDocument(documentId);
         // Remove from the local state
-        setDocuments(prev => prev.filter(doc => doc.id !== documentId));
-        setTotal(prev => prev - 1);
+        setDocuments(prev => (prev || []).filter(doc => doc.id !== documentId));
+        setTotal(prev => Math.max(0, prev - 1));
+        
+        // Update the document count in the dashboard
+        const documentCountElement = document.getElementById('document-count');
+        if (documentCountElement) {
+          documentCountElement.textContent = Math.max(0, total - 1).toString();
+        }
+        
         // Call the parent callback if provided
         if (onDelete) {
           onDelete(documentId);
         }
       } catch (error) {
+        console.error('Error deleting document:', error);
         setError('Failed to delete document');
       }
     }
@@ -93,12 +128,12 @@ export function DocumentList({
   
   if (error) {
     return (
-      <div className="p-4 border border-red-200 rounded-md flex items-center bg-red-50 text-red-800 mb-4">
-        <AlertCircle className="h-4 w-4" />
-        <div className="text-sm ml-2">{error}</div>
+      <div className="p-4 border border-destructive/20 rounded-lg flex items-center bg-destructive/10 text-destructive mb-4">
+        <AlertCircle className="h-5 w-5 flex-shrink-0" />
+        <div className="font-avenir-pro text-sm ml-3 flex-1">{error}</div>
         <button 
           onClick={() => fetchDocuments(1)} 
-          className="ml-auto text-sm py-1 px-3 border border-gray-300 rounded-md bg-white hover:bg-gray-50"
+          className="btn-outline ml-4 py-2 px-3 text-sm"
         >
           Try Again
         </button>
@@ -106,96 +141,118 @@ export function DocumentList({
     );
   }
   
+  const safeDocuments = documents || [];
+  
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-xl font-semibold">Your Documents</h2>
-        <div className="text-sm text-gray-500">{total} documents</div>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="font-avenir-pro-demi text-lg text-foreground">Your Documents</h3>
+        <div className="font-avenir-pro text-sm text-muted-foreground">
+          {total} document{total !== 1 ? 's' : ''}
+        </div>
       </div>
       
-      {documents.length === 0 && !isLoading ? (
-        <div className="text-center py-8 border rounded-md bg-gray-50">
-          <File className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-          <p className="text-gray-500">No documents yet. Upload your first PDF to get started.</p>
+      {safeDocuments.length === 0 && !isLoading ? (
+        <div className="text-center py-12 border border-border rounded-lg bg-muted/30">
+          <File className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+          <h4 className="font-avenir-pro-demi text-lg text-foreground mb-2">No documents yet</h4>
+          <p className="font-avenir-pro-light text-muted-foreground">
+            Upload your first PDF to get started with financial analysis.
+          </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {documents.map(doc => (
+        <div className="space-y-4">
+          {safeDocuments.map(doc => (
             <div 
               key={doc.id} 
-              className="flex items-center justify-between p-4 border rounded-md hover:bg-gray-50 transition-colors"
+              className="flex items-center justify-between p-6 border border-border rounded-lg bg-card hover:border-primary/20 transition-all duration-200 hover:shadow-sm"
             >
-              <div className="flex items-center flex-1 min-w-0" onClick={() => handleSelectDocument(doc.id)} style={{cursor: 'pointer'}}>
-                <File className="h-5 w-5 text-blue-500 flex-shrink-0 mr-3" />
+              <div 
+                className="flex items-center flex-1 min-w-0 cursor-pointer" 
+                onClick={() => handleSelectDocument(doc.id)}
+              >
+                <div className="p-3 bg-primary/10 rounded-lg mr-4">
+                  <File className="h-6 w-6 text-primary" />
+                </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{doc.filename}</div>
-                  <div className="text-xs text-gray-500">
-                    Uploaded {new Date(doc.uploadTimestamp).toLocaleString()}
+                  <div className="font-avenir-pro-demi text-foreground truncate text-base">
+                    {doc.filename}
+                  </div>
+                  <div className="font-avenir-pro-light text-sm text-muted-foreground mt-1">
+                    Uploaded {new Date(doc.uploadTimestamp).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
                   </div>
                   {doc.citationLinks && doc.citationLinks.length > 0 && (
-                    <div className="text-xs text-yellow-600 mt-1">
-                      {doc.citationLinks.length} citations available
+                    <div className="font-avenir-pro text-xs text-secondary mt-2 flex items-center">
+                      <div className="h-1.5 w-1.5 bg-secondary rounded-full mr-2"></div>
+                      {doc.citationLinks.length} citation{doc.citationLinks.length !== 1 ? 's' : ''} available
                     </div>
                   )}
                 </div>
               </div>
               
-              <div className="flex items-center space-x-2 ml-4">
+              <div className="flex items-center space-x-2 ml-6">
                 <button 
-                  className="p-2 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                  className="p-3 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   onClick={() => handleSelectDocument(doc.id)}
                   title="View document"
                 >
-                  <Eye className="h-4 w-4" />
+                  <Eye className="h-5 w-5" />
                 </button>
                 {onAnalyze && (
                   <button
-                    className="p-2 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                    className="p-3 rounded-lg text-muted-foreground hover:bg-secondary/10 hover:text-secondary transition-colors"
                     onClick={() => handleAnalyzeDocument(doc.id)}
                     title="Analyze document"
                   >
-                    <BarChart className="h-4 w-4" />
+                    <BarChart className="h-5 w-5" />
                   </button>
                 )}
                 <button 
-                  className="p-2 rounded-md text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors"
+                  className="p-3 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
                   onClick={() => handleDeleteDocument(doc.id)}
                   title="Delete document"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-5 w-5" />
                 </button>
               </div>
             </div>
           ))}
           
           {isLoading && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="flex items-center p-4 border rounded-md">
-                  <div className="h-5 w-5 rounded-full bg-gray-200 animate-pulse mr-3"></div>
+                <div key={i} className="flex items-center p-6 border border-border rounded-lg bg-card">
+                  <div className="h-12 w-12 rounded-lg bg-muted animate-pulse mr-4"></div>
                   <div className="flex-1">
-                    <div className="h-4 w-2/3 bg-gray-200 animate-pulse mb-2"></div>
-                    <div className="h-3 w-1/3 bg-gray-200 animate-pulse"></div>
+                    <div className="h-5 w-2/3 bg-muted animate-pulse mb-3"></div>
+                    <div className="h-4 w-1/3 bg-muted animate-pulse"></div>
                   </div>
                 </div>
               ))}
             </div>
           )}
           
-          {hasMore && (
+          {hasMore && !isLoading && (
             <button 
-              className="w-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm px-4 py-2 disabled:opacity-50 disabled:pointer-events-none"
+              className="btn-outline w-full justify-center"
               onClick={handleLoadMore} 
               disabled={isLoading}
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin inline" />
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                   Loading...
                 </>
               ) : (
                 <>
-                  Load More <ChevronRight className="h-4 w-4 ml-2 inline" />
+                  Load More
+                  <ChevronRight className="h-5 w-5 ml-2" />
                 </>
               )}
             </button>

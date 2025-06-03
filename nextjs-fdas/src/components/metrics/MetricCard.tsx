@@ -1,9 +1,17 @@
 import React from 'react';
-import { FinancialMetric } from '@/types/visualization';
 import { formatValue, formatChange, getTrend } from '@/utils/formatters';
 
 interface MetricCardProps {
-  metric: FinancialMetric;
+  metric: {
+    name: string;
+    value: number;
+    unit?: string;
+    percentChange?: number;
+    previousValue?: number;
+    trend?: 'up' | 'down' | 'neutral';
+    category?: string;
+    description?: string;
+  };
   className?: string;
   onClick?: () => void;
 }
@@ -17,17 +25,17 @@ export default function MetricCard({ metric, className = '', onClick }: MetricCa
   const trend = metric.trend || 
     (metric.percentChange !== undefined ? getTrend(metric.percentChange) : 'neutral');
   
-  // Determine color based on trend or provided color
+  // Determine color based on trend using brand colors
   const colorMap = {
-    up: 'text-green-600',
-    down: 'text-red-600',
-    neutral: 'text-gray-600'
+    up: 'text-brand-hobgoblin', // Hobgoblin for positive
+    down: 'text-brand-lust', // Lust for negative
+    neutral: 'text-brand-mt-rushmore' // Mt. Rushmore for neutral
   };
   
   const bgColorMap = {
-    up: 'bg-green-50',
-    down: 'bg-red-50',
-    neutral: 'bg-gray-50'
+    up: 'bg-brand-hobgoblin bg-opacity-10',
+    down: 'bg-brand-lust bg-opacity-10', 
+    neutral: 'bg-brand-pigeon bg-opacity-30'
   };
   
   const trendColor = colorMap[trend];
@@ -75,7 +83,7 @@ export default function MetricCard({ metric, className = '', onClick }: MetricCa
         >
           <path 
             fillRule="evenodd" 
-            d="M4 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H4.75A.75.75 0 014 10z" 
+            d="M10 2a.75.75 0 01.75.75v6.5h6.5a.75.75 0 010 1.5h-6.5v6.5a.75.75 0 01-1.5 0v-6.5h-6.5a.75.75 0 010-1.5h6.5v-6.5A.75.75 0 0110 2z" 
             clipRule="evenodd" 
           />
         </svg>
@@ -85,43 +93,45 @@ export default function MetricCard({ metric, className = '', onClick }: MetricCa
   
   return (
     <div 
-      className={`bg-white rounded-lg shadow-sm p-4 border border-gray-100 ${className} ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+      className={`metric-card ${className} ${onClick ? 'cursor-pointer hover:shadow-md' : ''}`}
       onClick={onClick}
     >
       <div className="flex justify-between items-start">
-        <h3 className="text-sm font-medium text-gray-500 truncate">{metric.name}</h3>
+        <h3 className="metric-card-title">{metric.name}</h3>
         
         {/* Display category label if provided */}
         {metric.category && (
-          <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
+          <span className="px-3 py-1 text-xs rounded-full bg-muted text-muted-foreground font-avenir-pro uppercase tracking-wide">
             {metric.category}
           </span>
         )}
       </div>
       
-      <div className="mt-2 flex items-baseline">
-        <div className="text-2xl font-semibold">
+      <div className="mt-4 flex items-baseline">
+        <div className="metric-card-value">
           {formatValue(metric.value, 'currency', 0)}
         </div>
-        <div className="ml-1 text-sm text-gray-500">
-          {metric.unit}
-        </div>
+        {metric.unit && (
+          <div className="ml-2 text-sm text-muted-foreground font-avenir-pro-light">
+            {metric.unit}
+          </div>
+        )}
       </div>
       
       {/* Trend indicator */}
       {metric.percentChange !== undefined && (
-        <div className="mt-2 flex items-center">
+        <div className="metric-card-change">
           <div className={`flex items-center ${trendColor}`}>
-            <span className={`p-1 rounded-full ${trendBgColor} mr-1`}>
+            <span className={`p-2 rounded-full ${trendBgColor} mr-2`}>
               <TrendIcon />
             </span>
-            <span className="text-sm font-medium">
+            <span className="font-avenir-pro-demi">
               {formatChange(metric.percentChange, 'percent')}
             </span>
           </div>
           
           {metric.previousValue !== undefined && (
-            <span className="ml-2 text-xs text-gray-500">
+            <span className="ml-3 text-xs text-muted-foreground font-avenir-pro-light">
               vs {formatValue(metric.previousValue, 'currency', 0)}
             </span>
           )}
@@ -130,7 +140,7 @@ export default function MetricCard({ metric, className = '', onClick }: MetricCa
       
       {/* Description if provided */}
       {metric.description && (
-        <p className="mt-2 text-xs text-gray-500 line-clamp-2">
+        <p className="mt-4 text-sm text-muted-foreground font-avenir-pro-light line-clamp-2">
           {metric.description}
         </p>
       )}

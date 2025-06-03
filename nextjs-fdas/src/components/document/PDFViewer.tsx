@@ -311,8 +311,8 @@ export function PDFViewer({
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 text-indigo-600 animate-spin mx-auto" />
-          <p className="mt-2 text-sm text-gray-500">Loading PDF viewer...</p>
+          <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto" />
+          <p className="mt-2 text-sm text-muted-foreground font-avenir-pro">Loading PDF viewer...</p>
         </div>
       </div>
     );
@@ -322,8 +322,8 @@ export function PDFViewer({
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 text-indigo-600 animate-spin mx-auto" />
-          <p className="mt-2 text-sm text-gray-500">{loadingState || "Loading document..."}</p>
+          <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto" />
+          <p className="mt-2 text-sm text-muted-foreground font-avenir-pro">{loadingState || "Loading document..."}</p>
         </div>
       </div>
     );
@@ -374,13 +374,13 @@ export function PDFViewer({
     
     // Determine highlight type and color
     const isAIHighlight = highlight.isAICitation || aiHighlights.some(h => h.id === highlight.id);
-    const highlightColor = isAIHighlight ? 'bg-yellow-300' : 'bg-indigo-300';
+    const highlightColor = isAIHighlight ? 'bg-accent/30' : 'bg-primary/30';
     
     const triggerHighlightClick = () => handleHighlightClick(highlight);
     
     const popupContent = (
       <div 
-        className={`${isAIHighlight ? 'bg-yellow-600' : 'bg-indigo-600'} text-white text-sm p-2 rounded shadow cursor-pointer`}
+        className={`${isAIHighlight ? 'bg-accent text-accent-foreground' : 'bg-primary text-primary-foreground'} text-sm p-2 rounded shadow cursor-pointer`}
         onClick={triggerHighlightClick}
       >
         {isAIHighlight 
@@ -480,7 +480,7 @@ export function PDFViewer({
                         <div className="flex justify-between mb-2">
                           <div>Add Highlight</div>
                           <button 
-                            className="text-indigo-600 hover:text-indigo-800 px-3 py-1 rounded text-sm" 
+                            className="text-primary hover:text-primary/80 px-3 py-1 rounded text-sm font-avenir-pro" 
                             onClick={() => {
                               const highlightId = `highlight-${Date.now()}`;
                               addHighlight({
@@ -517,19 +517,19 @@ export function PDFViewer({
           <div className="mb-1 font-medium">Performance Options</div>
           <div className="flex space-x-2">
             <button 
-              className={`px-2 py-1 rounded ${renderingQuality === 'low' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
+              className={`px-2 py-1 rounded ${renderingQuality === 'low' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
               onClick={() => setRenderScale(1.0)}
             >
               Low
             </button>
             <button 
-              className={`px-2 py-1 rounded ${renderingQuality === 'medium' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
+              className={`px-2 py-1 rounded ${renderingQuality === 'medium' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
               onClick={() => setRenderScale(1.5)}
             >
               Medium
             </button>
             <button 
-              className={`px-2 py-1 rounded ${renderingQuality === 'high' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
+              className={`px-2 py-1 rounded ${renderingQuality === 'high' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
               onClick={() => setRenderScale(2.0)}
             >
               High
