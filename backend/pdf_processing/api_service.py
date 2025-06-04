@@ -51,6 +51,7 @@ from datetime import datetime
 import contextlib
 import httpx
 import backoff
+import copy
 
 # Claude API optimization imports
 import settings
@@ -231,10 +232,41 @@ class ClaudeService:
         """
         # Estimate tokens for rate limiting
         messages = kwargs.get("messages", [])
-        tokens_in = count_tokens(messages)
-        
+        tokens_in = count_tokens(messages) # Custom estimator
+
+        # --- BEGIN SDK TOKEN COUNTING (AWAITED AND ALIGNED V4) ---
+        sdk_actual_tokens = None # Initialize to ensure it's defined
+        try:
+            actual_messages_for_count = messages if isinstance(messages, list) else []
+            if not actual_messages_for_count and isinstance(messages, dict):
+                actual_messages_for_count = [messages]
+
+            # Sanitize messages so the count_tokens endpoint accepts them
+            sanitized_messages_for_count = self._sanitize_messages_for_token_count(actual_messages_for_count)
+
+            params_for_count = {
+                "model": kwargs.get("model", self.model),
+                "messages": sanitized_messages_for_count  # use sanitized copy
+            }
+
+            if "tools" in kwargs and kwargs.get("tools"):
+                params_for_count["tools"] = kwargs.get("tools")
+            
+            if "system" in kwargs and kwargs.get("system"):
+                params_for_count["system"] = kwargs.get("system")
+            
+            sdk_token_count_result = await self.client.messages.count_tokens(**params_for_count)
+            sdk_actual_tokens = sdk_token_count_result.input_tokens
+            logger.info(f"Anthropic SDK estimated input tokens (tools call): {sdk_actual_tokens} (Custom estimate: {tokens_in})")
+        except Exception as e:
+            logger.error(f"Error during SDK token counting (tools call): {e}", exc_info=True)
+        # --- END SDK TOKEN COUNTING (AWAITED AND ALIGNED V4) ---
+
         # Apply rate limiting based on current token bucket state
-        await ClaudeBucket.throttle(tokens_in)
+        # Use SDK token count if available for more accurate throttling, otherwise fall back to custom estimate
+        tokens_for_throttling = sdk_actual_tokens if sdk_actual_tokens is not None else tokens_in
+        logger.info(f"Throttling based on token count: {tokens_for_throttling} (SDK count: {sdk_actual_tokens}, Custom estimate: {tokens_in})")
+        await ClaudeBucket.throttle(tokens_for_throttling)
 
         try:
             # Make the API call with token efficiency headers
@@ -295,7 +327,8 @@ class ClaudeService:
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4000,
-        temperature: float = 0.7
+        temperature: float = 0.7,
+        model_override: Optional[str] = None  # Added model_override
     ) -> AnthropicMessage:
         """
         Execute a single turn of tool-based interaction with Claude.
@@ -316,12 +349,15 @@ class ClaudeService:
         # Use provided tools or default to instance tools
         tools_to_use = tools if tools is not None else self.tools_for_api
         
-        # Choose optimal model based on tool complexity
-        tool_names = {tool.get("name", "") for tool in tools_to_use} if tools_to_use else set()
-        estimated_tokens = sum(len(str(msg.get("content", ""))) for msg in messages) // 4
-        optimal_model = choose_model(tool_names, estimated_tokens)
-        
-        logger.info(f"Executing tool interaction turn with {optimal_model}, {len(tools_to_use)} tools available")
+        # Choose optimal model based on tool complexity or override
+        if model_override:
+            optimal_model = model_override
+            logger.info(f"Executing tool interaction turn with overridden model: {optimal_model}, {len(tools_to_use) if tools_to_use else 0} tools available")
+        else:
+            tool_names = {tool.get("name", "") for tool in tools_to_use} if tools_to_use else set()
+            estimated_tokens = sum(len(str(msg.get("content", ""))) for msg in messages) // 4
+            optimal_model = choose_model(tool_names, estimated_tokens)
+            logger.info(f"Executing tool interaction turn with model_router selected model: {optimal_model}, {len(tools_to_use) if tools_to_use else 0} tools available")
         
         # Build request parameters
         request_params = {
@@ -361,7 +397,7 @@ class ClaudeService:
         if not self.client:
             # Mock response for testing or when API key is not available
             logger.warning("Using mock response because Claude API client is not available")
-            return "I'm sorry, I cannot process your request because the Claude API is not configured properly. Please check the API key and try again."
+            return "I'm sorry, I cannot process your request because the Claude API is not configured properly. Please check the API key."
         
         try:
             # Convert message format to Anthropic's format
@@ -371,6 +407,23 @@ class ClaudeService:
                 formatted_messages.append({"role": role, "content": msg["content"]})
             
             logger.info(f"Sending request to Claude API with {len(formatted_messages)} messages")
+
+            # --- BEGIN SDK TOKEN COUNTING (AWAITED AND ALIGNED V4) ---
+            try:
+                params_for_count_native = {
+                    "model": self.model,
+                    "messages": self._sanitize_messages_for_token_count(list(formatted_messages))
+                }
+
+                if system_prompt and isinstance(system_prompt, str):
+                    params_for_count_native["system"] = system_prompt
+                
+                sdk_token_count_result_native = await self.client.messages.count_tokens(**params_for_count_native)
+                sdk_actual_tokens_native = sdk_token_count_result_native.input_tokens
+                logger.info(f"Anthropic SDK estimated input tokens (native PDF call): {sdk_actual_tokens_native}")
+            except Exception as e:
+                logger.error(f"Error during SDK token counting (native PDF call): {e}", exc_info=True)
+            # --- END SDK TOKEN COUNTING (AWAITED AND ALIGNED V4) ---
             
             # Call Claude API
             response = await self.client.messages.create(
@@ -570,7 +623,7 @@ class ClaudeService:
                 upload_timestamp=datetime.now(),
                 file_size=len(pdf_data),
                 mime_type="application/pdf",
-                user_id="system" 
+                user_id="system"
             )
             
             processed_document = ProcessedDocument(
@@ -1230,3 +1283,35 @@ Follow these guidelines:
                     "content": "I apologize, but I'm unable to process your request at this time. Please try again later.",
                     "citations": []
                 }
+
+    def _sanitize_messages_for_token_count(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Prepare messages for the count_tokens endpoint by removing/transforming unsupported
+        document references (e.g. {'source': {'type': 'file', ...}}) so the request does not
+        fail with a 400 error.
+
+        We replace any such PDF references with a placeholder text block so that the overall
+        structure of the conversation is preserved while avoiding validation errors.
+        The placeholder contributes a negligible number of tokens, so the count remains an
+        approximation, but it lets us successfully call the endpoint instead of skipping
+        token counting entirely.
+        """
+        sanitized: List[Dict[str, Any]] = []
+        for msg in messages:
+            msg_copy = copy.deepcopy(msg)
+            content_block = msg_copy.get("content")
+            if isinstance(content_block, list):
+                new_content = []
+                for item in content_block:
+                    if (
+                        isinstance(item, dict)
+                        and item.get("type") == "document"
+                        and isinstance(item.get("source"), dict)
+                        and item["source"].get("type") == "file"
+                    ):
+                        # Replace the unsupported file reference with a minimal text placeholder
+                        new_content.append({"type": "text", "text": "[PDF document]"})
+                    else:
+                        new_content.append(item)
+                msg_copy["content"] = new_content
+            sanitized.append(msg_copy)
+        return sanitized
