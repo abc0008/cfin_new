@@ -49,6 +49,7 @@ import base64 # Added for PDF content encoding
 from fastapi import HTTPException # Added for Story #17
 from anthropic.types import Message, TextBlock, ToolUseBlock # Moved import
 
+from settings import MODEL_HAIKU, MODEL_SONNET # Changed to import from effective project root
 from repositories.analysis_repository import AnalysisRepository
 from repositories.document_repository import DocumentRepository
 from pdf_processing.api_service import ClaudeService, ALL_TOOLS_DICT
@@ -370,10 +371,20 @@ class AnalysisService:
                 for turn in range(max_turns):
                     logger.info(f"Basic financial analysis - Turn {turn + 1}")
                     try:
+                        # Determine model for this turn: Sonnet (via model_router) for first turn, Haiku for subsequent turns
+                        model_for_this_turn_override = None
+                        if turn > 0:
+                            model_for_this_turn_override = MODEL_HAIKU
+                            logger.info(f"Basic financial analysis - Turn {turn + 1}: Switching to Haiku model ({MODEL_HAIKU})")
+                        else:
+                            # For turn 0, model_override is None, ClaudeService will use its model_router (expected to be Sonnet)
+                            logger.info(f"Basic financial analysis - Turn {turn + 1}: Using default model selection (expected Sonnet via model_router)")
+
                         api_response: Message = await self.claude_service.execute_tool_interaction_turn(
                             system_prompt=BASIC_FINANCIAL_SYSTEM_PROMPT,
                             messages=current_messages,
-                            tools=self.claude_service.tools_for_api
+                            tools=self.claude_service.tools_for_api,
+                            model_override=model_for_this_turn_override # Pass Haiku for subsequent turns, None for first
                         )
                         
                         # Add assistant's response to message history

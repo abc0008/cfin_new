@@ -77,6 +77,7 @@ class ProcessingStatusEnum(enum.Enum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+    UPLOADED_PENDING_ANALYSIS = "uploaded_pending_analysis"
 
 
 def generate_uuid():
