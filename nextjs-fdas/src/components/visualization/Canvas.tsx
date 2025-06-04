@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { AnalysisResult } from '@/types';
+import { AnalysisResult, Citation } from '@/types';
 import { ChartData, TableData, VisualizationData, FinancialMetric } from '@/types/visualization';
 import ChartRenderer from '../charts/ChartRenderer';
 import TableRenderer from '../tables/TableRenderer';
@@ -21,6 +21,12 @@ interface CanvasProps {
  */
 const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading, error, onCitationClick }) => {
   const [currentTab, setCurrentTab] = useState<'overview' | 'charts' | 'tables'>('overview');
+
+  const handleDataPointClick = (dataPoint: any) => {
+    if (dataPoint && dataPoint.citation && onCitationClick) {
+      onCitationClick(dataPoint.citation.highlightId);
+    }
+  };
 
   // NOTE: The following extensive regex-based extraction functions (extractFinancialDataFromMessages and its helpers)
   // have been removed as Canvas.tsx now relies solely on structured data (analysis_blocks or visualizationData)
@@ -157,6 +163,12 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
 
   const visualizationData = processAnalysisResults(analysisResults, messages);
 
+  const handleCellClick = useCallback((citation: Citation) => {
+    if (onCitationClick) {
+      onCitationClick(citation.highlightId);
+    }
+  }, [onCitationClick]);
+
   if (loading) {
     return (
       <div role="status" aria-label="Loading visualizations" className="flex items-center justify-center p-8 bg-muted/20 rounded-lg min-h-[600px]">
@@ -246,15 +258,18 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {visualizationData.charts && visualizationData.charts.length > 0 && (
-                <ChartRenderer data={visualizationData.charts[0]} />
+                <ChartRenderer data={visualizationData.charts[0]} onDataPointClick={handleDataPointClick} />
               )}
               {visualizationData.charts && visualizationData.charts.length > 1 && (
-                <ChartRenderer data={visualizationData.charts[1]} />
+                <ChartRenderer data={visualizationData.charts[1]} onDataPointClick={handleDataPointClick} />
               )}
             </div>
             
             {visualizationData.tables && visualizationData.tables.length > 0 && (
-              <TableRenderer data={visualizationData.tables[0]} />
+              <TableRenderer
+                data={visualizationData.tables[0]}
+                onCellClick={onCitationClick ? handleCellClick : undefined}
+              />
             )}
             
             {/* Display Analysis Text if available */}
@@ -277,12 +292,15 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             {currentTab === 'charts' ? 
               (visualizationData.charts || []).map((chart, index) => (
                 <div key={index} className="col-span-1">
-                  <ChartRenderer data={chart} />
+                  <ChartRenderer data={chart} onDataPointClick={handleDataPointClick} />
                 </div>
               )) :
               (visualizationData.tables || []).map((table, index) => (
                 <div key={index} className="col-span-1">
-                  <TableRenderer data={table} />
+                  <TableRenderer
+                    data={table}
+                    onCellClick={onCitationClick ? handleCellClick : undefined}
+                  />
                 </div>
               ))
             }

@@ -18,19 +18,27 @@ interface BarChartProps {
   data: ChartData;
   height?: number | string;
   width?: number | string;
+  onDataPointClick?: (dataPoint: any) => void;
 }
 
 /**
  * BarChart component for rendering monetary values and comparing quantities
  * Uses Recharts library for rendering the chart
  */
-export default function BarChart({ data, height = 400, width = '100%' }: BarChartProps) {
+export default function BarChart({ data, height = 400, width = '100%', onDataPointClick }: BarChartProps) {
   const { config, chartConfig, data: rawChartData, chartType } = data;
   
   let processedData = rawChartData;
   // Expected categoryKey from config.xAxisKey or a fallback
-  const categoryKey = config.xAxisKey || 
+  const categoryKey = config.xAxisKey ||
                      (config.xAxisLabel ? config.xAxisLabel.toLowerCase().replace(/\s+/g, '_') : 'category');
+
+  const handleBarClick = (data: any) => {
+    const payload = data?.payload;
+    if (payload?.citation && onDataPointClick) {
+      onDataPointClick(payload);
+    }
+  };
 
   if (chartType === 'multiBar' && Array.isArray(rawChartData) && rawChartData.length > 0 && rawChartData[0].hasOwnProperty('name') && rawChartData[0].hasOwnProperty('data')) {
     // Transform data for multiBar:
@@ -77,6 +85,7 @@ export default function BarChart({ data, height = 400, width = '100%' }: BarChar
         stroke={metricConfig.color ? undefined : '#7066bb'}
         strokeWidth={1}
         radius={[4, 4, 0, 0]}
+        onClick={handleBarClick}
       />
     );
   });
