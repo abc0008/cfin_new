@@ -10,7 +10,7 @@ export default function Header() {
 
   return (
     <header className="border-b border-border bg-card shadow-sm">
-      <div className="container mx-auto px-6 py-4">
+      <div className="container mx-auto px-6 py-2">
         <div className="flex justify-between items-center">
           {/* Logo and branding */}
           <div className="flex items-center">

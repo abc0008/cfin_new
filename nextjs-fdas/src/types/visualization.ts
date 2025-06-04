@@ -120,4 +120,4 @@ export interface AnalysisResult {
   timestamp: string;
 }
 
-export type { FinancialMetric } from './index'; 
+export type { FinancialMetric, MetricCitation } from './index';
