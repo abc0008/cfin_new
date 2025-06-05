@@ -1,7 +1,6 @@
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 from fastapi.testclient import TestClient
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 
 # Import the API router directly instead of the main app
 import sys
@@ -9,7 +8,6 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from api.router import api_router
-from models.message import ConversationCreateRequest, MessageRequest
 from api.conversation import get_langgraph_service, get_document_service
 
 # Create a test app with just the API router

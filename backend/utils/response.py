@@ -2,7 +2,7 @@
 Utilities for standardized response handling across API endpoints.
 """
 import logging
-from typing import Dict, Any, Optional, List, Union, Type
+from typing import Dict, Any, Optional, List, Union
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 import os

@@ -38,19 +38,16 @@ This module provides the main backend interface for interacting with the Anthrop
 
 import os
 import base64
-import asyncio
 import json
 import re
 import uuid
-from typing import Dict, List, Optional, Any, Tuple, Union, TYPE_CHECKING, ForwardRef, AsyncGenerator, cast
+from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING, ForwardRef
 import logging
-from anthropic import AsyncAnthropic, APIStatusError, APITimeoutError, RateLimitError
-from anthropic.types import Message as AnthropicMessage, ToolUseBlock, MessageStreamEvent, ContentBlockDeltaEvent, MessageDeltaEvent
-import string
+from anthropic import AsyncAnthropic, RateLimitError
+from anthropic.types import Message as AnthropicMessage
 from datetime import datetime
 import contextlib
 import httpx
-import backoff
 import copy
 
 # Claude API optimization imports
@@ -63,12 +60,8 @@ from utils.hashlib_utils import sha256_str
 from utils.token_utils import count_tokens
 
 from models.document import ProcessedDocument, Citation as DocumentCitation, DocumentContentType, DocumentMetadata, ProcessingStatus
-from models.citation import Citation, CitationType, CharLocationCitation, PageLocationCitation, ContentBlockLocationCitation
 from pdf_processing.langchain_service import LangChainService
-from utils.database import get_db
-from models.visualization import ChartData, TableData
-from models.analysis import FinancialMetric
-from models.tools import ALL_TOOLS_DICT, CLAUDE_API_TOOLS_LIST, ToolSchema # Ensure this import is present
+from models.tools import ALL_TOOLS_DICT, CLAUDE_API_TOOLS_LIST # Ensure this import is present
 
 # Set up logger
 logger = logging.getLogger(__name__)

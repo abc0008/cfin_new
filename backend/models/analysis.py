@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Any, Literal
 from datetime import datetime
 import uuid
-from pydantic import BaseModel, Field, UUID4, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 
 # Assuming ChartData and TableData will be imported or defined if not already
 # For now, let's use Any as a placeholder if they are not in the current context of this file.

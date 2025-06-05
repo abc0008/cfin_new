@@ -1,4 +1,3 @@
-import pytest
 from models.tools import ChartGenerationTool, TableGenerationTool, ToolSchema
 from models.visualization import ChartData, TableData, VisualizationData
 

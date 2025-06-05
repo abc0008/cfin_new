@@ -42,9 +42,9 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import update, delete, func, and_, desc, or_
+from sqlalchemy import update, delete
 
-from models.database_models import AnalysisResult, Document, User
+from models.database_models import AnalysisResult
 
 logger = logging.getLogger(__name__)
 

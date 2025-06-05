@@ -61,8 +61,6 @@ from langchain_core.messages import SystemMessage
 from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
-
-from utils.database import SessionLocal
 from models.document import ProcessedDocument
 
 logger = logging.getLogger(__name__)

@@ -1,13 +1,8 @@
-import asyncio
 import pytest
-import os
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 
-from models.database_models import Document, ProcessingStatusEnum
+from models.database_models import ProcessingStatusEnum
 from repositories.document_repository import DocumentRepository
 from utils.database import get_db
-from utils.storage import StorageService
 
 # Test data
 TEST_FILE_DATA = b'%PDF-1.5\n%Test PDF file for unit testing'

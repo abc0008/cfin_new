@@ -57,9 +57,8 @@ easier to deploy in different environments.
 
 import os
 import io
-import uuid
 import aiofiles
-from typing import BinaryIO, Optional
+from typing import Optional
 import boto3
 import logging
 from abc import ABC, abstractmethod

@@ -1,16 +1,12 @@
 import os
 import logging
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain_core.runnables import RunnableLambda
-from langchain_core.runnables.config import RunnableConfig
-
-from models.message import Message
-from models.document import ProcessedDocument, Citation
+from models.document import Citation
 
 logger = logging.getLogger(__name__)
 

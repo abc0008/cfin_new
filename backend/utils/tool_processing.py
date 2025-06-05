@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 
 from pydantic import ValidationError
 

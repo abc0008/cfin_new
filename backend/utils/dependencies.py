@@ -1,6 +1,5 @@
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
 
 from utils.database import get_db
 from repositories.document_repository import DocumentRepository

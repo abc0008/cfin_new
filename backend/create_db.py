@@ -43,7 +43,7 @@ from sqlalchemy import text
 import os
 
 from models.database_models import Base
-from utils.database import get_db, SyncSessionLocal, sync_engine
+from utils.database import SyncSessionLocal, sync_engine
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

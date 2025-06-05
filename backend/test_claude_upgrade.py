@@ -8,7 +8,7 @@ import asyncio
 import logging
 import os
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import patch
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

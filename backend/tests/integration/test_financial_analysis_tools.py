@@ -1,13 +1,9 @@
 import pytest
 import asyncio
-import os
 from unittest.mock import patch, AsyncMock, MagicMock
-import json
-from typing import Dict, Any, List, Optional
 
 from fastapi.testclient import TestClient
 from app.main import app
-from repositories.document_repository import DocumentRepository
 from services.document_service import DocumentService
 from services.analysis_service import AnalysisService
 from cfin.backend.pdf_processing.api_service import ClaudeService

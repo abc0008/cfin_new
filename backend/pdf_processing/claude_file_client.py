@@ -1,6 +1,4 @@
-import os
 import httpx
-import logging
 import settings
 import asyncio
 import os

@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import sys
-import os
 from pathlib import Path
 
 # Add the parent directory to sys.path to help with imports
