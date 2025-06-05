@@ -36,6 +36,7 @@ dist-ssr
 .vercel
 .turbo
 next-env.d.ts
+nextjs-fdas/.next/
 
 # Python
 __pycache__/
