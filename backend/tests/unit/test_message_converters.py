@@ -1,9 +1,8 @@
-import pytest
 from datetime import datetime
 import uuid
 from dateutil.parser import parse
 
-from models.citation import Citation, CitationType, CharLocationCitation, PageLocationCitation, ContentBlock
+from models.citation import CitationType, CharLocationCitation, PageLocationCitation, ContentBlock
 from models.message import Message, MessageRole
 from utils.message_converters import (
     claude_message_to_internal,
@@ -11,9 +10,7 @@ from utils.message_converters import (
     frontend_message_to_internal,
     internal_message_to_frontend,
     _convert_claude_citation,
-    _convert_internal_citation_to_claude,
-    _convert_frontend_citation,
-    _convert_internal_citation_to_frontend
+    _convert_internal_citation_to_claude
 )
 
 class TestMessageConverters:

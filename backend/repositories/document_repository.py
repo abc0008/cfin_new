@@ -56,15 +56,14 @@ data in the database and the binary content in the storage system.
 
 import logging
 import uuid
-from typing import List, Optional, Dict, Any, BinaryIO
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete, func
-import json
 import os
 
-from models.database_models import Document, Citation, User, DocumentType, ProcessingStatusEnum
+from models.database_models import Document, Citation, DocumentType, ProcessingStatusEnum
 from models.document import ProcessedDocument, DocumentMetadata, DocumentUploadResponse, Citation as CitationSchema
 from utils.storage import StorageService
 

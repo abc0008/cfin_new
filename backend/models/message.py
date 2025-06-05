@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid
 from pydantic import BaseModel, Field, UUID4, field_serializer, AliasChoices

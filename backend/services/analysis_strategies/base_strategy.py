@@ -7,8 +7,6 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 
 from models.database_models import Document
-from models.visualization import ChartData, TableData
-from models.analysis import FinancialMetric
 from pdf_processing.api_service import ClaudeService
 import logging
 

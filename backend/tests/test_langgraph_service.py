@@ -1,14 +1,12 @@
 import unittest
 import asyncio
 import os
-import sys
-from typing import Dict, List, Any
 from dotenv import load_dotenv
 import pathlib
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # Import required modules
-from pdf_processing.langgraph_service import LangGraphService, AgentState
+from pdf_processing.langgraph_service import LangGraphService
 
 # Load environment variables from parent directory
 parent_dir = str(pathlib.Path(__file__).parent.parent.parent)

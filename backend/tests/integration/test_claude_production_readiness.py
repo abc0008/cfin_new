@@ -7,9 +7,7 @@ Validates all optimizations work correctly end-to-end.
 import pytest
 import asyncio
 import os
-import base64
 import time
-from typing import Dict, Any
 
 # Import the services we need to test
 from pdf_processing.claude_file_client import upload_pdf

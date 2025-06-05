@@ -4,7 +4,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi import HTTPException
 import logging
 import os
-import sys
 from dotenv import load_dotenv
 from pathlib import Path
 import uvicorn
@@ -12,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from .routes import document, conversation, analysis
 from utils.init_db import init_db
-from utils.error_handling import http_exception_handler, validation_exception_handler, add_cors_headers
+from utils.error_handling import http_exception_handler, validation_exception_handler
 from utils.response import add_cors_headers as add_response_cors_headers
 
 # Load environment variables from .env file in the project root

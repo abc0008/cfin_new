@@ -54,12 +54,11 @@ Interactions with other files:
 
 These models are the backbone of the backend application, ensuring consistent data structure and relationships across all services and repositories.
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, JSON, Boolean, Enum as SQLAlchemyEnum, cast, and_, func, select, literal_column
-from sqlalchemy.orm import relationship, foreign, remote
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, JSON, Boolean, Enum as SQLAlchemyEnum
+from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
 import enum
-from typing import List, Dict, Any, Optional
 
 from utils.database import Base
 

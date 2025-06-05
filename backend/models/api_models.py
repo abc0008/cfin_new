@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any, Literal
+from typing import Optional, Dict, Any, Literal
 
 # Utility for camelCase aliasing
 def to_camel(string: str) -> str:

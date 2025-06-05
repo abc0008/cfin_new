@@ -2,8 +2,6 @@
 Template loader utility for financial analysis templates.
 Provides easy access to specialized analysis templates.
 """
-
-import os
 from typing import Dict, Optional
 from pathlib import Path
 
