@@ -9,7 +9,6 @@ import os
 import logging
 import sys
 import asyncio
-from pdf_processing.langgraph_service import LangGraphService
 from cfin.backend.pdf_processing.api_service import ClaudeService
 
 # Configure logging

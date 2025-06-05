@@ -1,14 +1,9 @@
 import pytest
 import base64
-import os
 import json
-from unittest.mock import AsyncMock, patch, MagicMock, Mock
-from typing import Dict, List, Tuple
-
-import asyncio
+from unittest.mock import AsyncMock, Mock
 from cfin.backend.pdf_processing.api_service import ClaudeService
 from models.document import ProcessedDocument, Citation, DocumentContentType
-from models.document import DocumentMetadata, ProcessingStatus
 
 
 # Helper class to simulate Anthropic content blocks

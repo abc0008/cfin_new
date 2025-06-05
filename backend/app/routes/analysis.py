@@ -1,27 +1,20 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, Path, Body
+from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, List, Optional, Any
 import uuid
 import logging
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi.responses import JSONResponse
 import json
-from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, Field
 
 from models.analysis import AnalysisRequest, AnalysisResult, AnalysisApiResponse, VisualizationDataResponse
-from models.analysis import FinancialMetric, FinancialRatio, ComparativePeriod
-from models.visualization import VisualizationData, ChartData, TableData
-from models.document import ProcessedDocument
-from models.database_models import ProcessingStatusEnum
+from models.analysis import FinancialMetric, FinancialRatio
+from models.visualization import ChartData, TableData
 from repositories.document_repository import DocumentRepository
 from repositories.analysis_repository import AnalysisRepository
 from services.analysis_service import AnalysisService
 from pdf_processing.document_service import DocumentService
 from utils.dependencies import (
-    get_conversation_service, 
-    get_analysis_service, 
-    get_document_service
+    get_analysis_service
 )
 from pdf_processing.api_service import ClaudeService
 from pdf_processing.langchain_service import LangChainService

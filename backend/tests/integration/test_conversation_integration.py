@@ -3,7 +3,7 @@ import os
 import uuid
 from typing import AsyncGenerator
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
@@ -15,9 +15,7 @@ from main import app
 from database.session import Base, get_db
 from models.document import DocumentContentType
 from models.message import MessageRole
-from api.conversation import get_langgraph_service, get_document_service
 from services.authentication import get_current_user_id
-from services.session_service import get_session_service
 
 # Create test database
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"

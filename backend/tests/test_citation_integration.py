@@ -1,20 +1,13 @@
 import unittest
 import asyncio
 import os
-import sys
-import json
-import base64
 from unittest.mock import patch, MagicMock
-import pytest
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any
 from dotenv import load_dotenv
 import pathlib
-
-# Import required modules
-from pdf_processing.langgraph_service import LangGraphService
 from cfin.backend.pdf_processing.api_service import ClaudeService
 from services.conversation_service import ConversationService
-from models.citation import Citation, CitationType, CharLocationCitation, PageLocationCitation
+from models.citation import CitationType, CharLocationCitation, PageLocationCitation
 
 # Load environment variables from parent directory
 parent_dir = str(pathlib.Path(__file__).parent.parent.parent)

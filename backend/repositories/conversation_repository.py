@@ -46,12 +46,10 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import update, delete, func, and_, desc, or_
+from sqlalchemy import update, delete, func, and_, or_
 from sqlalchemy.orm import selectinload
 
-from models.database_models import Conversation, Message, User, Document, Citation, MessageCitation, ConversationDocument, AnalysisBlock
-from models.document import Citation as CitationSchema
-from utils.storage import StorageService
+from models.database_models import Conversation, Message, Document, Citation, MessageCitation, ConversationDocument, AnalysisBlock
 
 logger = logging.getLogger(__name__)
 

@@ -11,11 +11,9 @@ This script:
 """
 
 import os
-import json
 import asyncio
 import logging
 import uuid
-from datetime import datetime
 from fastapi.testclient import TestClient
 
 # Configure logging
@@ -27,11 +25,6 @@ logger = logging.getLogger(__name__)
 
 # Import app and modules
 from app.main import app
-from services.conversation_service import ConversationService
-from repositories.conversation_repository import ConversationRepository
-from repositories.document_repository import DocumentRepository
-from cfin.backend.pdf_processing.api_service import ClaudeService
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 # Create test client

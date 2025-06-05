@@ -2,13 +2,11 @@
 Unit tests for the ComprehensiveAnalysisStrategy.
 '''
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 from services.analysis_strategies.comprehensive_strategy import ComprehensiveAnalysisStrategy
 from cfin.backend.pdf_processing.api_service import ClaudeService
 from models.visualization import ChartData
-from models.analysis import FinancialMetric
 from models.database_models import Document # Assuming Document model is needed for strategy input
 from anthropic.types import Message as AnthropicMessage, TextBlock, ToolUseBlock
 

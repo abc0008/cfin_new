@@ -1,11 +1,8 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-import json
-from typing import Dict, List, Any, Optional
+from unittest.mock import AsyncMock, MagicMock
 
 from services.analysis_service import AnalysisService
 from models.document import ProcessedDocument, DocumentMetadata, DocumentContentType, ProcessingStatus
-from models.tools import ChartGenerationTool, TableGenerationTool
 from models.visualization import ChartData, TableData, VisualizationData
 from cfin.backend.pdf_processing.api_service import ClaudeService
 

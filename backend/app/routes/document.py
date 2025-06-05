@@ -1,10 +1,8 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query, Path, Body
-from fastapi.responses import JSONResponse, FileResponse, Response
-from typing import List, Optional, Dict, Any
-import uuid
+from fastapi.responses import FileResponse, Response
+from typing import List, Dict, Any
 import logging
 import os
-import io
 
 from models.document import DocumentUploadResponse, ProcessedDocument, DocumentMetadata, Citation
 from models.api_models import RetryExtractionRequest

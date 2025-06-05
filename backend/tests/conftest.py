@@ -3,7 +3,6 @@ import os
 import sys
 import asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 import uuid

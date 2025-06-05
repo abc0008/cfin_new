@@ -1,17 +1,14 @@
 import os
 import logging
-from typing import Dict, List, Any, Optional, Tuple, TypedDict, Annotated
+from typing import Dict, List, Any, Optional, TypedDict
 from enum import Enum
 import json
-import datetime
 
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_anthropic import ChatAnthropic
-from langchain_core.tools import tool, BaseTool, ToolException
-from pydantic import BaseModel, Field
-from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
+from langchain_core.tools import tool, ToolException
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 
 from langgraph.graph import StateGraph, END
 try:
@@ -20,8 +17,6 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - library compatibility layer
     from .tool_executor import ToolExecutor
 from langgraph.graph.message import add_messages
-
-from models.document import Citation
 
 logger = logging.getLogger(__name__)
 

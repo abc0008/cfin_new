@@ -6,7 +6,6 @@ Simple test script to test uploading a document.
 import asyncio
 import logging
 import os
-from models.document import DocumentUploadResponse
 from repositories.document_repository import DocumentRepository
 from pdf_processing.document_service import DocumentService
 from utils.database import SessionLocal

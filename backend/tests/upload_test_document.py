@@ -3,8 +3,6 @@ import logging
 import sys
 import os
 import dotenv
-import uuid
-from typing import Optional
 
 # Load environment variables from .env file
 dotenv.load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))

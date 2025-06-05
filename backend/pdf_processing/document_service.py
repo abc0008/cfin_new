@@ -1,25 +1,15 @@
-import os
-import uuid
-import json
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional, BinaryIO, Any
-from pathlib import Path
+from typing import Dict, List, Optional, Any
 import asyncio
 import settings
 
 from models.document import (
-    ProcessedDocument, 
-    DocumentMetadata, 
-    ProcessingStatus,
-    DocumentContentType,
     Citation as CitationSchema,
     DocumentUploadResponse
 )
-from models.database_models import DocumentType, ProcessingStatusEnum, Document, Citation
+from models.database_models import DocumentType, ProcessingStatusEnum, Citation
 from pdf_processing.api_service import ClaudeService
 from repositories.document_repository import DocumentRepository
-from utils.hashlib_utils import sha256_str
 
 
 logger = logging.getLogger(__name__)

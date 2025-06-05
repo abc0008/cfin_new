@@ -1,8 +1,6 @@
 import asyncio
 import logging
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-import os
 
 from .database import engine, Base, SessionLocal
 
