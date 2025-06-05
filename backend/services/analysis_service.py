@@ -37,8 +37,6 @@ Design Notes:
 - Designed for modularity: new analysis types or AI services can be added with minimal changes to the core workflow.
 - Ensures all outputs are formatted for downstream API and UI consumption, including metadata, visualizations, and insights.
 """
-
-import os
 import logging
 import json
 import uuid
@@ -47,25 +45,21 @@ from typing import List, Dict, Any, Optional, Tuple
 import asyncio
 import base64 # Added for PDF content encoding
 from fastapi import HTTPException # Added for Story #17
-from anthropic.types import Message, TextBlock, ToolUseBlock # Moved import
+from anthropic.types import Message, TextBlock # Moved import
 
-from settings import MODEL_HAIKU, MODEL_SONNET # Changed to import from effective project root
+from settings import MODEL_HAIKU # Changed to import from effective project root
 from repositories.analysis_repository import AnalysisRepository
 from repositories.document_repository import DocumentRepository
-from pdf_processing.api_service import ClaudeService, ALL_TOOLS_DICT
+from pdf_processing.api_service import ClaudeService
 from pdf_processing.financial_agent import FinancialAnalysisAgent
 from models.database_models import AnalysisResult, Document
 from utils.visualization_helpers import (
     generate_monetary_values_data,
     generate_percentage_data,
-    generate_keyword_frequency_data,
-    get_data_for_visualization_type,
+    generate_keyword_frequency_data
 )
-from models.analysis import FinancialMetric, FinancialRatio, ComparativePeriod
-from models.visualization import ChartData, TableData # Assuming these are defined
 
 from .analysis_strategies import strategy_map # Added for Story #1
-from utils import tool_processing # Corrected import
 from utils.exceptions import ToolSchemaValidationError # Corrected import
 
 logger = logging.getLogger(__name__)

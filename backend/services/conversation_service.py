@@ -57,15 +57,13 @@ import os
 import uuid
 import json
 import logging
-from datetime import datetime
-from typing import List, Dict, Any, Optional, Tuple, Union
-import asyncio
+from typing import List, Dict, Any, Optional, Tuple
 
 from repositories.conversation_repository import ConversationRepository
 from repositories.document_repository import DocumentRepository
 from repositories.analysis_repository import AnalysisRepository
 from pdf_processing.api_service import ClaudeService
-from models.database_models import Message, Conversation, Document, Citation, AnalysisBlock, User
+from models.database_models import Message, Conversation
 
 logger = logging.getLogger(__name__)
 

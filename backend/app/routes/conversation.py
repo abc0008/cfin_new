@@ -1,14 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, status
-from typing import List, Optional, Dict, Any
-import uuid
-from datetime import datetime
+from typing import List, Dict, Any
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.message import ConversationCreateRequest, MessageRequest, MessageResponse, ConversationHistoryResponse
+from models.message import ConversationCreateRequest, MessageRequest, MessageResponse
 from utils.dependencies import get_conversation_service, get_document_service
 from models.message import Message, MessageRole, ConversationState
-from models.document import ProcessedDocument, Citation
+from models.document import Citation
 from services.conversation_service import ConversationService
 from pdf_processing.api_service import ClaudeService
 from pdf_processing.document_service import DocumentService

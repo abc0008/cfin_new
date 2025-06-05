@@ -1,8 +1,5 @@
 import pytest
-import base64
-import os
-import json
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 import uuid
 from datetime import datetime
 
@@ -10,7 +7,6 @@ from pdf_processing.document_service import DocumentService
 from cfin.backend.pdf_processing.api_service import ClaudeService
 from models.document import ProcessedDocument, Citation, DocumentContentType
 from models.document import DocumentMetadata, ProcessingStatus
-from repositories.document_repository import DocumentRepository
 
 
 @pytest.fixture

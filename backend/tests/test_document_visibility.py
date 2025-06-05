@@ -5,10 +5,8 @@ Simple test script to verify the document API endpoints.
 
 import asyncio
 import logging
-from models.document import DocumentUploadResponse, ProcessedDocument, DocumentMetadata
 from repositories.document_repository import DocumentRepository
 from utils.database import SessionLocal
-from models.database_models import User, Document, ProcessingStatusEnum
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

@@ -1,4 +1,4 @@
-from typing import Union, Optional
+from typing import Union
 
 class ToolSchemaValidationError(ValueError):
     """Custom exception for tool input/output schema validation errors."""

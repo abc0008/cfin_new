@@ -16,8 +16,7 @@ from models.citation import (
     CitationType,
     CharLocationCitation,
     PageLocationCitation,
-    ContentBlock,
-    AnthropicMessage,
+    ContentBlock
 )
 
 

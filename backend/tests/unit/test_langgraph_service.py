@@ -1,12 +1,10 @@
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 import uuid
-from typing import Dict, Any, List
 from models.document import ProcessedDocument, DocumentMetadata, DocumentContentType, Citation
-from models.citation import PageLocationCitation, CitationType
 
 # Import the service to test
-from pdf_processing.langgraph_service import LangGraphService, AgentState
+from pdf_processing.langgraph_service import LangGraphService
 
 class TestLangGraphService:
     """Unit tests for LangGraphService."""

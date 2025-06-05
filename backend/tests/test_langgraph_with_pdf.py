@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 import PyPDF2
 import argparse
 from pdf_processing.langgraph_service import LangGraphService
-from unittest.mock import patch, MagicMock
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

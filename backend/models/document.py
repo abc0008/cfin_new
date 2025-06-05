@@ -47,7 +47,7 @@ the application, ensuring consistency between the database, service layer, and A
 """
 
 from enum import Enum
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 import uuid
 from pydantic import BaseModel, Field, UUID4
