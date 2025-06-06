@@ -117,12 +117,12 @@ export default function TableRenderer({
   
   return (
     <div 
-      className={`w-full overflow-hidden rounded-lg bg-white p-4 shadow-sm ${className}`}
-      style={{ width, height: height || 'auto' }}
+      className={`w-full h-full overflow-hidden rounded-lg bg-white shadow-sm flex flex-col ${className}`}
+      style={{ width }}
     >
       {/* Table title and subtitle/description */}
       {config.title && (
-        <div className="mb-4">
+        <div className="p-4 pb-0 flex-shrink-0">
           <h3 className="text-lg font-semibold text-gray-800">{config.title}</h3>
           {config.subtitle && <p className="text-sm text-gray-500">{config.subtitle}</p>}
           {config.description && !config.subtitle && (
@@ -131,10 +131,10 @@ export default function TableRenderer({
         </div>
       )}
       
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* Table - scrollable area */}
+      <div className="flex-1 overflow-auto p-4">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
               {/* Row numbers column if enabled */}
               {config.showRowNumbers && (
@@ -210,141 +210,144 @@ export default function TableRenderer({
         </table>
       </div>
       
-      {/* Footer if provided */}
-      {config.footer && (
-        <div className="mt-2 text-sm text-gray-500">
-          {config.footer}
-        </div>
-      )}
-      
-      {/* Pagination controls */}
-      {config.pagination !== false && totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6 mt-4">
-          <div className="flex flex-1 justify-between sm:hidden">
-            <button
-              onClick={goToPrevPage}
-              disabled={currentPage === 0}
-              className={`relative inline-flex items-center rounded-md px-4 py-2 text-sm font-medium ${
-                currentPage === 0
-                  ? 'text-gray-300 cursor-not-allowed'
-                  : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Previous
-            </button>
-            <button
-              onClick={goToNextPage}
-              disabled={currentPage === totalPages - 1}
-              className={`relative ml-3 inline-flex items-center rounded-md px-4 py-2 text-sm font-medium ${
-                currentPage === totalPages - 1
-                  ? 'text-gray-300 cursor-not-allowed'
-                  : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Next
-            </button>
+      {/* Footer and Pagination - fixed at bottom */}
+      <div className="flex-shrink-0">
+        {/* Footer if provided */}
+        {config.footer && (
+          <div className="px-4 py-2 text-sm text-gray-500 border-t border-gray-200">
+            {config.footer}
           </div>
-          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-gray-700">
-                Showing <span className="font-medium">{currentPage * rowsPerPage + 1}</span> to{' '}
-                <span className="font-medium">
-                  {Math.min((currentPage + 1) * rowsPerPage, tableData.length)}
-                </span>{' '}
-                of <span className="font-medium">{tableData.length}</span> results
-              </p>
-            </div>
-            <div>
-              <nav
-                className="isolate inline-flex -space-x-px rounded-md shadow-sm"
-                aria-label="Pagination"
+        )}
+        
+        {/* Pagination controls */}
+        {config.pagination !== false && totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6">
+            <div className="flex flex-1 justify-between sm:hidden">
+              <button
+                onClick={goToPrevPage}
+                disabled={currentPage === 0}
+                className={`relative inline-flex items-center rounded-md px-4 py-2 text-sm font-medium ${
+                  currentPage === 0
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
               >
-                <button
-                  onClick={goToPrevPage}
-                  disabled={currentPage === 0}
-                  className={`relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ${
-                    currentPage === 0
-                      ? 'cursor-not-allowed'
-                      : 'hover:bg-gray-50'
-                  }`}
+                Previous
+              </button>
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages - 1}
+                className={`relative ml-3 inline-flex items-center rounded-md px-4 py-2 text-sm font-medium ${
+                  currentPage === totalPages - 1
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                Next
+              </button>
+            </div>
+            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Showing <span className="font-medium">{currentPage * rowsPerPage + 1}</span> to{' '}
+                  <span className="font-medium">
+                    {Math.min((currentPage + 1) * rowsPerPage, tableData.length)}
+                  </span>{' '}
+                  of <span className="font-medium">{tableData.length}</span> results
+                </p>
+              </div>
+              <div>
+                <nav
+                  className="isolate inline-flex -space-x-px rounded-md shadow-sm"
+                  aria-label="Pagination"
                 >
-                  <span className="sr-only">Previous</span>
-                  {/* Heroicon: chevron-left */}
-                  <svg
-                    className="h-5 w-5"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
+                  <button
+                    onClick={goToPrevPage}
+                    disabled={currentPage === 0}
+                    className={`relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ${
+                      currentPage === 0
+                        ? 'cursor-not-allowed'
+                        : 'hover:bg-gray-50'
+                    }`}
                   >
-                    <path
-                      fillRule="evenodd"
-                      d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-                
-                {/* Page numbers (limit to 5 pages for UI clarity) */}
-                {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
-                  // For more than 5 pages, show first 2, current, and last 2
-                  let pageNumber = i;
-                  if (totalPages > 5) {
-                    if (currentPage < 2) {
-                      pageNumber = i;
-                    } else if (currentPage > totalPages - 3) {
-                      pageNumber = totalPages - 5 + i;
-                    } else {
-                      pageNumber = currentPage - 2 + i;
-                    }
-                  }
-                  
-                  return (
-                    <button
-                      key={pageNumber}
-                      onClick={() => setCurrentPage(pageNumber)}
-                      aria-current={currentPage === pageNumber ? 'page' : undefined}
-                      className={`relative inline-flex items-center px-4 py-2 text-sm font-medium ${
-                        currentPage === pageNumber
-                          ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                          : 'text-gray-500 hover:bg-gray-50'
-                      }`}
+                    <span className="sr-only">Previous</span>
+                    {/* Heroicon: chevron-left */}
+                    <svg
+                      className="h-5 w-5"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
                     >
-                      {pageNumber + 1}
-                    </button>
-                  );
-                })}
-                
-                <button
-                  onClick={goToNextPage}
-                  disabled={currentPage === totalPages - 1}
-                  className={`relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ${
-                    currentPage === totalPages - 1
-                      ? 'cursor-not-allowed'
-                      : 'hover:bg-gray-50'
-                  }`}
-                >
-                  <span className="sr-only">Next</span>
-                  {/* Heroicon: chevron-right */}
-                  <svg
-                    className="h-5 w-5"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
+                      <path
+                        fillRule="evenodd"
+                        d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                  
+                  {/* Page numbers (limit to 5 pages for UI clarity) */}
+                  {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                    // For more than 5 pages, show first 2, current, and last 2
+                    let pageNumber = i;
+                    if (totalPages > 5) {
+                      if (currentPage < 2) {
+                        pageNumber = i;
+                      } else if (currentPage > totalPages - 3) {
+                        pageNumber = totalPages - 5 + i;
+                      } else {
+                        pageNumber = currentPage - 2 + i;
+                      }
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNumber}
+                        onClick={() => setCurrentPage(pageNumber)}
+                        aria-current={currentPage === pageNumber ? 'page' : undefined}
+                        className={`relative inline-flex items-center px-4 py-2 text-sm font-medium ${
+                          currentPage === pageNumber
+                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                            : 'text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNumber + 1}
+                      </button>
+                    );
+                  })}
+                  
+                  <button
+                    onClick={goToNextPage}
+                    disabled={currentPage === totalPages - 1}
+                    className={`relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ${
+                      currentPage === totalPages - 1
+                        ? 'cursor-not-allowed'
+                        : 'hover:bg-gray-50'
+                    }`}
                   >
-                    <path
-                      fillRule="evenodd"
-                      d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-              </nav>
+                    <span className="sr-only">Next</span>
+                    {/* Heroicon: chevron-right */}
+                    <svg
+                      className="h-5 w-5"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                </nav>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 } 

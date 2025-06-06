@@ -171,7 +171,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
 
   if (loading) {
     return (
-      <div role="status" aria-label="Loading visualizations" className="flex items-center justify-center p-8 bg-muted/20 rounded-lg min-h-[600px]">
+      <div role="status" aria-label="Loading visualizations" className="flex items-center justify-center p-8 bg-muted/20 rounded-lg h-full">
         <div className="animate-pulse flex flex-col items-center">
           <div className="h-8 w-40 bg-muted rounded mb-4" />
           <div className="h-80 w-full bg-muted rounded" />
@@ -182,7 +182,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
 
   if (error) {
     return (
-      <div role="alert" className="flex items-center justify-center p-8 bg-destructive/10 rounded-lg min-h-[600px]">
+      <div role="alert" className="flex items-center justify-center p-8 bg-destructive/10 rounded-lg h-full">
         <div className="text-destructive text-center">
           <h3 className="font-avenir-pro-demi mb-2">Error loading visualizations</h3>
           <p className="text-sm font-avenir-pro">{error.toString()}</p>
@@ -196,15 +196,15 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
        (!visualizationData.tables || visualizationData.tables.length === 0) && 
        (!visualizationData.metrics || visualizationData.metrics.length === 0))) {
     return (
-      <div role="status" aria-label="No data" className="flex items-center justify-center p-8 bg-muted/20 rounded-lg min-h-[600px]">
+      <div role="status" aria-label="No data" className="flex items-center justify-center p-8 bg-muted/20 rounded-lg h-full">
         <p className="text-muted-foreground font-avenir-pro">No visualization data available. Try asking a question that requires charts or tables.</p>
       </div>
     );
   }
 
   return (
-    <div role="main" className="w-full rounded-lg bg-card shadow-sm">
-      <div className="border-b border-border">
+    <div role="main" className="w-full h-full rounded-lg bg-card shadow-sm flex flex-col">
+      <div className="border-b border-border flex-shrink-0">
         <div role="tablist" className="flex space-x-4 px-4">
           <button
             role="tab"
@@ -248,33 +248,39 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
         </div>
       </div>
 
-      <div className="p-4 overflow-y-auto max-h-[calc(100vh-200px)]">
+      <div className="flex-1 p-4 overflow-y-auto">
         {currentTab === 'overview' ? (
-          <div className="space-y-6">
+          <div className="space-y-6 h-full flex flex-col">
             <MetricGrid 
               metrics={visualizationData.metrics || []}
               title="Key Performance Indicators"
             />
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
               {visualizationData.charts && visualizationData.charts.length > 0 && (
-                <ChartRenderer data={visualizationData.charts[0]} onDataPointClick={handleDataPointClick} />
+                <div className="h-full">
+                  <ChartRenderer data={visualizationData.charts[0]} onDataPointClick={handleDataPointClick} />
+                </div>
               )}
               {visualizationData.charts && visualizationData.charts.length > 1 && (
-                <ChartRenderer data={visualizationData.charts[1]} onDataPointClick={handleDataPointClick} />
+                <div className="h-full">
+                  <ChartRenderer data={visualizationData.charts[1]} onDataPointClick={handleDataPointClick} />
+                </div>
               )}
             </div>
             
             {visualizationData.tables && visualizationData.tables.length > 0 && (
-              <TableRenderer
-                data={visualizationData.tables[0]}
-                onCellClick={onCitationClick ? handleCellClick : undefined}
-              />
+              <div className="flex-1">
+                <TableRenderer
+                  data={visualizationData.tables[0]}
+                  onCellClick={onCitationClick ? handleCellClick : undefined}
+                />
+              </div>
             )}
             
             {/* Display Analysis Text if available */}
             {visualizationData.analysisText && (
-              <div className="mt-6 p-4 bg-muted/30 rounded-lg shadow-sm border border-border">
+              <div className="mt-6 p-4 bg-muted/30 rounded-lg shadow-sm border border-border flex-shrink-0">
                 <h4 className="text-md font-avenir-pro-demi text-foreground mb-2">Textual Summary</h4>
                 <p className="text-sm font-avenir-pro text-muted-foreground whitespace-pre-wrap">
                   {visualizationData.analysisText}
@@ -287,16 +293,16 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             role="tabpanel"
             id={`${currentTab}-panel`}
             aria-labelledby={`${currentTab}-tab`}
-            className="grid grid-cols-1 lg:grid-cols-2 gap-4"
+            className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full"
           >
             {currentTab === 'charts' ? 
               (visualizationData.charts || []).map((chart, index) => (
-                <div key={index} className="col-span-1">
+                <div key={index} className="col-span-1 h-full">
                   <ChartRenderer data={chart} onDataPointClick={handleDataPointClick} />
                 </div>
               )) :
               (visualizationData.tables || []).map((table, index) => (
-                <div key={index} className="col-span-1">
+                <div key={index} className="col-span-1 h-full">
                   <TableRenderer
                     data={table}
                     onCellClick={onCitationClick ? handleCellClick : undefined}

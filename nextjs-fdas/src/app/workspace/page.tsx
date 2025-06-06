@@ -473,7 +473,7 @@ export default function Workspace() {
       <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 px-4 pb-6">
         {/* Left side: Chat Interface */}
         <div className="bg-card rounded-xl shadow-md flex flex-col min-h-[calc(100vh-12rem)] overflow-auto border border-border col-span-1 flex-1">
-          <div className="py-1 px-2 border-b border-border bg-muted/30 rounded-t-xl">
+          <div className="py-1 px-2 border-b border-border bg-muted/30 rounded-t-xl flex-shrink-0">
             <h2 className="text-base font-avenir-pro-demi text-foreground flex items-center">
               <FileSearch className="h-5 w-5 mr-2" />
               Interactive Chat
@@ -517,7 +517,7 @@ export default function Workspace() {
                   </div>
                 </TabsTrigger>
               </TabsList>
-              <TabsContent value="document" className="h-[calc(100vh-13rem)] p-0">
+              <TabsContent value="document" className="h-[calc(100vh-13rem)] p-0 flex flex-col">
                 {showUploadForm ? (
                   <div className="p-6">
                     <h2 className="text-xl font-avenir-pro-demi text-primary mb-4">Upload Document</h2>
@@ -534,7 +534,7 @@ export default function Workspace() {
                     </button>
                   </div>
                 ) : selectedDocument ? (
-                  <div className="h-full">
+                  <div className="h-full flex-1">
                     <PDFViewer 
                       document={selectedDocument}
                       highlightId={highlightId}
@@ -570,22 +570,13 @@ export default function Workspace() {
                   </div>
                 )}
               </TabsContent>
-              <TabsContent value="analysis" className="h-[calc(100vh-13rem)] p-0 flex flex-col">
-                {selectedDocument && (
-                  <div className="p-4 border-b border-border">
-                    <AnalysisControls 
-                      isLoading={analysisLoading}
-                      onRunAnalysis={(analysisType, knowledgeBase, userQuery) => {
-                        runManualAnalysis(
-                          selectedDocument.metadata.id,
-                          analysisType,
-                          knowledgeBase,
-                          userQuery
-                        );
-                      }}
-                    />
-                  </div>
-                )}
+              <TabsContent value="analysis" className="p-0 flex flex-col flex-1">
+                <div className="flex-shrink-0">
+                  <AnalysisControls 
+                    onRunAnalysis={runManualAnalysis}
+                    isLoading={analysisLoading}
+                  />
+                </div>
                 <div className="flex-1 overflow-hidden">
                   <Canvas 
                     analysisResults={analysisResults}

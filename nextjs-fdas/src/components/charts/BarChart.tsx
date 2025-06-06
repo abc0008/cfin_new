@@ -102,9 +102,9 @@ export default function BarChart({ data, height = 400, width = '100%', onDataPoi
   };
 
   return (
-    <div className="w-full overflow-hidden rounded-lg bg-white p-4 shadow-sm">
+    <div className="w-full h-full overflow-hidden rounded-lg bg-white shadow-sm flex flex-col">
       {config.title && (
-        <div className="mb-4">
+        <div className="p-4 pb-0 flex-shrink-0">
           <h3 className="text-lg font-semibold text-gray-800">{config.title}</h3>
           {config.subtitle && <p className="text-sm text-gray-500">{config.subtitle}</p>}
           {config.description && !config.subtitle && (
@@ -116,72 +116,76 @@ export default function BarChart({ data, height = 400, width = '100%', onDataPoi
         </div>
       )}
       
-      <ResponsiveContainer width={width} height={height}>
-        <RechartsBarChart
-          data={processedData}
-          margin={{ top: 10, right: 30, left: 20, bottom: 30 }}
-          barSize={config.stack ? 20 : 40}
-          barGap={config.stack ? 0 : 4}
-          barCategoryGap={config.stack ? '10%' : '20%'}
-        >
-          {config.showGrid !== false && <CartesianGrid strokeDasharray="3 3" vertical={false} />}
-          
-          <XAxis
-            dataKey={categoryKey}
-            scale="point"
-            padding={{ left: 20, right: 20 }}
-            tick={{ fontSize: 12 }}
-            tickLine={true}
-            axisLine={true}
+      <div className="flex-1 p-4" style={{ minHeight: height === "100%" ? "300px" : undefined }}>
+        <ResponsiveContainer width={width} height={height === "100%" ? "100%" : height}>
+          <RechartsBarChart
+            data={processedData}
+            margin={{ top: 10, right: 30, left: 20, bottom: 30 }}
+            barSize={config.stack ? 20 : 40}
+            barGap={config.stack ? 0 : 4}
+            barCategoryGap={config.stack ? '10%' : '20%'}
           >
-            {config.xAxisLabel && <Label value={config.xAxisLabel} offset={-10} position="insideBottom" />}
-          </XAxis>
-          
-          <YAxis
-            tick={{ fontSize: 12 }}
-            tickLine={true}
-            axisLine={true}
-            tickFormatter={(value) => {
-              // Format Y-axis ticks based on the first metric's config
-              if (metricKeys.length > 0) {
-                const firstMetric = chartConfig[metricKeys[0]];
-                return formatValue(value, firstMetric.formatter, firstMetric.precision);
-              }
-              return value;
-            }}
-          >
-            {config.yAxisLabel && <Label value={config.yAxisLabel} angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />}
-          </YAxis>
-          
-          <Tooltip
-            formatter={formatTooltip}
-            contentStyle={{
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              border: '1px solid #e2e8f0',
-              borderRadius: '6px',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-              padding: '8px 12px',
-            }}
-          />
-          
-          {config.showLegend && (
-            <Legend
-              verticalAlign={config.legendPosition === 'top' || config.legendPosition === 'bottom' ? config.legendPosition : 'bottom'}
-              align={config.legendPosition === 'left' || config.legendPosition === 'right' ? config.legendPosition : 'center'}
-              iconType="circle"
-              iconSize={10}
-              wrapperStyle={{ paddingTop: '10px' }}
+            {config.showGrid !== false && <CartesianGrid strokeDasharray="3 3" vertical={false} />}
+            
+            <XAxis
+              dataKey={categoryKey}
+              scale="point"
+              padding={{ left: 20, right: 20 }}
+              tick={{ fontSize: 12 }}
+              tickLine={true}
+              axisLine={true}
+            >
+              {config.xAxisLabel && <Label value={config.xAxisLabel} offset={-10} position="insideBottom" />}
+            </XAxis>
+            
+            <YAxis
+              tick={{ fontSize: 12 }}
+              tickLine={true}
+              axisLine={true}
+              tickFormatter={(value) => {
+                // Format Y-axis ticks based on the first metric's config
+                if (metricKeys.length > 0) {
+                  const firstMetric = chartConfig[metricKeys[0]];
+                  return formatValue(value, firstMetric.formatter, firstMetric.precision);
+                }
+                return value;
+              }}
+            >
+              {config.yAxisLabel && <Label value={config.yAxisLabel} angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />}
+            </YAxis>
+            
+            <Tooltip
+              formatter={formatTooltip}
+              contentStyle={{
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                padding: '8px 12px',
+              }}
             />
-          )}
-          
-          {bars}
-        </RechartsBarChart>
-      </ResponsiveContainer>
+            
+            {config.showLegend && (
+              <Legend
+                verticalAlign={config.legendPosition === 'top' || config.legendPosition === 'bottom' ? config.legendPosition : 'bottom'}
+                align={config.legendPosition === 'left' || config.legendPosition === 'right' ? config.legendPosition : 'center'}
+                iconType="circle"
+                iconSize={10}
+                wrapperStyle={{ paddingTop: '10px' }}
+              />
+            )}
+            
+            {bars}
+          </RechartsBarChart>
+        </ResponsiveContainer>
+      </div>
 
       {/* Display totalLabel if provided */}
       {config.totalLabel && (
-        <div className="mt-2 text-sm text-gray-500 text-center">
-          {config.totalLabel}
+        <div className="px-4 pb-4 flex-shrink-0">
+          <div className="text-sm text-gray-500 text-center">
+            {config.totalLabel}
+          </div>
         </div>
       )}
     </div>
