@@ -28,42 +28,66 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   // Render the appropriate chart component based on chartType
   switch (chartType) {
     case 'bar':
-      return <BarChart data={data} onDataPointClick={onDataPointClick} />;
+      return (
+        <div className={`h-full ${className}`}>
+          <BarChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        </div>
+      );
     
     case 'multiBar':
-      return <BarChart data={data} onDataPointClick={onDataPointClick} />;
+      return (
+        <div className={`h-full ${className}`}>
+          <BarChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        </div>
+      );
     
     case 'line':
-      return <LineChart data={data} onDataPointClick={onDataPointClick} />;
+      return (
+        <div className={`h-full ${className}`}>
+          <LineChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        </div>
+      );
     
     case 'pie':
-      return <PieChart data={data} onDataPointClick={onDataPointClick} />;
+      return (
+        <div className={`h-full ${className}`}>
+          <PieChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        </div>
+      );
     
     case 'area':
     case 'stackedArea':
-      return <AreaChart data={data} onDataPointClick={onDataPointClick} />;
+      return (
+        <div className={`h-full ${className}`}>
+          <AreaChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        </div>
+      );
     
     case 'scatter':
-      return <ScatterChart data={data} onDataPointClick={onDataPointClick} />;
+      return (
+        <div className={`h-full ${className}`}>
+          <ScatterChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        </div>
+      );
     
     default:
       // Fallback to EnhancedChart for any other chart types
       return (
-        <div className={`bg-white rounded-lg shadow-sm p-4 ${className}`}>
+        <div className={`bg-white rounded-lg shadow-sm p-4 h-full flex flex-col ${className}`}>
           {data.config?.title && (
-            <div className="mb-4">
+            <div className="mb-4 flex-shrink-0">
               <h3 className="text-lg font-semibold text-gray-900">{data.config.title}</h3>
               {data.config.description && (
                 <p className="text-sm text-gray-500 mt-1">{data.config.description}</p>
               )}
             </div>
           )}
-          <div className="relative h-[300px]">
+          <div className="relative flex-1 min-h-[300px]">
             <EnhancedChart 
               data={data.data}
               chartType={chartType}
               onDataPointClick={onDataPointClick}
-              height={300}
+              height="100%"
               xAxisTitle={data.config?.xAxisLabel}
               yAxisTitle={data.config?.yAxisLabel}
             />
