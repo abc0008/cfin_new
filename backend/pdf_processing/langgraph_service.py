@@ -1094,14 +1094,17 @@ IMPORTANT INSTRUCTIONS:
                 claude_file_id = doc.get('claude_file_id')
                 if claude_file_id:
                     try:
-                        # Create file block using correct Files API format
-                        # According to Anthropic's Files API, files are referenced directly
-                        file_block = {
-                            "type": "file",
-                            "file_id": claude_file_id
+                        # Create document block using correct Files API format
+                        # Files must be passed in a document content block, not a file tag
+                        document_block = {
+                            "type": "document",
+                            "source": {
+                                "type": "file",
+                                "file_id": claude_file_id
+                            }
                         }
                         
-                        user_content.append(file_block)
+                        user_content.append(document_block)
                         logger.info(f"✅ Added document {doc_id} using Files API file_id: {claude_file_id}")
                         processed_successfully = True
                         
@@ -1152,7 +1155,7 @@ IMPORTANT INSTRUCTIONS:
                         logger.warning(f"❌ Could not find any usable content for document {doc_id}")
             
             # If no documents were prepared, return an error message
-            if not any(item.get("type") in ["document", "file"] for item in user_content):
+            if not any(item.get("type") == "document" for item in user_content):
                 logger.warning("No documents were prepared for the Claude API")
                 return {
                     "content": "I couldn't process the document content. Please ensure the documents were properly uploaded and contain readable text.",
@@ -1187,7 +1190,7 @@ IMPORTANT INSTRUCTIONS:
             })
             
             # Log the API call
-            document_count = len([item for item in user_content if item.get('type') in ['document', 'file']])
+            document_count = len([item for item in user_content if item.get('type') == 'document'])
             logger.info(f"Calling Anthropic API with {len(anthropic_messages)} messages and {document_count} documents")
             
             # Use a model that supports citations
