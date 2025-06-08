@@ -2,6 +2,7 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 import re # Added for PlanPlanPlan.md item 1.2
+from importlib.resources import files # Added for this change
 
 from models.analysis import FinancialMetric
 from .base_strategy import AnalysisStrategy
@@ -34,11 +35,8 @@ def extract_between_tags(text: str, tag: str) -> str:
     )
     return (match.group(1) if match else '').strip()
 
-# Moved from analysis_service.py (Story #7)
-FINANCIAL_ANALYSIS_TEMPLATE_PROMPT = """
-You are an advanced AI system functioning as a Regional Bank Financial Analyst. Your primary role is to analyze internal financial documents, provide insights on financial trends or anomalies, and create visualizations to illustrate financial data.
-
-First, review the following financial documents and knowledge base:
+# FINANCIAL_ANALYSIS_TEMPLATE_PROMPT was moved to a separate .md file
+# backend/services/analysis_strategies/prebuilt_prompts/financial_template_prompt.md
 
 <financial_documents>
 {document_text}
@@ -124,19 +122,23 @@ Suggested Next Actions:
 3. [Third suggested deeper analysis of provided financials, phrased to directly trigger the next analysis]
 </response>
 
- Provide your response within <response> tags.
-"""
-
 class FinancialTemplateStrategy(AnalysisStrategy):
     """
     Strategy for financial analysis using a predefined template and multi-turn interaction.
     Encapsulates the logic previously handling the \'financial_template\' type directly.
     """
+    PROMPT_PATH = files('services.analysis_strategies').joinpath('prebuilt_prompts/financial_template_prompt.md') # Added for this change
+    FINANCIAL_ANALYSIS_TEMPLATE_PROMPT_FROM_FILE = PROMPT_PATH.read_text(encoding='utf-8') # Added for this change
 
     def __init__(self, claude_service: ClaudeService):
         super().__init__(claude_service)
         self.max_turns = 9
         self.planning_verified = False # Added for PlanPlanPlan.md item 1.2
+        # Ensure the prompt is loaded during initialization
+        if not FinancialTemplateStrategy.FINANCIAL_ANALYSIS_TEMPLATE_PROMPT_FROM_FILE:
+            logger.error("Financial template prompt could not be loaded.")
+            raise ValueError("Financial template prompt could not be loaded.")
+
 
     async def execute(
         self,
@@ -151,7 +153,7 @@ class FinancialTemplateStrategy(AnalysisStrategy):
         user_query_for_template = user_query or parameters.get("query", "Provide a comprehensive financial analysis.")
         knowledge_base_content = parameters.get("knowledge_base", "")
 
-        system_prompt = FINANCIAL_ANALYSIS_TEMPLATE_PROMPT.format(
+        system_prompt = FinancialTemplateStrategy.FINANCIAL_ANALYSIS_TEMPLATE_PROMPT_FROM_FILE.format(
             document_text=aggregated_text,
             KNOWLEDGE_BASE=knowledge_base_content,
             USER_QUERY=user_query_for_template
