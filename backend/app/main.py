@@ -51,10 +51,26 @@ app = FastAPI(
 )
 
 # Configure CORS
-allowed_origins = os.getenv(
-    "ALLOWED_ORIGINS", 
-    "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3003"
-).split(",")
+allowed_origins_env_str = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3003,http://127.0.0.1:49937"
+)
+# Ensure that if ALLOWED_ORIGINS is empty or not set, we still have a valid list to append to
+if not allowed_origins_env_str:
+    allowed_origins = []
+else:
+    allowed_origins = allowed_origins_env_str.split(",")
+
+# Add regex for 127.0.0.1 with any port to support dynamic ports from browser previews
+# This regex matches http://127.0.0.1: followed by one or more digits.
+preview_origin_regex = r"http://127\.0\.0\.1:\d+"
+if preview_origin_regex not in allowed_origins: # Avoid duplicates
+    allowed_origins.append(preview_origin_regex)
+
+# Also, ensure the specific preview origin provided by the user is included.
+user_preview_origin = "http://127.0.0.1:64142" # From user input
+if user_preview_origin not in allowed_origins:
+    allowed_origins.append(user_preview_origin)
 logger.info(f"CORS: Allowing origins: {allowed_origins}")
 
 # Add CORS middleware directly to the app

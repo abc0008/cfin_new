@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Message, Citation } from '@/types';
 import { conversationApi } from '@/lib/api/conversation';
 import { Loader2, Send, FileText } from 'lucide-react';
@@ -80,7 +80,8 @@ export function ChatInterface({
     }
   };
 
-  const renderMessage = (message: Message) => {
+  // Memoize the renderMessage function to prevent unnecessary re-renders
+  const renderMessage = useCallback((message: Message) => {
     // Special case for loading message
     if (message.role === 'system' && message.content === 'AI is thinking...') {
       return (
@@ -95,7 +96,7 @@ export function ChatInterface({
 
     return (
       <div 
-        key={message.id} 
+        key={`${message.id}-${message.role}`} 
         className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
       >
         <div 
@@ -114,15 +115,12 @@ export function ChatInterface({
         </div>
       </div>
     );
-  };
+  }, [handleCitationClick]);
 
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="py-1 px-2 border-b border-border bg-card">
         <h2 className="text-base font-avenir-pro-demi text-foreground">Claude Assistant</h2>
-        <p className="text-xs font-avenir-pro text-muted-foreground">
-          Ask questions about your financial documents
-        </p>
       </div>
 
       <div className="flex-1 overflow-y-auto py-1 px-2 space-y-4 bg-muted/20 text-xs">
@@ -155,7 +153,11 @@ export function ChatInterface({
             </div>
           </div>
         ) : (
-          messages.map((message) => renderMessage(message))
+          // Use memoized rendering for the message list to prevent duplicate rendering
+          useMemo(() => {
+            console.log('[ChatInterface] Rendering message list with', messages.length, 'messages');
+            return messages.map((message) => renderMessage(message));
+          }, [messages, renderMessage])
         )}
         {isLoading && (
           <div className="flex justify-start">

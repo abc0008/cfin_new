@@ -238,7 +238,7 @@ export const AnalysisBlock: React.FC<AnalysisBlockProps> = ({
             <BarChart2 className="h-4 w-4 mr-1 text-blue-600" />
             Visualization
           </h4>
-          <div className="h-64">
+          <div className="h-64 bg-white rounded-lg shadow-sm p-4 border border-gray-100">
             <EnhancedChart
               data={block.chartData}
               chartType={block.chartType as ChartType}

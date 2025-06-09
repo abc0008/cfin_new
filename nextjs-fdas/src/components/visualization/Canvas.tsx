@@ -203,7 +203,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
   }
 
   return (
-    <div role="main" className="w-full h-full rounded-lg bg-card shadow-sm flex flex-col">
+    <div role="main" className="w-full h-full bg-card shadow-sm flex flex-col">
       <div className="border-b border-border flex-shrink-0">
         <div role="tablist" className="flex space-x-4 px-4">
           <button
@@ -250,7 +250,16 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
 
       <div className="flex-1 p-4 overflow-y-auto">
         {currentTab === 'overview' ? (
-          <div className="space-y-6 h-full flex flex-col">
+          <div className="space-y-2 h-full flex flex-col">
+            {/* Textual Summary - Moved to top */}
+            {visualizationData.analysisText && (
+              <div className="p-4 bg-muted/30 rounded-lg shadow-sm border border-border">
+                <h4 className="text-md font-avenir-pro-demi text-foreground mb-2">Textual Summary</h4>
+                <p className="text-sm font-avenir-pro text-muted-foreground whitespace-pre-wrap">
+                  {visualizationData.analysisText}
+                </p>
+              </div>
+            )}
             <MetricGrid 
               metrics={visualizationData.metrics || []}
               title="Key Performance Indicators"
@@ -278,15 +287,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
               </div>
             )}
             
-            {/* Display Analysis Text if available */}
-            {visualizationData.analysisText && (
-              <div className="mt-6 p-4 bg-muted/30 rounded-lg shadow-sm border border-border flex-shrink-0">
-                <h4 className="text-md font-avenir-pro-demi text-foreground mb-2">Textual Summary</h4>
-                <p className="text-sm font-avenir-pro text-muted-foreground whitespace-pre-wrap">
-                  {visualizationData.analysisText}
-                </p>
-              </div>
-            )}
+            {/* Textual Summary - Moved to top of this section */}
           </div>
         ) : (
           <div

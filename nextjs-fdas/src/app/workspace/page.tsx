@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, BarChart2, Upload, FileUp, Zap, ChevronRight, FileSearch } from 'lucide-react'
 import { ChatInterface } from '../../components/chat/ChatInterface'
@@ -21,16 +21,44 @@ const PDFViewer = dynamic(
 
 export default function Workspace() {
   const [activeTab, setActiveTab] = useState<'document' | 'analysis'>('document')
-  const [messages, setMessages] = useState([]);
+  // Store messages as a normalized object with ID as key for better deduplication
+  const [messagesMap, setMessagesMap] = useState<Record<string, Message>>({});
+  // Derive the array form only when needed for rendering
+  const messages = useMemo(() => {
+    return Object.values(messagesMap).sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+  }, [messagesMap]);
+  
   const [selectedDocument, setSelectedDocument] = useState<ProcessedDocument | null>(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [analysisLoading, setAnalysisLoading] = useState<boolean>(false);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [showReflectionsDialog, setShowReflectionsDialog] = useState(false);
+  const processedAnalysisMessageIdsRef = useRef<Set<string>>(new Set());
+  const analysisRequestInFlightRef = useRef<Set<string>>(new Set());
+  
+  // Message ID generation with hash to ensure uniqueness
+  const generateMessageId = useCallback((role: string, content: string) => {
+    // Simple hash function to generate a consistent hash for the same content
+    const hashContent = (str: string) => {
+      let hash = 0;
+      for (let i = 0; i <str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+      }
+      return Math.abs(hash).toString(16);
+    };
+    
+    const contentHash = hashContent(content);
+    const timestamp = Date.now();
+    return `msg-${role}-${contentHash}-${timestamp}`;
+  }, []);
 
   // Initialize conversation session when component mounts
   useEffect(() => {
@@ -51,18 +79,19 @@ export default function Workspace() {
           }
         } catch (error) {
           console.error('Error initializing session:', error);
-          if (mounted) {
-            setMessages(prev => [...prev, {
-              id: `system-${Date.now()}`,
+          const errorId = `system-${Date.now()}`;
+          setMessagesMap(prev => ({
+            ...prev,
+            [errorId]: {
+              id: errorId,
+              sessionId: '',
               role: 'system',
               content: 'Error initializing chat session. Please refresh the page.',
               timestamp: new Date().toISOString(),
-              metadata: {
-                referencedDocuments: [],
-                referencedAnalyses: []
-              }
-            }]);
-          }
+              referencedDocuments: [],
+              referencedAnalyses: []
+            }
+          }));
         } finally {
           if (mounted) {
             setIsLoading(false);
@@ -76,7 +105,7 @@ export default function Workspace() {
     return () => {
       mounted = false;
     };
-  }, []); // Remove sessionId dependency to prevent multiple initializations
+  }, []);
 
   // Define handleAnalysisResult first, potentially wrap with useCallback if needed later
   const handleAnalysisResult = (
@@ -101,10 +130,12 @@ export default function Workspace() {
         ? "Analysis result ID is invalid."
         : "Received invalid analysis result structure from backend."
       );
-      setMessages(prev => {
-        const newSystemMessage: Message = {
-          id: `msg-${Date.now()}`,
-          sessionId: sessionId,
+      const errorId = `msg-${Date.now()}`;
+      setMessagesMap(prev => ({
+        ...prev,
+        [errorId]: {
+          id: errorId,
+          sessionId: sessionId || '',
           role: 'system',
           content: validation.success 
             ? `Error: Analysis result for "${selectedDocument?.metadata?.filename || documentId}" has an invalid ID.`
@@ -112,9 +143,8 @@ export default function Workspace() {
           timestamp: new Date().toISOString(),
           referencedDocuments: [selectedDocument?.metadata?.id || documentId],
           referencedAnalyses: [],
-        };
-        return [...prev, newSystemMessage];
-      });
+        }
+      }));
       return; 
     }
 
@@ -160,18 +190,19 @@ export default function Workspace() {
     if (isFailedAnalysis) {
       const failureInsight = typedResult.insights?.find(insight => typeof insight === 'string' && (insight.includes('Unable to perform financial analysis') || insight.includes('document does not contain structured financial data'))) || "detailed information was not found.";
       const analysisMessage = `I attempted to analyze the financial data in "${selectedDocument?.metadata?.filename || documentId}" but ${failureInsight.toLowerCase()}`;
-      setMessages(prev => {
-        const newSystemMessage: Message = {
-          id: `msg-${Date.now()}`,
-          sessionId: sessionId,
+      const messageId = `msg-${Date.now()}`;
+      setMessagesMap(prev => ({
+        ...prev,
+        [messageId]: {
+          id: messageId,
+          sessionId: sessionId || '',
           role: 'system',
           content: analysisMessage,
           timestamp: new Date().toISOString(),
           referencedDocuments: [selectedDocument?.metadata?.id || documentId],
           referencedAnalyses: [],
-        };
-        return [...prev, newSystemMessage];
-      });
+        }
+      }));
     } else {
       // SUCCESSFUL ANALYSIS: Use result.analysisText for an assistant message
       const currentAnalysisResult = typedResult;
@@ -188,34 +219,53 @@ export default function Workspace() {
 
       if (detailedAnalysisContent) {
         console.log("[handleAnalysisResult] Condition 'detailedAnalysisContent' is TRUE. Setting assistant message.");
-        const messageContent = `[FROM IF-BLOCK]: ${detailedAnalysisContent}`;
-        setMessages(prev => {
-          const newAssistantMessage: Message = {
-            id: `msg-${Date.now()}`,
-            sessionId: sessionId,
-            role: 'assistant',
-            content: messageContent,
-            timestamp: new Date().toISOString(),
-            referencedDocuments: [selectedDocument?.metadata?.id || documentId],
-            referencedAnalyses: [currentAnalysisResult.id],
-          };
-          return [...prev, newAssistantMessage];
-        });
+        console.log(`[handleAnalysisResult] Preparing to set message. Current Analysis ID: ${currentAnalysisResult.id}`);
+
+        // Idempotency check using ref
+        if (processedAnalysisMessageIdsRef.current.has(currentAnalysisResult.id)) {
+          console.log(`[handleAnalysisResult] Ref check: Message for analysis ID ${currentAnalysisResult.id} already processed. Skipping duplicate.`);
+          return; // Return from the if block, not the whole function unless appropriate
+        }
+
+        const messageContent = detailedAnalysisContent;
+        const messageId = generateMessageId('assistant', messageContent);
+        
+        // Double-check if this messageId already exists
+        if (messageId in messagesMap) {
+          console.log(`[handleAnalysisResult] Message ID ${messageId} already exists. Skipping duplicate.`);
+          return;
+        }
+        
+        const newAssistantMessage: Message = {
+          id: messageId,
+          sessionId: sessionId || '',
+          role: 'assistant',
+          content: messageContent,
+          timestamp: new Date().toISOString(),
+          referencedDocuments: [selectedDocument?.metadata?.id || documentId],
+          referencedAnalyses: [currentAnalysisResult.id],
+        };
+
+        setMessagesMap(prev => ({
+          ...prev,
+          [messageId]: newAssistantMessage
+        }));
       } else {
         console.log("[handleAnalysisResult] Condition 'detailedAnalysisContent' is FALSE. Setting fallback system message.");
         const fallbackMessage = `Financial analysis for "${selectedDocument?.metadata?.filename || documentId}" is complete. Key findings are available in the Analysis tab, though a textual summary (detailedAnalysisContent was '${detailedAnalysisContent}') was not explicitly provided in the chat.`;
-        setMessages(prev => {
-          const newSystemMessage: Message = {
-            id: `msg-${Date.now()}`,
-            sessionId: sessionId,
+        const messageId = `msg-${Date.now()}`;
+        setMessagesMap(prev => ({
+          ...prev,
+          [messageId]: {
+            id: messageId,
+            sessionId: sessionId || '',
             role: 'system',
             content: fallbackMessage,
             timestamp: new Date().toISOString(),
             referencedDocuments: [selectedDocument?.metadata?.id || documentId],
             referencedAnalyses: [currentAnalysisResult.id],
-          };
-          return [...prev, newSystemMessage];
-        });
+          }
+        }));
       }
     }
   };
@@ -223,16 +273,30 @@ export default function Workspace() {
   // Run financial analysis when a document is selected
   useEffect(() => {
     const runAnalysis = async () => {
-      if (!selectedDocument) return;
-      
+      if (!selectedDocument) {
+        // console.log('[useEffect runAnalysis] No selected document, returning.');
+        return;
+      }
+
+      const requestKey = `${selectedDocument.metadata.id}-basic_financial`;
+      // console.log(`[useEffect runAnalysis] Generated requestKey: ${requestKey}`);
+
+      if (analysisRequestInFlightRef.current.has(requestKey)) {
+        console.log(`[useEffect runAnalysis] Analysis request ${requestKey} already in flight. Skipping.`);
+        return;
+      }
+
+      // Check if analysis has already been successfully completed and results are stored
       if (analysisResults.some(result => result.documentIds.includes(selectedDocument.metadata.id) && result.analysisType === 'basic_financial')) {
-        console.log('Basic financial analysis already performed for this document');
+        console.log(`[useEffect runAnalysis] Basic financial analysis already performed and results exist for document ${selectedDocument.metadata.id}. Skipping.`);
         return;
       }
       
-      setAnalysisLoading(true);
-      
       try {
+        analysisRequestInFlightRef.current.add(requestKey);
+        setAnalysisLoading(true);
+        console.log(`[useEffect runAnalysis] Starting analysis for ${requestKey}. In-flight requests:`, Array.from(analysisRequestInFlightRef.current));
+
         const result = await analysisApi.runAnalysis(
           [selectedDocument.metadata.id],
           'basic_financial',
@@ -242,28 +306,36 @@ export default function Workspace() {
         handleAnalysisResult(result, selectedDocument.metadata.id, 'basic_financial');
         
       } catch (error) {
-        console.error('Error running initial analysis in useEffect:', error);
+        console.error(`[useEffect runAnalysis] Error running initial analysis for ${requestKey}:`, error);
         const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred during initial analysis.';
-        setMessages(prev => {
-          const newSystemMessage: Message = {
-            id: `msg-${Date.now()}`,
-            sessionId: sessionId,
+        // Ensure selectedDocument is still valid here if error occurs late
+        const docIdForError = selectedDocument ? selectedDocument.metadata.id : 'unknown_document';
+        const docFilenameForError = selectedDocument ? selectedDocument.metadata.filename : 'unknown_filename';
+
+        const errorId = `msg-error-${Date.now()}`;
+        setMessagesMap(prev => ({
+          ...prev,
+          [errorId]: {
+            id: errorId,
+            sessionId: sessionId || '',
             role: 'system',
-            content: `Error performing initial analysis: ${errorMsg}`,
+            content: `Error performing initial analysis for ${docFilenameForError}: ${errorMsg}`,
             timestamp: new Date().toISOString(),
-            referencedDocuments: [selectedDocument.metadata.id],
-            referencedAnalyses: [],
-          };
-          return [...prev, newSystemMessage];
-        });
+            referencedDocuments: [docIdForError],
+            referencedAnalyses: [], 
+          }
+        }));
         setAnalysisError(errorMsg);
       } finally {
+        analysisRequestInFlightRef.current.delete(requestKey);
         setAnalysisLoading(false);
+        console.log(`[useEffect runAnalysis] Finished analysis processing for ${requestKey}. In-flight requests:`, Array.from(analysisRequestInFlightRef.current));
       }
     };
 
+    // console.log('[useEffect runAnalysis] Effect triggered. selectedDocument:', selectedDocument ? selectedDocument.metadata.id : 'null');
     runAnalysis();
-  }, [selectedDocument]);
+  }, [selectedDocument, analysisResults, sessionId, handleAnalysisResult]); // Added analysisResults, sessionId, and handleAnalysisResult to dependencies
 
   const handleSendMessage = async (messageText: string) => {
     if (!sessionId) {
@@ -273,10 +345,18 @@ export default function Workspace() {
 
     setIsLoading(true);
 
-    // Immediately add user message to chat
+    // Create a stable ID for user message
+    const messageId = generateMessageId('user', messageText);
+    
+    // Check if a message with this ID already exists
+    if (messageId in messagesMap) {
+      console.log(`[handleSendMessage] User message with ID ${messageId} already exists. Skipping duplicate.`);
+      return;
+    }
+    
     const userMessage: Message = {
-      id: `msg-${Date.now()}`,
-      sessionId: sessionId,
+      id: messageId,
+      sessionId: sessionId || '',
       role: 'user',
       content: messageText,
       timestamp: new Date().toISOString(),
@@ -284,7 +364,11 @@ export default function Workspace() {
       referencedAnalyses: [],
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    // Update messages map to ensure no duplicates
+    setMessagesMap(prev => ({
+      ...prev,
+      [messageId]: userMessage
+    }));
 
     try {
       let response;
@@ -298,30 +382,46 @@ export default function Workspace() {
         response = await conversationApi.sendMessage(sessionId, messageText);
       }
 
-      // Add assistant response to chat
-      setMessages(prev => [...prev, {
-        id: `msg-${Date.now()}`,
-        sessionId: sessionId,
-        role: 'assistant',
-        content: response.response,
-        timestamp: new Date().toISOString(),
-        referencedDocuments: response.referenced_documents || [],
-        referencedAnalyses: response.referenced_analyses || [],
-        citationReferences: response.citation_references || [],
-        analysis_blocks: response.analysis_blocks || [],
-      }]);
-
+      // Generate stable ID for assistant response
+      const responseContent = response.response || '';
+      const messageId = generateMessageId('assistant', responseContent);
+      
+      // Check if a message with this ID already exists
+      if (messageId in messagesMap) {
+        console.log(`[handleSendMessage] Assistant response with ID ${messageId} already exists. Skipping duplicate.`);
+        return;
+      }
+      
+      // Add assistant response to chat map
+      setMessagesMap(prev => ({
+        ...prev,
+        [messageId]: {
+          id: messageId,
+          sessionId: sessionId || '',
+          role: 'assistant',
+          content: responseContent,
+          timestamp: new Date().toISOString(),
+          referencedDocuments: response.referenced_documents || [],
+          referencedAnalyses: response.referenced_analyses || [],
+          citationReferences: response.citation_references || [],
+          analysis_blocks: response.analysis_blocks || [],
+        }
+      }));
     } catch (error) {
       console.error('Error sending message:', error);
-      setMessages(prev => [...prev, {
-        id: `msg-${Date.now()}`,
-        sessionId: sessionId,
-        role: 'system',
-        content: 'Error sending message. Please try again.',
-        timestamp: new Date().toISOString(),
-        referencedDocuments: [],
-        referencedAnalyses: [],
-      }]);
+      const errorId = `msg-error-${Date.now()}`;
+      setMessagesMap(prev => ({
+        ...prev,
+        [errorId]: {
+          id: errorId,
+          sessionId: sessionId || '',
+          role: 'system',
+          content: 'Error sending message. Please try again.',
+          timestamp: new Date().toISOString(),
+          referencedDocuments: [],
+          referencedAnalyses: [],
+        }
+      }));
     } finally {
       setIsLoading(false);
     }
@@ -330,27 +430,35 @@ export default function Workspace() {
   const handleUploadSuccess = (document: ProcessedDocument) => {
     setSelectedDocument(document);
     setShowUploadForm(false);
-    setMessages(prev => [...prev, {
-      id: `msg-${Date.now()}`,
-      sessionId: sessionId,
-      role: 'system',
-      content: `Document "${document.metadata.filename}" uploaded successfully. Starting analysis...`,
-      timestamp: new Date().toISOString(),
-      referencedDocuments: [document.metadata.id],
-      referencedAnalyses: [],
-    }]);
+    const messageId = `msg-${Date.now()}`;
+    setMessagesMap(prev => ({
+      ...prev,
+      [messageId]: {
+        id: messageId,
+        sessionId: sessionId || '',
+        role: 'system',
+        content: `Document "${document.metadata.filename}" uploaded successfully. Starting analysis...`,
+        timestamp: new Date().toISOString(),
+        referencedDocuments: [document.metadata.id],
+        referencedAnalyses: [],
+      }
+    }));
   };
 
   const handleUploadError = (error: Error) => {
-    setMessages(prev => [...prev, {
-      id: `msg-${Date.now()}`,
-      sessionId: sessionId,
-      role: 'system',
-      content: `Upload failed: ${error.message}`,
-      timestamp: new Date().toISOString(),
-      referencedDocuments: [],
-      referencedAnalyses: [],
-    }]);
+    const errorId = `msg-${Date.now()}`;
+    setMessagesMap(prev => ({
+      ...prev,
+      [errorId]: {
+        id: errorId,
+        sessionId: sessionId || '',
+        role: 'system',
+        content: `Upload failed: ${error.message}`,
+        timestamp: new Date().toISOString(),
+        referencedDocuments: [],
+        referencedAnalyses: [],
+      }
+    }));
   };
 
   const handleCitationClick = (highlightId: string) => {
@@ -407,32 +515,35 @@ export default function Workspace() {
       const currentManualAnalysisResult = result as AnalysisResult; // Type assertion
       const detailedManualAnalysisContent = currentManualAnalysisResult.analysisText?.trim();
       if (detailedManualAnalysisContent) {
-        setMessages(prev => {
-          const newAssistantMessage: Message = {
-            id: `msg-${Date.now()}`,
-            sessionId: sessionId,
+        const messageId = generateMessageId('assistant', detailedManualAnalysisContent);
+        setMessagesMap(prev => ({
+          ...prev,
+          [messageId]: {
+            id: messageId,
+            sessionId: sessionId || '',
             role: 'assistant',
             content: detailedManualAnalysisContent,
             timestamp: new Date().toISOString(),
             referencedDocuments: [documentId],
             referencedAnalyses: [currentManualAnalysisResult.id],
-          };
-          return [...prev, newAssistantMessage];
-        });
+          }
+        }));
       } else {
         // Fallback system message if no analysisText
-        setMessages(prev => {
-          const newSystemMessage: Message = {
-            id: `msg-${Date.now()}`,
-            sessionId: sessionId,
+        const fallbackMessage = `I've completed the ${analysisType} analysis${userQuery ? ' for: "' + userQuery + '"' : ''}. You can see the results in the Analysis tab, though a textual summary (detailedAnalysisContent was '${detailedManualAnalysisContent}') was not explicitly provided in the chat.`;
+        const messageId = `msg-${Date.now()}`;
+        setMessagesMap(prev => ({
+          ...prev,
+          [messageId]: {
+            id: messageId,
+            sessionId: sessionId || '',
             role: 'system',
-            content: `I've completed the ${analysisType} analysis${userQuery ? ' for: "' + userQuery + '"' : ''}. You can see the results in the Analysis tab. A textual summary was not generated for direct chat display.`,
+            content: fallbackMessage,
             timestamp: new Date().toISOString(),
             referencedDocuments: [documentId],
             referencedAnalyses: [currentManualAnalysisResult.id],
-          };
-          return [...prev, newSystemMessage];
-        });
+          }
+        }));
       }
       
       // Switch to analysis tab to show results
@@ -443,18 +554,19 @@ export default function Workspace() {
       
       // Add error message to chat
       const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
-      setMessages(prev => {
-        const newSystemMessage: Message = {
-          id: `msg-${Date.now()}`,
-          sessionId: sessionId,
+      const errorId = `msg-${Date.now()}`;
+      setMessagesMap(prev => ({
+        ...prev,
+        [errorId]: {
+          id: errorId,
+          sessionId: sessionId || '',
           role: 'system',
-          content: `Error performing analysis: ${errorMsg}`,
+          content: errorMsg,
           timestamp: new Date().toISOString(),
           referencedDocuments: [documentId],
           referencedAnalyses: [],
-        };
-        return [...prev, newSystemMessage];
-      });
+        }
+      }));
     } finally {
       setAnalysisLoading(false);
     }
@@ -462,9 +574,9 @@ export default function Workspace() {
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-background to-muted/20">
-      <div className="container mx-auto px-4 py-0">
-        <h1 className="text-2xl font-avenir-pro-demi text-primary mb-2">Analysis Workspace</h1>
-        <p className="text-muted-foreground font-avenir-pro mb-6">
+      <div className="container mx-auto px-4 pt-2">
+        <h1 className="text-2xl font-avenir-pro-demi text-primary mb-0">Analysis Workspace</h1>
+        <p className="text-muted-foreground font-avenir-pro mb-[6px]">
           Upload financial documents, ask questions, and analyze the data through interactive visualizations.
         </p>
       </div>
@@ -526,12 +638,7 @@ export default function Workspace() {
                       onUploadError={handleUploadError}
                       sessionId={sessionId || undefined}
                     />
-                    <button
-                      onClick={() => setShowUploadForm(false)}
-                      className="mt-4 text-sm text-muted-foreground hover:text-foreground font-avenir-pro transition-colors"
-                    >
-                      Cancel
-                    </button>
+
                   </div>
                 ) : selectedDocument ? (
                   <div className="h-full flex-1">
