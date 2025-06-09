@@ -310,6 +310,15 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
                   </span>
                   <span>{Math.round(progress)}%</span>
                 </div>
+                <div className="flex justify-center mt-4">
+                  <button
+                    type="button"
+                    onClick={cancelUpload}
+                    className="bg-brand-lust hover:bg-brand-lust/90 text-white font-avenir-pro-demi py-1.5 px-4 rounded-md shadow-sm transition-all duration-200 flex items-center justify-center text-xs"
+                  >
+                    Cancel Upload
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="flex space-x-2">

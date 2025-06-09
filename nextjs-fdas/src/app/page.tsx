@@ -1,10 +1,50 @@
 import Link from 'next/link'
 import { BarChart3, FileUp, FileSearch, Zap, TrendingUp, Shield, Users, ArrowRight, CheckCircle, Star, Play, HelpCircle, Mail, ChevronDown, AlertTriangle, Award, Clock } from 'lucide-react'
-import { Modal, ModalBody, ModalContent, ModalTrigger } from '@/components/ui/animated-modal'
+import { Modal, ModalBody, ModalContent, ModalTrigger } from '@/components/ui/animated-modal';
+import { AppleCardsCarousel } from '@/components/ui/apple-cards-carousel';
+import TestimonialCard from '@/components/testimonials/TestimonialCard';
 import { Skeleton } from '@/components/ui/skeleton'
 import AnimatedBeamSection from '@/components/sections/AnimatedBeamSection'
 
 export default function Home() {
+  const testimonialsData = [
+    {
+      id: 1,
+      quote: "FDAS transformed our quarterly reporting process. What used to take days now takes hours.",
+      name: "Michael Rodriguez",
+      title: "CFO, TechCorp",
+      avatarImage: "/assets/TestimonialPortraits/man-7450033_1920.jpg",
+    },
+    {
+      id: 2,
+      quote: "The citation tracking feature is incredible. Every insight is instantly verifiable.",
+      name: "Sarah Brannon",
+      title: "Senior Analyst, TechCorp",
+      avatarImage: "/assets/TestimonialPortraits/woman-7450034_1920.jpg",
+    },
+    {
+      id: 3,
+      quote: "Finally, a tool that understands financial context. The AI responses are remarkably accurate.",
+      name: "David Lee",
+      title: "Investment Manager, Meridian Capital",
+      avatarImage: "/assets/TestimonialPortraits/engineer-4922428_1920.jpg",
+    },
+    {
+      id: 4, 
+      quote: "The intuitive interface and powerful AI have saved us countless hours.",
+      name: "Emily Zhang",
+      title: "Financial Controller, BlueHarbor Group",
+      avatarImage: "/assets/TestimonialPortraits/engineer-4940833_1920.jpg", 
+    },
+    {
+      id: 5, 
+      quote: "A game-changer for our financial reporting and analysis workflows.",
+      name: "Jace Miller",
+      title: "Head of Finance, Axiom Partners",
+      avatarImage: "/assets/TestimonialPortraits/fashion-4951644_1920.jpg", 
+    },
+  ];
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-background via-background to-brand-white-smoke">
       {/* Hero Section */}
@@ -349,82 +389,25 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Social Proof */}
-      <section className="py-20">
+      {/* Social Proof / Testimonials Section */}
+      <section className="py-20 bg-background">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-avenir-pro-demi text-foreground mb-4">
               Trusted by Financial Professionals
             </h2>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Testimonial 1 */}
-            <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-card to-card/50 border-2 border-brand-pigeon shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <div className="relative">
-                <div className="flex items-center mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="h-4 w-4 text-brand-lust fill-current" />
-                  ))}
-                </div>
-                <p className="text-brand-mt-rushmore font-avenir-pro mb-4">
-                  "FDAS transformed our quarterly reporting process. What used to take days now takes hours."
-                </p>
-                <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/80 mr-3"></div>
-                  <div>
-                    <div className="font-avenir-pro-demi text-foreground">Sarah Chen</div>
-                    <div className="text-sm text-brand-mt-rushmore font-avenir-pro">CFO, TechCorp</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Testimonial 2 */}
-            <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-card to-card/50 border-2 border-brand-pigeon shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-secondary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <div className="relative">
-                <div className="flex items-center mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="h-4 w-4 text-brand-lust fill-current" />
-                  ))}
-                </div>
-                <p className="text-brand-mt-rushmore font-avenir-pro mb-4">
-                  "The citation tracking feature is incredible. Every insight is instantly verifiable."
-                </p>
-                <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-secondary to-secondary/80 mr-3"></div>
-                  <div>
-                    <div className="font-avenir-pro-demi text-foreground">Michael Rodriguez</div>
-                    <div className="text-sm text-brand-mt-rushmore font-avenir-pro">Senior Analyst</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Testimonial 3 */}
-            <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-card to-card/50 border-2 border-brand-pigeon shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <div className="relative">
-            <div className="flex items-center mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="h-4 w-4 text-brand-lust fill-current" />
-                  ))}
-                </div>
-                <p className="text-brand-mt-rushmore font-avenir-pro mb-4">
-                  "Finally, a tool that understands financial context. The AI responses are remarkably accurate."
-                </p>
-                <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent to-accent/80 mr-3"></div>
-                  <div>
-                    <div className="font-avenir-pro-demi text-foreground">Emily Zhang</div>
-                    <div className="text-sm text-brand-mt-rushmore font-avenir-pro">Investment Manager</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <AppleCardsCarousel 
+            items={testimonialsData.map(testimonial => (
+              <TestimonialCard
+                key={testimonial.id}
+                quote={testimonial.quote}
+                name={testimonial.name}
+                title={testimonial.title}
+                avatarImage={testimonial.avatarImage}
+              />
+            ))}
+          />
         </div>
       </section>
 

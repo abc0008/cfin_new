@@ -4,8 +4,16 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { cn } from "@/lib/utils";
 
 interface AnalysisControlsProps {
   onRunAnalysis: (
@@ -16,6 +24,14 @@ interface AnalysisControlsProps {
   isLoading: boolean;
 }
 
+const analysisTypes = [
+  { value: 'basic_financial', label: 'Basic Financial Analysis' },
+  { value: 'comprehensive', label: 'Comprehensive Analysis' },
+  { value: 'ratio_analysis', label: 'Financial Ratios' },
+  { value: 'trend_analysis', label: 'Trend Analysis' },
+  { value: 'benchmarking', label: 'Industry Benchmarking' },
+];
+
 export const AnalysisControls: React.FC<AnalysisControlsProps> = ({ 
   onRunAnalysis,
   isLoading 
@@ -24,7 +40,9 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(false);
   const [knowledgeBase, setKnowledgeBase] = useState<string>('');
   const [userQuery, setUserQuery] = useState<string>('');
-  
+
+  const advancedOptionsFilled = knowledgeBase.trim() !== '' || userQuery.trim() !== '';
+
   const handleRunAnalysis = () => {
     onRunAnalysis(
       analysisType,
@@ -34,92 +52,93 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
   };
   
   return (
-    <div className="w-full p-4 border border-border rounded-lg bg-card shadow-sm">
+    <div className="w-full p-4 border border-border bg-card shadow-sm">
       <div className="flex flex-col space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-lg font-avenir-pro-demi text-foreground">Analysis Controls</h2>
-          
-          <Button
-            onClick={handleRunAnalysis}
-            disabled={isLoading}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            {isLoading ? 'Running Analysis...' : 'Run Analysis'}
-          </Button>
-        </div>
-        
-        <div className="flex flex-wrap gap-4">
-          <div className="w-full">
-            <label className="block text-sm font-avenir-pro-demi text-foreground mb-1">
-              Analysis Type
+        <div className="flex items-center gap-4">
+          <div className="flex-shrink min-w-0 pb-2 border-b border-border">
+            <h2 className="text-xl font-avenir-pro-demi text-foreground">Analysis Controls</h2>
+          </div>
+
+          <div className="flex-1 min-w-[200px] flex items-center gap-2">
+            <label className="text-xs font-avenir-pro-demi text-foreground flex-shrink-0">
+              Analysis Type:
             </label>
-            <select
-              className="w-full p-2 border border-border rounded-md bg-background text-foreground font-avenir-pro focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
-              value={analysisType}
-              onChange={(e) => setAnalysisType(e.target.value)}
+            <Select value={analysisType} onValueChange={setAnalysisType} disabled={isLoading}>
+              <SelectTrigger className="flex-1 h-8 py-1 px-3 border border-border rounded-md bg-background text-foreground font-avenir-pro focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring min-w-0 text-sm">
+                <SelectValue placeholder="Select analysis type" />
+              </SelectTrigger>
+              <SelectContent className="font-avenir-pro bg-background">
+                {analysisTypes.map((type) => (
+                  <SelectItem key={type.value} value={type.value} className="text-sm">
+                    {type.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Popover open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={cn(
+                  "h-8 px-3 py-1 ml-2 flex-shrink-0 flex items-center font-avenir-pro text-xs",
+                  advancedOptionsFilled && "bg-brand-caribbean-blue text-primary-foreground hover:bg-brand-caribbean-blue/90"
+                )}
+              >
+                <Settings className="h-3.5 w-3.5 mr-1.5" />
+                <span>Advanced Options</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[500px] p-4 border border-border bg-card shadow-md rounded-md mt-2" align="center" sideOffset={10}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-avenir-pro-demi text-foreground mb-1">
+                    Knowledge Base (Optional)
+                  </label>
+                  <Textarea
+                    placeholder="Enter custom knowledge base information..."
+                    value={knowledgeBase}
+                    onChange={(e) => setKnowledgeBase(e.target.value)}
+                    disabled={isLoading}
+                    className="min-h-[100px] font-avenir-pro"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1 font-avenir-pro">
+                    Provide domain-specific knowledge to enhance the analysis.
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-avenir-pro-demi text-foreground mb-1">
+                    Custom Query (Optional)
+                  </label>
+                  <Textarea
+                    placeholder="Enter a specific query for the document..."
+                    value={userQuery}
+                    onChange={(e) => setUserQuery(e.target.value)}
+                    disabled={isLoading}
+                    className="min-h-[100px] font-avenir-pro"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1 font-avenir-pro">
+                    Specify a custom question to analyze in the document.
+                  </p>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <div className="flex-shrink-0">
+            <Button
+              onClick={handleRunAnalysis}
               disabled={isLoading}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
-              <option value="basic_financial">Basic Financial Analysis</option>
-              <option value="comprehensive">Comprehensive Analysis</option>
-              <option value="ratio_analysis">Financial Ratios</option>
-              <option value="trend_analysis">Trend Analysis</option>
-              <option value="benchmarking">Industry Benchmarking</option>
-            </select>
+              {isLoading ? 'Running Analysis...' : 'Run Analysis'}
+            </Button>
           </div>
         </div>
-        
-        <Collapsible 
-          open={isAdvancedOpen} 
-          onOpenChange={setIsAdvancedOpen}
-          className="border border-border rounded-md p-2"
-        >
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" className="w-full flex justify-between items-center font-avenir-pro hover:bg-muted">
-              <div className="flex items-center">
-                <Settings className="h-4 w-4 mr-2" />
-                <span>Advanced Options</span>
-              </div>
-              {isAdvancedOpen ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-2 space-y-4">
-            <div>
-              <label className="block text-sm font-avenir-pro-demi text-foreground mb-1">
-                Knowledge Base (Optional)
-              </label>
-              <Textarea
-                placeholder="Enter custom knowledge base information..."
-                value={knowledgeBase}
-                onChange={(e) => setKnowledgeBase(e.target.value)}
-                disabled={isLoading}
-                className="min-h-[100px] font-avenir-pro"
-              />
-              <p className="text-xs text-muted-foreground mt-1 font-avenir-pro">
-                Provide domain-specific knowledge to enhance the analysis.
-              </p>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-avenir-pro-demi text-foreground mb-1">
-                Custom Query (Optional)
-              </label>
-              <Textarea
-                placeholder="Enter a specific query for the document..."
-                value={userQuery}
-                onChange={(e) => setUserQuery(e.target.value)}
-                disabled={isLoading}
-                className="min-h-[100px] font-avenir-pro"
-              />
-              <p className="text-xs text-muted-foreground mt-1 font-avenir-pro">
-                Specify a custom question to analyze in the document.
-              </p>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+
       </div>
     </div>
   );

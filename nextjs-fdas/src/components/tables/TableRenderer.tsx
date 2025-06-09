@@ -146,8 +146,8 @@ export default function TableRenderer({
                 <th
                   key={`col-${colIndex}`}
                   scope="col"
-                  className={`px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                    column.align ? `text-${column.align}` : 'text-left'
+                  className={`px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider ${
+                    column.align ? `text-${column.align}` : 'text-right'
                   }`}
                   style={{ width: column.width ? `${column.width}px` : 'auto' }}
                 >
@@ -176,7 +176,7 @@ export default function TableRenderer({
                     <td
                       key={`cell-${rowIndex}-${colIndex}`}
                       className={`px-3 py-4 whitespace-nowrap text-sm text-gray-500 ${
-                        column.align ? `text-${column.align}` : ''
+                        column.align ? `text-${column.align}` : 'text-right'
                       }`}
                     >
                       {citation && onCellClick ? (
