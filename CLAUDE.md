@@ -171,6 +171,8 @@ The backend implements a tool-based system for Claude interactions:
 - Tool definitions in `models/tools.py`
 - Tool processing logic in `utils/tool_processing.py`
 - Supports: charts, tables, metrics, financial calculations
+- **Critical**: Chart tools require `xAxisKey` in config and transform data to `{x, y}` format
+- Multi-series charts automatically detected and processed differently than single-series
 
 ## Testing Strategy
 
@@ -208,6 +210,9 @@ npm run test:e2e
 3. **Error Handling**: All API endpoints return standardized error responses
 4. **Logging**: Use `secure_logging` utility to avoid exposing sensitive data
 5. **Database Migrations**: Always test migrations on a copy before applying to production
+6. **Schema Alignment**: All Pydantic models use `ConfigDict(alias_generator=to_camel, populate_by_name=True)` for consistent camelCase API responses
+7. **Visualization Data**: Use `List[Dict[str, Any]]` for visualization fields (`monetary_values`, `percentages`) - not dictionaries
+8. **Tool Processing**: Charts require `xAxisKey` in config; data is automatically transformed to `{x, y}` format for frontend consumption
 
 ## Common Issues & Solutions
 
@@ -215,6 +220,9 @@ npm run test:e2e
 2. **Claude API Errors**: Check API key and rate limits
 3. **Database Connection**: Verify `DATABASE_URL` is set correctly
 4. **File Upload Issues**: Check `MAX_FILE_SIZE` setting (default: 50MB)
+5. **Pydantic Validation Errors**: Check that `model_dump(by_alias=True)` is used for API responses to ensure camelCase output
+6. **Chart Data Errors**: Missing `xAxisKey` in chart config will cause validation failures; all chart data needs x/y structure
+7. **Dict vs List Type Errors**: Visualization helpers return lists, not dicts - update models accordingly
 
 ## Deployment Considerations
 
