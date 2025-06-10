@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any, Literal
 
 # Utility for camelCase aliasing
@@ -20,6 +20,4 @@ class RetryExtractionRequest(BaseModel):
         description="Additional options for extraction"
     )
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True) 

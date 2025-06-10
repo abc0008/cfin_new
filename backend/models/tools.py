@@ -1,5 +1,5 @@
 from typing import Dict, List, Optional, Any, Literal, Union, Callable
-from pydantic import BaseModel, Field, RootModel
+from pydantic import BaseModel, Field, RootModel, ConfigDict
 import logging
 from utils import tool_processing
 
@@ -19,9 +19,7 @@ class ToolSchema(BaseModel):
     cache_control: Optional[Dict[str, str]] = Field(default=None, alias="cacheControl", description="Optional cache control settings")
     processor: Optional[Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]] = Field(default=None, exclude=True)
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 # --- New Tool Registration Logic (PlanPlanPlan.md item 2) ---
 ALL_TOOLS_SCHEMAS: list[ToolSchema] = []
@@ -53,9 +51,7 @@ class ChartMetricConfig(BaseModel):
     formatter: Optional[str] = None
     precision: Optional[int] = None
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class ChartConfig(BaseModel):
     title: str
@@ -72,9 +68,7 @@ class ChartConfig(BaseModel):
     footer: Optional[str] = None
     total_label: Optional[str] = Field(default=None, alias="totalLabel")
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class ChartDataItem(RootModel):
     root: Dict[str, Union[str, float, int, None]]
@@ -85,18 +79,14 @@ class ChartGenerationInputSchema(BaseModel):
     data: List[Dict[str, Any]]
     chart_config: Dict[str, ChartMetricConfig] = Field(..., alias="chartConfig")
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class ChartGenerationTool(ToolSchema):
     name: str = "generate_graph_data"
     description: str = """Use this tool to generate structured JSON data for financial charts and graphs (bar, line, pie, area, scatter).\nSpecify the chartType, provide general config (title, axis labels), the data array, and chartConfig for each series/metric.\nThe 'data' array objects must contain a key matching 'config.xAxisKey' and keys matching the keys used in 'chartConfig'.\nFor pie charts, 'data' objects typically have 'name' and 'value' keys."""
     input_schema: Dict[str, Any] = ChartGenerationInputSchema.model_json_schema()
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 register_tool(ChartGenerationTool()) # Register after definition
 
@@ -110,9 +100,7 @@ class TableColumnConfig(BaseModel):
     width: Optional[int] = None
     align: Optional[Literal["left", "center", "right"]] = "left"
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class TableConfig(BaseModel):
     title: str
@@ -124,27 +112,21 @@ class TableConfig(BaseModel):
     pagination: Optional[bool] = True
     page_size: Optional[int] = Field(default=10, alias="pageSize")
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class TableGenerationInputSchema(BaseModel):
     table_type: Literal["simple", "matrix", "comparison", "detailed"] = Field(default="simple", alias="tableType")
     config: TableConfig
     data: List[Dict[str, Any]]
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class TableGenerationTool(ToolSchema):
     name: str = "generate_table_data"
     description: str = """Use this tool to generate structured JSON data for creating financial data tables.\nSpecify the tableType (e.g., 'comparison', 'detailed'), provide config (title, column definitions), and the data array.\nThe 'data' objects' keys must match the 'key' values defined in 'config.columns'.\nUse appropriate 'format' values in column definitions (number, currency, percentage, text, date)."""
     input_schema: Dict[str, Any] = TableGenerationInputSchema.model_json_schema()
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 register_tool(TableGenerationTool()) # Register after definition
 

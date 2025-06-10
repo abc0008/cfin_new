@@ -50,7 +50,12 @@ from enum import Enum
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import uuid
-from pydantic import BaseModel, Field, UUID4
+from pydantic import BaseModel, Field, UUID4, ConfigDict
+
+# Utility for camelCase aliasing
+def to_camel(string: str) -> str:
+    parts = string.split('_')
+    return parts[0] + ''.join(word.capitalize() for word in parts[1:]) if len(parts) > 1 else string
 
 
 class DocumentContentType(str, Enum):
@@ -72,36 +77,44 @@ class Citation(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     page: int
     text: str
-    bounding_box: Optional[Dict[str, float]] = None
+    bounding_box: Optional[Dict[str, float]] = Field(default=None, alias="boundingBox")
     section: Optional[str] = None
+    
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
 class DocumentMetadata(BaseModel):
     id: UUID4 = Field(default_factory=uuid.uuid4)
     filename: str
-    upload_timestamp: datetime = Field(default_factory=datetime.now)
-    file_size: int
-    mime_type: str
-    user_id: str
-    citation_links: List[str] = Field(default_factory=list)
+    upload_timestamp: datetime = Field(default_factory=datetime.now, alias="uploadTimestamp")
+    file_size: int = Field(alias="fileSize")
+    mime_type: str = Field(alias="mimeType") 
+    user_id: str = Field(alias="userId")
+    citation_links: List[str] = Field(default_factory=list, alias="citationLinks")
+    
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
 class ProcessedDocument(BaseModel):
     metadata: DocumentMetadata
-    content_type: DocumentContentType = DocumentContentType.OTHER
-    extraction_timestamp: datetime = Field(default_factory=datetime.now)
+    content_type: DocumentContentType = Field(default=DocumentContentType.OTHER, alias="contentType")
+    extraction_timestamp: datetime = Field(default_factory=datetime.now, alias="extractionTimestamp")
     periods: List[str] = Field(default_factory=list)
-    extracted_data: Dict[str, Any] = Field(default_factory=dict)
+    extracted_data: Dict[str, Any] = Field(default_factory=dict, alias="extractedData")
     citations: List[Citation] = Field(default_factory=list)
-    confidence_score: float = 0.0
-    processing_status: ProcessingStatus = ProcessingStatus.PENDING
-    error_message: Optional[str] = None
+    confidence_score: float = Field(default=0.0, alias="confidenceScore")
+    processing_status: ProcessingStatus = Field(default=ProcessingStatus.PENDING, alias="processingStatus")
+    error_message: Optional[str] = Field(default=None, alias="errorMessage")
+    
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
 class DocumentUploadResponse(BaseModel):
-    document_id: UUID4
+    document_id: UUID4 = Field(alias="documentId")
     filename: str
     status: ProcessingStatus
     message: str
-    contentType: str
-    fileSize: int
+    content_type: str = Field(alias="contentType")
+    file_size: int = Field(alias="fileSize")
+    
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)

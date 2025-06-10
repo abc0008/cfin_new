@@ -55,8 +55,7 @@ from pdf_processing.financial_agent import FinancialAnalysisAgent
 from models.database_models import AnalysisResult, Document
 from utils.visualization_helpers import (
     generate_monetary_values_data,
-    generate_percentage_data,
-    generate_keyword_frequency_data
+    generate_percentage_data
 )
 
 from .analysis_strategies import strategy_map # Added for Story #1
@@ -64,9 +63,7 @@ from utils.exceptions import ToolSchemaValidationError # Corrected import
 
 logger = logging.getLogger(__name__)
 
-# Added for PlanPlanPlan.md item 3
-# TODO: Make this environment-driven as per plan
-KW_FREQ_ENABLED = False 
+# Keyword frequency feature removed - was old mock implementation 
 
 # BASIC_FINANCIAL_SYSTEM_PROMPT was moved to backend/services/analysis_strategies/prebuilt_prompts/basic_financial_prompt.md
 # and is now loaded by BasicFinancialStrategy
@@ -296,16 +293,10 @@ class AnalysisService:
                         viz['percentages']    = generate_percentage_data(metrics_data, result_data.get('insights', [])) # insights added based on deep dive
                     else:
                         logger.warning("Metrics data not found or not in expected format for derived visuals.")
-                        viz['monetary_values'] = {}
-                        viz['percentages']    = {}
+                        viz['monetary_values'] = []
+                        viz['percentages']    = []
 
-                    if KW_FREQ_ENABLED and aggregated_text:
-                        logger.info("Generating keyword frequency data.")
-                        viz['keyword_frequency'] = generate_keyword_frequency_data(aggregated_text)
-                    elif KW_FREQ_ENABLED:
-                        logger.warning("KW_FREQ_ENABLED is true, but aggregated_text is empty.")
-                        viz['keyword_frequency'] = {}
-                    # If KW_FREQ_ENABLED is False, keywordFrequency will not be added, which is fine.
+                    # Keyword frequency was an old mock implementation - removed
 
                 except ToolSchemaValidationError as tsve: # Story #17 - Specific error for tool schema issues
                     logger.error(f"Tool schema validation error during strategy execution for analysis {analysis_id}: {tsve}", exc_info=True)

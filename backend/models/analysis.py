@@ -82,9 +82,8 @@ class VisualizationDataResponse(BaseModel):
     charts: List[ChartData] = Field(default_factory=list)
     tables: List[TableData] = Field(default_factory=list)
     # Using snake_case for Python attributes, will be aliased to camelCase
-    monetary_values: Optional[Dict[str, Any]] = Field(default=None, alias="monetaryValues")
-    percentages: Optional[Dict[str, Any]] = None
-    keyword_frequency: Optional[Dict[str, Any]] = Field(default=None, alias="keywordFrequency")
+    monetary_values: Optional[List[Dict[str, Any]]] = Field(default=None, alias="monetaryValues")
+    percentages: Optional[List[Dict[str, Any]]] = None
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 

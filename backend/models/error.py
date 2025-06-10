@@ -2,7 +2,7 @@
 Standard error response models for API endpoints.
 """
 from typing import List, Dict, Any, Optional, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 # Utility for camelCase aliasing
 def to_camel(string: str) -> str:
@@ -18,9 +18,7 @@ class ValidationErrorDetail(BaseModel):
     msg: str = Field(..., description="Error message")
     type: str = Field(..., description="Error type")
 
-    class Config:
-        alias_generator = to_camel
-        populate_by_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class ErrorResponse(BaseModel):
     """Standard error response model for all API endpoints."""
@@ -35,16 +33,17 @@ class ErrorResponse(BaseModel):
         description="Optional error type for categorization (not_found, validation_error, etc.)"
     )
     
-    class Config:
-        alias_generator = to_camel
-        populate_by_name = True
-        schema_extra = {
+    model_config = ConfigDict(
+        alias_generator=to_camel, 
+        populate_by_name=True,
+        json_schema_extra={
             "example": {
                 "statusCode": 404,
                 "detail": "Resource not found",
                 "errorType": "not_found"
             }
         }
+    )
 
 
 def create_error_response(

@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import List, Optional, Union, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 # Utility for camelCase aliasing
 def to_camel(string: str) -> str:
@@ -19,9 +19,7 @@ class CitationBase(BaseModel):
     document_index: int = Field(..., alias="documentIndex")
     document_title: str = Field(..., alias="documentTitle")
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class CharLocationCitation(CitationBase):
     """Citation for plain text documents."""
@@ -29,9 +27,7 @@ class CharLocationCitation(CitationBase):
     start_char_index: int = Field(..., alias="startCharIndex")
     end_char_index: int = Field(..., alias="endCharIndex")
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class PageLocationCitation(CitationBase):
     """Citation for PDF documents."""
@@ -39,9 +35,7 @@ class PageLocationCitation(CitationBase):
     start_page_number: int = Field(..., alias="startPageNumber")
     end_page_number: int = Field(..., alias="endPageNumber")
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class ContentBlockLocationCitation(CitationBase):
     """Citation for custom content documents."""
@@ -49,9 +43,7 @@ class ContentBlockLocationCitation(CitationBase):
     start_block_index: int = Field(..., alias="startBlockIndex")
     end_block_index: int = Field(..., alias="endBlockIndex")
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 # Generic Citation type that could be any of the specific citation types
 Citation = Union[CharLocationCitation, PageLocationCitation, ContentBlockLocationCitation]
@@ -62,14 +54,10 @@ class ContentBlock(BaseModel):
     text: str
     citations: Optional[List[Citation]] = None
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class AnthropicMessage(BaseModel):
     """Model for a message in Claude's response."""
     content: List[ContentBlock]
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True) 

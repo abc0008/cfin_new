@@ -14,9 +14,7 @@ class MetricConfig(BaseModel):
     formatter: str = ""  # Changed from Optional[str] = None
     precision: int = 2  # Changed from Optional[int] = None
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class ChartConfig(BaseModel):
     """Configuration for a chart."""
@@ -36,27 +34,21 @@ class ChartConfig(BaseModel):
     width: Optional[int] = None  # Added for frontend sizing
     stack: Optional[bool] = False  # Added for frontend stacked charts
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class ChartDataItem(BaseModel):
     """A single data point for a chart."""
     x_value: Union[str, int, float] = Field(alias="x")
     y_value: Union[int, float] = Field(alias="y")
 
-    class Config:
-        alias_generator = to_camel
-        populate_by_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class PydanticMultiSeriesChartDataItem(BaseModel):
     """Represents a single series in a multi-series chart."""
     name: str
     data: List[ChartDataItem]
 
-    class Config:
-        alias_generator = to_camel
-        populate_by_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class ChartData(BaseModel):
     """Data structure for a chart, including type, config, data points, and chart-specific config."""
@@ -82,9 +74,7 @@ class TableColumn(BaseModel):
     align: Optional[Literal["left", "center", "right"]] = "left"  # Added for frontend text alignment
     formatter: Optional[str] = None  # Added for frontend custom formatting
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class TableConfig(BaseModel):
     """Configuration for a table."""
@@ -100,9 +90,7 @@ class TableConfig(BaseModel):
     height: Optional[int] = None  # Added for frontend sizing
     width: Optional[int] = None  # Added for frontend sizing
 
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class TableData(BaseModel):
     """Model for table data."""
