@@ -18,6 +18,13 @@
                 "AZURE_OPENAI_API_KEY": "AZURE_OPENAI_API_KEY_HERE",
                 "OLLAMA_API_KEY": "OLLAMA_API_KEY_HERE"
             }
+        },
+        "puppeteer": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-puppeteer"
+            ]
         }
     }
 }

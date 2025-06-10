@@ -1,0 +1,327 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset0 Menlo-Regular;\f2\fnil\fcharset0 Menlo-Bold;
+}
+{\colortbl;\red255\green255\blue255;\red255\green255\blue254;\red0\green0\blue0;\red130\green53\blue188;
+\red83\green133\blue132;\red143\green16\blue118;\red153\green115\blue4;\red16\green121\blue2;}
+{\*\expandedcolortbl;;\cssrgb\c100000\c100000\c99608;\cssrgb\c0\c0\c0;\cssrgb\c58824\c31373\c78431;
+\cssrgb\c39216\c58824\c58824;\cssrgb\c63529\c15686\c53725;\cssrgb\c66667\c52157\c0;\cssrgb\c0\c53333\c0;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 Backend prior\
+\
+\pard\pardeftab720\partightenfactor0
+
+\f1 \cf0 \cb2 \expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec3 ---\cb1 \
+\cb2 config:\cb1 \
+\cb2   theme: redux\cb1 \
+\cb2 ---\cb1 \
+\pard\pardeftab720\partightenfactor0
+
+\f2\b \cf4 \cb2 \strokec4 graph
+\f1\b0 \cf0 \strokec3  \cf5 \strokec5 TD\cf0 \cb1 \strokec3 \
+\pard\pardeftab720\partightenfactor0
+\cf0 \cb2     \cf6 \strokec6 UserRequest\cf7 \strokec7 ["User HTTP Request"]\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 AppMain\cf7 \strokec7 ["app.main.py: FastAPI App Setup"]\cf0 \cb1 \strokec3 \
+\cb2     
+\f2\b \cf4 \strokec4 subgraph
+\f1\b0 \cf0 \strokec3  \cf7 \strokec7 "FastAPI Core & Setup"\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 direction\cf0 \strokec3  \cf5 \strokec5 LR\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 AppMain\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Handles Errors, Standardizes Responses" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 ErrorHandling\cf7 \strokec7 ["utils.error_handling.py & utils.response.py"]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 AppMain\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "On Startup, Initializes DB Schema" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 InitDB\cf7 \strokec7 ["utils.init_db.py"]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 InitDB\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Defines Schema via" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 DBModels\cf7 \strokec7 ["models.database_models.py (SQLAlchemy)"]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 InitDB\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Uses DB Config from" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 UtilsDatabase\cf7 \strokec7 ["utils.database.py"]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 AppMain\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Routes Requests to" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 APIRouters\cf7 \strokec7 ["API Routers (app.routes.*)"]\cf0 \cb1 \strokec3 \
+\cb2     
+\f2\b \cf4 \strokec4 end
+\f1\b0 \cf0 \cb1 \strokec3 \
+\cb2     
+\f2\b \cf4 \strokec4 subgraph
+\f1\b0 \cf0 \strokec3  \cf7 \strokec7 "API Routes & Pydantic Models (Data Validation & Structuring)"\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 direction\cf0 \strokec3  \cf5 \strokec5 LR\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 APIRouters\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 DocumentRouter\cf7 \strokec7 ["document.py: Handles /documents endpoints (upload, get, etc.)"]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 APIRouters\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 ConversationRouter\cf7 \strokec7 ["conversation.py: Handles /conversation endpoints (create, message, history)"]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 APIRouters\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 AnalysisRouter\cf7 \strokec7 ["analysis.py: Handles /analysis endpoints (run, get results)"]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 PydanticModels\cf7 \strokec7 ["Pydantic Models (models/* except database_models.py)<br/>Defines API request/response shapes, internal data structures, AI tool schemas"]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 PydanticModels\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 DocumentRouter\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 PydanticModels\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 ConversationRouter\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 PydanticModels\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 AnalysisRouter\cf0 \cb1 \strokec3 \
+\cb2     
+\f2\b \cf4 \strokec4 end
+\f1\b0 \cf0 \cb1 \strokec3 \
+\cb2     \cf6 \strokec6 DocumentRouter\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Uses Dependency" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 DocServiceDep\cf7 \strokec7 ["utils.dependencies.py: get_document_service()"]\cf0 \cb1 \strokec3 \
+\cb2     \cf6 \strokec6 DocServiceDep\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 PDFDocService\cf7 \strokec7 ["pdf_processing.document_service.py: DocumentService<br/>Orchestrates document upload, storage. Queues PDF for AI processing."]\cf0 \cb1 \strokec3 \
+\cb2     \cf6 \strokec6 ConversationRouter\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Uses Dependency" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 ConvoServiceDep\cf7 \strokec7 ["utils.dependencies.py: get_conversation_service()"]\cf0 \cb1 \strokec3 \
+\cb2     \cf6 \strokec6 ConvoServiceDep\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 ConvoService\cf7 \strokec7 ["services.conversation_service.py: ConversationService<br/>Manages conversation logic, message history, and AI response generation for chat."]\cf0 \cb1 \strokec3 \
+\cb2     \cf6 \strokec6 AnalysisRouter\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Uses Dependency" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 AnalysisServiceDep\cf7 \strokec7 ["utils.dependencies.py: get_analysis_service()"]\cf0 \cb1 \strokec3 \
+\cb2     \cf6 \strokec6 AnalysisServiceDep\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 AnalysisService\cf7 \strokec7 ["services.analysis_service.py: AnalysisService<br/>Runs financial analyses, leveraging AI tools for structured data and visualizations."]\cf0 \cb1 \strokec3 \
+\cb2     
+\f2\b \cf4 \strokec4 subgraph
+\f1\b0 \cf0 \strokec3  \cf7 \strokec7 "Service Layer Logic (Business Operations)"\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 direction\cf0 \strokec3  \cf5 \strokec5 TB\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 PDFDocService\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 DocRepo\cf7 \strokec7 ["repositories.document_repository.py<br/>DB ops for Documents, Citations.<br/>Uses StorageService."]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 PDFDocService\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Initiates PDF processing via" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 ClaudeServiceAI\cf7 \strokec7 ["pdf_processing.claude_service.py<br/>Primary interface to Anthropic Claude API for PDF analysis."]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 ConvoService\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 ConvoRepo\cf7 \strokec7 ["repositories.conversation_repository.py<br/>DB ops for Conversations, Messages."]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 ConvoService\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Uses for document context" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 DocRepo\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 ConvoService\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Generates chat responses via" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 ClaudeServiceAI\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 AnalysisService\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 AnalysisRepo\cf7 \strokec7 ["repositories.analysis_repository.py<br/>DB ops for AnalysisResults."]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 AnalysisService\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Uses for document data" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 DocRepo\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 AnalysisService\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Generates analysis & visualizations via" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 ClaudeServiceAI\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 AnalysisService\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "(Potentially) Uses for specific agent tasks" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 FinancialAgent\cf7 \strokec7 ["pdf_processing.financial_agent.py<br/>LangGraph agent for specific financial tool use."]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 AnalysisService\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "(Intended) Uses for chart data population" 
+\f2\b \cf8 \strokec8 ---
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 VisualizationHelpers\cf7 \strokec7 ["utils.visualization_helpers.py<br/>Populates specific chart data keys."]\cf0 \cb1 \strokec3 \
+\cb2     
+\f2\b \cf4 \strokec4 end
+\f1\b0 \cf0 \cb1 \strokec3 \
+\cb2     
+\f2\b \cf4 \strokec4 subgraph
+\f1\b0 \cf0 \strokec3  \cf7 \strokec7 "AI & PDF Processing Layer (Claude Integration & Workflows)"\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 direction\cf0 \strokec3  \cf5 \strokec5 TB\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 ClaudeServiceAI\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Makes API calls to" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 AnthropicAPI\cf7 \strokec7 ["External: Anthropic Claude API<br/>Receives PDF binary/base64 for analysis."]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 ClaudeServiceAI\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Uses for document Q&A, complex chat" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 LangGraphSvc\cf7 \strokec7 ["pdf_processing.langgraph_service.py<br/>Manages LangGraph stateful workflows, document QA with citations."]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 ClaudeServiceAI\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Uses as fallback or for specific tasks" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 LangChainSvc\cf7 \strokec7 ["pdf_processing.langchain_service.py<br/>Provides LangChain-based functionalities."]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 ClaudeServiceAI\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Uses AI tool definitions from" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 ModelsTools\cf7 \strokec7 ["models.tools.py<br/>Pydantic schemas for Claude tools (charts, tables)."]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 ClaudeServiceAI\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Structures output using" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 ModelsVisualization\cf7 \strokec7 ["models.visualization.py<br/>Pydantic models for chart/table data."]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 LangGraphSvc\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Makes API calls to" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 AnthropicAPI\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 LangGraphSvc\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Fetches document binary content via" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 DocRepo\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 FinancialAgent\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Makes API calls to" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 AnthropicAPI\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 FinancialAgent\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Uses AI tool definitions from" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 ModelsTools\cf0 \cb1 \strokec3 \
+\cb2     
+\f2\b \cf4 \strokec4 end
+\f1\b0 \cf0 \cb1 \strokec3 \
+\cb2     
+\f2\b \cf4 \strokec4 subgraph
+\f1\b0 \cf0 \strokec3  \cf7 \strokec7 "Data Repositories & Storage (Persistence Layer)"\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 direction\cf0 \strokec3  \cf5 \strokec5 TB\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 DocRepo\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Maps to/from" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 DBModels\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 DocRepo\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Uses for file operations" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 UtilsStorage\cf7 \strokec7 ["utils.storage.py: StorageService<br/>Abstracts file storage (Local/S3)."]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 DocRepo\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Connects to DB via" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 UtilsDatabase\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 DocRepo\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 Database\cf7 \strokec7 ["External: Database (SQL)"]\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 ConvoRepo\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Maps to/from" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 DBModels\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 ConvoRepo\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Connects to DB via" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 UtilsDatabase\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 ConvoRepo\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 Database\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 AnalysisRepo\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Maps to/from" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 DBModels\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 AnalysisRepo\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Connects to DB via" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 UtilsDatabase\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 AnalysisRepo\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 Database\cf0 \cb1 \strokec3 \
+\cb2         \cf6 \strokec6 UtilsStorage\cf0 \strokec3  
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 FileStorage\cf7 \strokec7 ["External: File Storage (Local/S3)"]\cf0 \cb1 \strokec3 \
+\cb2     
+\f2\b \cf4 \strokec4 end
+\f1\b0 \cf0 \cb1 \strokec3 \
+\cb2     \cf6 \strokec6 RunPy\cf7 \strokec7 ["run.py<br/>Primary server startup script"]\cf0 \strokec3  
+\f2\b \cf8 \strokec8 --
+\f1\b0 \cf7 \strokec7  "Starts Uvicorn with" 
+\f2\b \cf8 \strokec8 -->
+\f1\b0 \cf0 \strokec3  \cf6 \strokec6 AppMain\cf0 \cb1 \strokec3 \
+\cb2     \cf5 \strokec5 classDef\cf0 \strokec3  \cf6 \strokec6 entrypoint\cf0 \strokec3  \cf6 \strokec6 fill\cf0 \strokec3 :#\cf6 \strokec6 E6E6FA\cf0 \strokec3 ,\cf6 \strokec6 stroke\cf0 \strokec3 :#333,\cf6 \strokec6 stroke\cf0 \strokec3 -\cf6 \strokec6 width\cf0 \strokec3 :2\cf6 \strokec6 px\cf0 \strokec3 ,\cf6 \strokec6 font\cf0 \strokec3 -\cf6 \strokec6 weight\cf0 \strokec3 :\cf6 \strokec6 bold
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 classDef\cf0 \strokec3  \cf6 \strokec6 api\cf0 \strokec3  \cf6 \strokec6 fill\cf0 \strokec3 :#\cf6 \strokec6 ADD8E6\cf0 \strokec3 ,\cf6 \strokec6 stroke\cf0 \strokec3 :#333,\cf6 \strokec6 stroke\cf0 \strokec3 -\cf6 \strokec6 width\cf0 \strokec3 :2\cf6 \strokec6 px
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 classDef\cf0 \strokec3  \cf6 \strokec6 service\cf0 \strokec3  \cf6 \strokec6 fill\cf0 \strokec3 :#90\cf6 \strokec6 EE90\cf0 \strokec3 ,\cf6 \strokec6 stroke\cf0 \strokec3 :#333,\cf6 \strokec6 stroke\cf0 \strokec3 -\cf6 \strokec6 width\cf0 \strokec3 :2\cf6 \strokec6 px
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 classDef\cf0 \strokec3  \cf6 \strokec6 repo\cf0 \strokec3  \cf6 \strokec6 fill\cf0 \strokec3 :#\cf6 \strokec6 FFDAB9\cf0 \strokec3 ,\cf6 \strokec6 stroke\cf0 \strokec3 :#333,\cf6 \strokec6 stroke\cf0 \strokec3 -\cf6 \strokec6 width\cf0 \strokec3 :2\cf6 \strokec6 px
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 classDef\cf0 \strokec3  \cf6 \strokec6 ai\cf0 \strokec3  \cf6 \strokec6 fill\cf0 \strokec3 :#\cf6 \strokec6 FFFFE0\cf0 \strokec3 ,\cf6 \strokec6 stroke\cf0 \strokec3 :#333,\cf6 \strokec6 stroke\cf0 \strokec3 -\cf6 \strokec6 width\cf0 \strokec3 :2\cf6 \strokec6 px
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 classDef\cf0 \strokec3  \cf6 \strokec6 util\cf0 \strokec3  \cf6 \strokec6 fill\cf0 \strokec3 :#\cf6 \strokec6 D3D3D3\cf0 \strokec3 ,\cf6 \strokec6 stroke\cf0 \strokec3 :#333,\cf6 \strokec6 stroke\cf0 \strokec3 -\cf6 \strokec6 width\cf0 \strokec3 :1\cf6 \strokec6 px
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 classDef\cf0 \strokec3  \cf6 \strokec6 model\cf0 \strokec3  \cf6 \strokec6 fill\cf0 \strokec3 :#\cf6 \strokec6 E0FFFF\cf0 \strokec3 ,\cf6 \strokec6 stroke\cf0 \strokec3 :#333,\cf6 \strokec6 stroke\cf0 \strokec3 -\cf6 \strokec6 width\cf0 \strokec3 :1\cf6 \strokec6 px
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 classDef\cf0 \strokec3  \cf6 \strokec6 external\cf0 \strokec3  \cf6 \strokec6 fill\cf0 \strokec3 :#\cf6 \strokec6 FFCCCB\cf0 \strokec3 ,\cf6 \strokec6 stroke\cf0 \strokec3 :#333,\cf6 \strokec6 stroke\cf0 \strokec3 -\cf6 \strokec6 width\cf0 \strokec3 :2\cf6 \strokec6 px
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 classDef\cf0 \strokec3  \cf6 \strokec6 runner\cf0 \strokec3  \cf6 \strokec6 fill\cf0 \strokec3 :#\cf6 \strokec6 F5F5F5\cf0 \strokec3 ,\cf6 \strokec6 stroke\cf0 \strokec3 :#333,\cf6 \strokec6 stroke\cf0 \strokec3 -\cf6 \strokec6 width\cf0 \strokec3 :2\cf6 \strokec6 px
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 class\cf0 \strokec3  \cf6 \strokec6 UserRequest\cf0 \strokec3  \cf6 \strokec6 entrypoint
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 class\cf0 \strokec3  \cf6 \strokec6 AppMain\cf0 \strokec3 ,\cf6 \strokec6 DocumentRouter\cf0 \strokec3 ,\cf6 \strokec6 ConversationRouter\cf0 \strokec3 ,\cf6 \strokec6 AnalysisRouter\cf0 \strokec3 ,\cf6 \strokec6 APIRouters\cf0 \strokec3  \cf6 \strokec6 api
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 class\cf0 \strokec3  \cf6 \strokec6 PDFDocService\cf0 \strokec3 ,\cf6 \strokec6 ConvoService\cf0 \strokec3 ,\cf6 \strokec6 AnalysisService\cf0 \strokec3  \cf6 \strokec6 service
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 class\cf0 \strokec3  \cf6 \strokec6 DocRepo\cf0 \strokec3 ,\cf6 \strokec6 ConvoRepo\cf0 \strokec3 ,\cf6 \strokec6 AnalysisRepo\cf0 \strokec3  \cf6 \strokec6 repo
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 class\cf0 \strokec3  \cf6 \strokec6 ClaudeServiceAI\cf0 \strokec3 ,\cf6 \strokec6 LangGraphSvc\cf0 \strokec3 ,\cf6 \strokec6 LangChainSvc\cf0 \strokec3 ,\cf6 \strokec6 FinancialAgent\cf0 \strokec3  \cf6 \strokec6 ai
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 class\cf0 \strokec3  \cf6 \strokec6 UtilsDatabase\cf0 \strokec3 ,\cf6 \strokec6 UtilsStorage\cf0 \strokec3 ,\cf6 \strokec6 InitDB\cf0 \strokec3 ,\cf6 \strokec6 ErrorHandling\cf0 \strokec3 ,\cf6 \strokec6 VisualizationHelpers\cf0 \strokec3 ,\cf6 \strokec6 DocServiceDep\cf0 \strokec3 ,\cf6 \strokec6 ConvoServiceDep\cf0 \strokec3 ,\cf6 \strokec6 AnalysisServiceDep\cf0 \strokec3  \cf6 \strokec6 util
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 class\cf0 \strokec3  \cf6 \strokec6 DBModels\cf0 \strokec3 ,\cf6 \strokec6 ModelsTools\cf0 \strokec3 ,\cf6 \strokec6 ModelsVisualization\cf0 \strokec3 ,\cf6 \strokec6 PydanticModels\cf0 \strokec3  \cf6 \strokec6 model
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 class\cf0 \strokec3  \cf6 \strokec6 AnthropicAPI\cf0 \strokec3 ,\cf6 \strokec6 Database\cf0 \strokec3 ,\cf6 \strokec6 FileStorage\cf0 \strokec3  \cf6 \strokec6 external
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\cb2     \cf5 \strokec5 class\cf0 \strokec3  \cf6 \strokec6 RunPy\cf0 \strokec3  \cf6 \strokec6 runner
+\f2\b \cf0 \strokec3 ;
+\f1\b0 \cb1 \
+\
+}

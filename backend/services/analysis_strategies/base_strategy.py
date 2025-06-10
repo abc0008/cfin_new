@@ -1,6 +1,25 @@
 #!/usr/bin/env python3
 """
 Base class for analysis strategies.
+
+This module defines the abstract base class AnalysisStrategy that all concrete analysis 
+strategies must inherit from. It establishes a common interface for executing different 
+types of financial document analysis.
+
+Upstream Dependencies:
+- models.database_models.Document: Database model for document entities
+- pdf_processing.api_service.ClaudeService: Core AI service for Claude API interactions
+
+Downstream Dependencies:
+- Used by all concrete strategy implementations (basic_financial_strategy.py, 
+  comprehensive_strategy.py, financial_template_strategy.py, sentiment_analysis_strategy.py)
+- Instantiated by services.analysis_service.AnalysisService which routes analysis requests
+  to the appropriate strategy based on analysis type
+
+Key Responsibilities:
+- Define the execute() method signature that all strategies must implement
+- Provide common initialization pattern with ClaudeService dependency injection
+- Establish standard return format for analysis results (analysis_text, visualizations, metrics)
 """
 
 from abc import ABC, abstractmethod

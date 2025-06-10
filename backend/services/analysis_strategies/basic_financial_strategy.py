@@ -1,3 +1,39 @@
+"""
+Basic Financial Analysis Strategy
+
+This module implements a lightweight financial analysis strategy that provides quick 
+financial overviews and insights from uploaded documents using Claude's native PDF 
+processing capabilities.
+
+Upstream Dependencies:
+- base_strategy.AnalysisStrategy: Abstract base class defining the strategy interface
+- models.database_models.Document: Document entity model for metadata
+- models.analysis.FinancialMetric: Data model for financial metrics
+- models.visualization.ChartData/TableData: Data models for visualization components
+- pdf_processing.api_service.ClaudeService: Core Claude API service
+- utils.exceptions.ToolSchemaValidationError: Custom exception handling
+- settings.MODEL_HAIKU: Configuration for model selection in multi-turn interactions
+
+Downstream Dependencies:
+- Called by services.analysis_service.AnalysisService when analysis_type="basic_financial"
+- Results consumed by API routes in app.routes.analysis.py
+- Visualization data processed by frontend components for chart/table rendering
+
+Key Features:
+- Multi-turn conversation flow (max 5 turns) with Claude for iterative analysis
+- Native PDF processing using Claude's document understanding capabilities
+- Tool-based interaction for generating charts, tables, and financial metrics
+- Fallback to aggregated text when PDF content unavailable
+- Haiku model optimization for cost-effective multi-turn interactions
+- Comprehensive error handling with HTTP exception mapping
+
+Analysis Flow:
+1. Process PDF documents directly or fall back to aggregated text
+2. Execute multi-turn conversation with Claude using predefined financial prompt
+3. Handle tool calls for visualization generation (charts, tables, metrics)
+4. Collect and structure results into standard analysis response format
+"""
+
 import logging
 import json
 from typing import List, Dict, Any, Optional
@@ -135,11 +171,14 @@ class BasicFinancialStrategy(AnalysisStrategy):
                                 processed_data_for_tool = tool_schema.processor(tool_input)
                                 if processed_data_for_tool is not None:
                                     if tool_name == "generate_graph_data":
-                                        collected_charts.append(ChartData(**processed_data_for_tool))
+                                        # processor already returns a dict with by_alias=True
+                                        collected_charts.append(processed_data_for_tool)
                                     elif tool_name == "generate_table_data":
-                                        collected_tables.append(TableData(**processed_data_for_tool))
+                                        # processor already returns a dict with by_alias=True
+                                        collected_tables.append(processed_data_for_tool)
                                     elif tool_name == "generate_financial_metric":
-                                        collected_metrics.append(FinancialMetric(**processed_data_for_tool))
+                                        # processor already returns a dict with by_alias=True
+                                        collected_metrics.append(processed_data_for_tool)
                                     tool_output_content_for_claude = json.dumps(processed_data_for_tool)
                                 else:
                                     tool_output_content_for_claude = json.dumps({"status": "Tool processed, no output."})

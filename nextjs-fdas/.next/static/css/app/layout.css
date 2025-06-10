@@ -2008,6 +2008,10 @@ video {
 .stroke-2 {
   stroke-width: 2;
 }
+.object-cover {
+  -o-object-fit: cover;
+     object-fit: cover;
+}
 .p-0 {
   padding: 0px;
 }

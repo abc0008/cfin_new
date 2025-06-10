@@ -1,3 +1,43 @@
+"""
+Sentiment Analysis Strategy
+
+This module implements sentiment analysis for financial documents, focusing on tone,
+market sentiment, and qualitative insights extraction from financial communications,
+earnings reports, and other text-based financial content.
+
+Upstream Dependencies:
+- base_strategy.AnalysisStrategy: Abstract base class for strategy implementation
+- models.database_models.Document: Document metadata model (not used directly for text analysis)
+- pdf_processing.api_service.ClaudeService: Core Claude API service for text analysis
+- utils.exceptions.ToolSchemaValidationError: Custom exception handling for tool validation
+- anthropic.types.Message/TextBlock: Anthropic API response types for message construction
+
+Downstream Dependencies:
+- Invoked by services.analysis_service.AnalysisService when analysis_type="sentiment_analysis"
+- Results consumed by API routes in app.routes.analysis.py
+- Sentiment insights displayed in frontend analysis interface
+- Used for qualitative analysis complementing quantitative financial metrics
+
+Key Features:
+- Text-focused analysis using aggregated document content (not PDF-native processing)
+- Multi-turn conversation support (max 5 turns) for comprehensive sentiment extraction
+- Tool integration capability for potential sentiment visualization/metrics
+- User query context integration for targeted sentiment analysis
+- Robust error handling with HTTP exception mapping
+- Mock message construction for final result processing
+
+Analysis Flow:
+1. Process aggregated text content from uploaded documents
+2. Integrate user query context for focused sentiment analysis
+3. Execute multi-turn conversation using specialized sentiment analysis prompts
+4. Handle any tool calls for sentiment metrics or visualizations
+5. Construct final sentiment analysis results with standard format
+6. Return sentiment insights as structured analysis response
+
+Note: Unlike other strategies, this focuses on qualitative text analysis rather than
+quantitative financial metrics, making it complementary to numerical analysis strategies.
+"""
+
 import logging
 import json
 from typing import List, Dict, Any, Optional

@@ -134,6 +134,10 @@ export interface FinancialMetric {
   unit: string;
   isEstimated?: boolean;
   citation?: MetricCitation;
+  trend?: 'up' | 'down' | 'neutral';
+  percentChange?: number;
+  previousValue?: number;
+  description?: string;
 }
 
 // Added for Story # (Resolving linter error)

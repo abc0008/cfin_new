@@ -18,9 +18,9 @@ const TestimonialCard: React.FC<TestimonialCardProps> = ({ quote, name, title, a
         <Image 
           src={avatarImage} 
           alt={`${name}'s portrait`} 
-          layout="fill" 
-          objectFit="cover" 
-          className="transition-transform duration-300 group-hover:scale-105"
+          fill
+          sizes="350px"
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
           priority
         />
       </div>

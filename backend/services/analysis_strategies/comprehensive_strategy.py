@@ -1,3 +1,41 @@
+"""
+Comprehensive Financial Analysis Strategy
+
+This module implements the most thorough financial analysis strategy, providing detailed
+multi-turn analysis with extensive visualizations, metrics, and insights. It uses the
+most sophisticated prompts and allows for complex analytical workflows.
+
+Upstream Dependencies:
+- base_strategy.AnalysisStrategy: Abstract base class defining strategy interface
+- models.database_models.Document: Document entity model
+- models.visualization.ChartData/TableData: Visualization data models
+- models.analysis.FinancialMetric: Financial metric data model
+- pdf_processing.api_service.ClaudeService: Core Claude API service
+- utils.tool_processing: Shared tool processing utilities for visualization generation
+
+Downstream Dependencies:
+- Invoked by services.analysis_service.AnalysisService when analysis_type="comprehensive"
+- Results consumed by API endpoints in app.routes.analysis.py
+- Rich visualization data rendered by frontend chart components
+- Used for the most detailed financial analysis reports requiring multiple charts/tables
+
+Key Features:
+- Extended multi-turn conversation flow (max 7 turns) for complex analysis
+- Comprehensive system prompt loaded from external file for maintainability
+- Advanced tool processing for generating multiple visualization types
+- Accumulates extensive text, charts, tables, and metrics across conversation turns
+- Designed for high-value, detailed financial analysis use cases
+- Supports both PDF and text-based document analysis
+
+Analysis Flow:
+1. Load comprehensive analysis prompt from external template
+2. Initialize multi-turn conversation with user query and document context
+3. Execute up to 7 turns of Claude interaction with tool support
+4. Process visualization tools (charts, tables, metrics) at each turn
+5. Accumulate rich analysis content across all conversation turns
+6. Return comprehensive structured results with extensive visualizations
+"""
+
 import json
 from typing import List, Dict, Any, Optional
 import logging
@@ -119,11 +157,14 @@ class ComprehensiveAnalysisStrategy(AnalysisStrategy):
                             processed_data = tool_processing.process_visualization_input(tool_name, tool_input, tool_use_id)
                             if processed_data:
                                 if tool_name == "generate_graph_data":
-                                    accumulated_charts.append(ChartData(**processed_data) if isinstance(processed_data, dict) else processed_data)
+                                    # Already returns a dict from process_visualization_input
+                                    accumulated_charts.append(processed_data)
                                 elif tool_name == "generate_table_data":
-                                    accumulated_tables.append(TableData(**processed_data) if isinstance(processed_data, dict) else processed_data)
+                                    # Already returns a dict from process_visualization_input
+                                    accumulated_tables.append(processed_data)
                                 elif tool_name == "generate_financial_metric":
-                                    accumulated_metrics.append(FinancialMetric(**processed_data) if isinstance(processed_data, dict) else processed_data)
+                                    # Already returns a dict from process_visualization_input
+                                    accumulated_metrics.append(processed_data)
                                 
                                 tool_results_for_this_turn.append({
                                     "type": "tool_result", "tool_use_id": tool_use_id,

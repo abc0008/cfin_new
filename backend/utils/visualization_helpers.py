@@ -12,15 +12,31 @@ from models.analysis import FinancialMetric # Add this import
 
 logger = logging.getLogger(__name__)
 
-def generate_monetary_values_data(metrics: List[FinancialMetric], insights: List[str]) -> Optional[List[Dict[str, Any]]]:
+def generate_monetary_values_data(metrics: List[Any], insights: List[str]) -> Optional[List[Dict[str, Any]]]:
     """Generate monetary values data for visualization."""
-    # First, try to use actual metrics with appropriate units
-    monetary_metrics = [
-        {"name": metric.name, "value": metric.value, "description": f"{metric.category}: {metric.name} ({metric.period})"}
-        for metric in metrics
-        if metric.unit and (any(keyword in metric.unit.lower() for keyword in ["usd", "$", "dollar", "million", "billion", "revenue", "cost", "price", "value"]))
-        or (metric.name and any(keyword in metric.name.lower() for keyword in ["revenue", "sales", "cost", "price", "income", "profit", "expense", "asset"]))
-    ]
+    # Handle both dict and FinancialMetric instances
+    monetary_metrics = []
+    for metric in metrics:
+        # Handle dict format
+        if isinstance(metric, dict):
+            unit = metric.get('unit', '')
+            name = metric.get('name', '')
+            if unit and (any(keyword in unit.lower() for keyword in ["usd", "$", "dollar", "million", "billion", "revenue", "cost", "price", "value"])) \
+               or (name and any(keyword in name.lower() for keyword in ["revenue", "sales", "cost", "price", "income", "profit", "expense", "asset"])):
+                monetary_metrics.append({
+                    "name": name,
+                    "value": metric.get('value', 0),
+                    "description": f"{metric.get('category', '')}: {name} ({metric.get('period', '')})"
+                })
+        # Handle FinancialMetric instances
+        else:
+            if metric.unit and (any(keyword in metric.unit.lower() for keyword in ["usd", "$", "dollar", "million", "billion", "revenue", "cost", "price", "value"])) \
+               or (metric.name and any(keyword in metric.name.lower() for keyword in ["revenue", "sales", "cost", "price", "income", "profit", "expense", "asset"])):
+                monetary_metrics.append({
+                    "name": metric.name,
+                    "value": metric.value,
+                    "description": f"{metric.category}: {metric.name} ({metric.period})"
+                })
     
     logger.info(f"VIS_HELPER_LOG: Found {len(metrics)} total metrics for monetary values chart")
     logger.info(f"VIS_HELPER_LOG: Filtered down to {len(monetary_metrics)} monetary metrics")
@@ -54,14 +70,31 @@ def generate_monetary_values_data(metrics: List[FinancialMetric], insights: List
     
     return monetary_metrics[:5] if monetary_metrics else None
 
-def generate_percentage_data(metrics: List[FinancialMetric], insights: List[str]) -> Optional[List[Dict[str, Any]]]:
+def generate_percentage_data(metrics: List[Any], insights: List[str]) -> Optional[List[Dict[str, Any]]]:
     """Generate percentage data for visualization."""
-    percentage_metrics = [
-        {"name": metric.name, "value": metric.value, "description": f"{metric.category}: {metric.name} ({metric.period})"}
-        for metric in metrics
-        if metric.unit and (any(keyword in metric.unit.lower() for keyword in ["percent", "%", "ratio", "rate", "growth"])) 
-        or (metric.name and any(keyword in metric.name.lower() for keyword in ["percent", "rate", "ratio", "growth", "margin", "yield", "return"]))
-    ]
+    # Handle both dict and FinancialMetric instances
+    percentage_metrics = []
+    for metric in metrics:
+        # Handle dict format
+        if isinstance(metric, dict):
+            unit = metric.get('unit', '')
+            name = metric.get('name', '')
+            if unit and (any(keyword in unit.lower() for keyword in ["percent", "%", "ratio", "rate", "growth"])) \
+               or (name and any(keyword in name.lower() for keyword in ["percent", "rate", "ratio", "growth", "margin", "yield", "return"])):
+                percentage_metrics.append({
+                    "name": name,
+                    "value": metric.get('value', 0),
+                    "description": f"{metric.get('category', '')}: {name} ({metric.get('period', '')})"
+                })
+        # Handle FinancialMetric instances
+        else:
+            if metric.unit and (any(keyword in metric.unit.lower() for keyword in ["percent", "%", "ratio", "rate", "growth"])) \
+               or (metric.name and any(keyword in metric.name.lower() for keyword in ["percent", "rate", "ratio", "growth", "margin", "yield", "return"])):
+                percentage_metrics.append({
+                    "name": metric.name,
+                    "value": metric.value,
+                    "description": f"{metric.category}: {metric.name} ({metric.period})"
+                })
     
     logger.info(f"VIS_HELPER_LOG: Found {len(metrics)} total metrics for percentage chart")
     logger.info(f"VIS_HELPER_LOG: Filtered down to {len(percentage_metrics)} percentage metrics")
@@ -139,7 +172,7 @@ def generate_keyword_frequency_data(insights: List[str]) -> Optional[List[Dict[s
 
     return frequency_data[:5] if frequency_data else None 
 
-def get_data_for_visualization_type(visualization_type: str, metrics: List[FinancialMetric], insights: List[str]) -> Optional[List[Dict[str, Any]]]:
+def get_data_for_visualization_type(visualization_type: str, metrics: List[Any], insights: List[str]) -> Optional[List[Dict[str, Any]]]:
     """
     Dispatches to the correct data generation function based on visualization type.
     """

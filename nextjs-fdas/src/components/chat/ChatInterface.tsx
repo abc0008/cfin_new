@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Message, Citation } from '@/types';
 import { conversationApi } from '@/lib/api/conversation';
 import { Loader2, Send, FileText } from 'lucide-react';
@@ -71,14 +71,14 @@ export function ChatInterface({
     }
   };
 
-  const handleCitationClick = (citation: Citation) => {
+  const handleCitationClick = useCallback((citation: Citation) => {
     if (!activeDocuments) return;
     
     // Navigate to the citation in the document
     if (onNavigateToHighlight && citation.rects && citation.rects.length > 0) {
       onNavigateToHighlight(citation);
     }
-  };
+  }, [activeDocuments, onNavigateToHighlight]);
 
   // Memoize the renderMessage function to prevent unnecessary re-renders
   const renderMessage = useCallback((message: Message) => {
@@ -153,11 +153,7 @@ export function ChatInterface({
             </div>
           </div>
         ) : (
-          // Use memoized rendering for the message list to prevent duplicate rendering
-          useMemo(() => {
-            console.log('[ChatInterface] Rendering message list with', messages.length, 'messages');
-            return messages.map((message) => renderMessage(message));
-          }, [messages, renderMessage])
+          messages.map((message) => renderMessage(message))
         )}
         {isLoading && (
           <div className="flex justify-start">

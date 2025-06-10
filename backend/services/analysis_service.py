@@ -74,6 +74,29 @@ KW_FREQ_ENABLED = False
 # SENTIMENT_ANALYSIS_SYSTEM_PROMPT was moved to backend/services/analysis_strategies/prebuilt_prompts/sentiment_analysis_prompt.md
 # and is now loaded by SentimentAnalysisStrategy
 
+def ensure_json_serializable(obj: Any) -> Any:
+    """
+    Recursively convert an object to ensure it's JSON serializable.
+    Converts Pydantic models to dicts and handles other non-serializable types.
+    """
+    if hasattr(obj, 'model_dump'):
+        # It's a Pydantic model
+        return obj.model_dump(by_alias=True)
+    elif hasattr(obj, 'dict'):
+        # Older Pydantic models
+        return obj.dict(by_alias=True)
+    elif isinstance(obj, dict):
+        return {k: ensure_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [ensure_json_serializable(item) for item in obj]
+    elif isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
+    else:
+        # For any other type, convert to string
+        return str(obj)
+
 class AnalysisService:
     """Service for managing financial analysis."""
     
@@ -618,9 +641,12 @@ class AnalysisService:
     ) -> Tuple[str, Dict[str, Any]]:
         logger.info(f"Saving analysis result for {analysis_id}, type {analysis_type}, docs {document_ids}")
         
+        # Ensure all data is JSON serializable before saving to database
+        serializable_result_data = ensure_json_serializable(result_data)
+        
         # Consolidate all information to be stored in the result_data JSONB field
         persisted_result_payload = {
-            "analysis_output": result_data,  # The actual results from Claude/strategy
+            "analysis_output": serializable_result_data,  # The actual results from Claude/strategy
             "input_parameters": parameters if parameters else {},
             "input_query": user_query,
             "processing_status": "completed" # Status of this analysis run
@@ -646,10 +672,10 @@ class AnalysisService:
             # This structure should align with what API consumers expect.
             # The 'results' key in the formatted return should ideally contain what was in the original 'result_data' argument.
             
-            # Extract core analysis outputs from result_data
-            analysis_text_content = result_data.get("analysis_text", "") # Ensure this key matches _process_tool_calls output
-            visualizations_content = result_data.get("visualizations", {"charts": [], "tables": []})
-            metrics_content = result_data.get("metrics", [])
+            # Extract core analysis outputs from serializable_result_data
+            analysis_text_content = serializable_result_data.get("analysis_text", "") # Ensure this key matches _process_tool_calls output
+            visualizations_content = serializable_result_data.get("visualizations", {"charts": [], "tables": []})
+            metrics_content = serializable_result_data.get("metrics", [])
             # Assuming result_data might also contain other keys like 'ratios', 'insights' etc. from strategies
             # These should also be promoted if the frontend expects them at the top level.
             # For now, focusing on the ones derived from _process_tool_calls and seen in frontend issues.
@@ -666,12 +692,12 @@ class AnalysisService:
                 "analysis_text": analysis_text_content,
                 "visualization_data": visualizations_content,
                 "metrics": metrics_content,
-                # Spread other potential top-level fields from result_data if necessary,
+                # Spread other potential top-level fields from serializable_result_data if necessary,
                 # for example, if strategies directly return 'ratios', 'insights' at top of their result_data dict:
-                "ratios": result_data.get("ratios", []),
-                "insights": result_data.get("insights", []),
-                "comparativePeriods": result_data.get("comparative_periods", []), # Example
-                "citationReferences": result_data.get("citation_references", {}) # Example
+                "ratios": serializable_result_data.get("ratios", []),
+                "insights": serializable_result_data.get("insights", []),
+                "comparativePeriods": serializable_result_data.get("comparative_periods", []), # Example
+                "citationReferences": serializable_result_data.get("citation_references", {}) # Example
                 # Remove the nested "results" key
             }
             return analysis_id, formatted_return
