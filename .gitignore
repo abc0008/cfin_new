@@ -30,13 +30,25 @@ dist-ssr
 .env.development
 .env.production
 
-# NextJS specific
-.next/cache/
-.next/*.log
+# NextJS specific - comprehensive patterns
+.next/
+*/.next/
+nextjs-fdas/.next/
+**/.next/
 .vercel
 .turbo
 next-env.d.ts
-nextjs-fdas/.next/
+# Next.js build outputs
+out/
+build/
+# Next.js cache
+.next/cache/
+**/.next/cache/
+# Next.js production files
+.next/static/
+.next/server/
+**/.next/static/
+**/.next/server/
 
 # Python
 __pycache__/
@@ -50,3 +62,13 @@ ENV/
 build/
 *.egg-info/
 .pytest_cache/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Large files (prevent future issues)
+*.pack
+*.pack.gz
+*.pack.old
