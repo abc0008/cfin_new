@@ -51,10 +51,10 @@ export const analysisApi = {
         parameters: parameters,
       };
       if (customKnowledgeBase) {
-        payload.custom_knowledge_base = customKnowledgeBase;
+        payload.customKnowledgeBase = customKnowledgeBase;
       }
       if (customUserQuery) {
-        payload.custom_user_query = customUserQuery;
+        payload.query = customUserQuery;
       }
 
       const response = await apiService.post<AnalysisResult>(

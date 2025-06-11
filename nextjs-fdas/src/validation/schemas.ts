@@ -13,7 +13,7 @@ export const DocumentMetadataSchema = z.object({
 
 // Add the DocumentUploadResponseSchema to match the backend's response
 export const DocumentUploadResponseSchema = z.object({
-  document_id: z.string().uuid(),
+  documentId: z.string().uuid(),
   filename: z.string(),
   status: z.enum(['pending', 'processing', 'completed', 'failed']),
   message: z.string().optional(),
@@ -185,7 +185,11 @@ export const ChartSeriesSchema = z.object({
 export const ChartDataSchema = z.object({
   chartType: z.enum(['bar', 'multiBar', 'line', 'pie', 'area', 'stackedArea', 'scatter']),
   config: ChartConfigSchema,
-  data: z.union([z.array(ChartDataItemSchema), z.array(ChartSeriesSchema)]),
+  data: z.union([
+    z.array(ChartDataItemSchema),
+    z.array(ChartSeriesSchema),
+    z.array(z.record(z.any())) // Allow flat format for multi-series line charts
+  ]),
   chartConfig: z.record(MetricConfigSchema).optional(),
   xAxisTitle: z.string().optional(),
   yAxisTitle: z.string().optional(),

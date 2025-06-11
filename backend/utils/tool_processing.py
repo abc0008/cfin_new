@@ -136,11 +136,21 @@ def process_chart_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
     if not x_axis_key:
         raise ToolSchemaValidationError(f"xAxisKey is missing in chart config. Input: {tool_input}")
 
-    # Determine if it's a multi-series chart based on chartConfig keys
-    # Simple charts (like a single series bar/line or pie) usually have one entry in chartConfig or chartConfig keys map directly to y-values from data.
-    # Multi-series charts (like multiBar) have multiple entries in chartConfig representing each series.
+    # Determine if it's a multi-series chart based on data structure
+    # Simple charts: data like [{'name': 'A', 'value': 10}] - single metric per item
+    # Multi-series charts: data like [{'quarter': 'Q1', 'sales': 100, 'profit': 20}] - multiple metrics per item
     
     series_keys = list(chart_config_settings.keys())
+    
+    # Check the actual data structure to determine if it's truly multi-series
+    is_multi_series = False
+    if isinstance(original_data, list) and len(original_data) > 0:
+        first_item = original_data[0]
+        if isinstance(first_item, dict):
+            # Count how many series keys exist in the actual data
+            data_series_count = sum(1 for key in series_keys if key in first_item)
+            # It's multi-series if multiple series keys exist in the data AND we have multiple series in config
+            is_multi_series = data_series_count > 1 and len(series_keys) > 1
 
     # Transform data to ChartDataItem format (x, y) that the Pydantic model expects
     if isinstance(original_data, list) and len(original_data) > 0:
@@ -155,45 +165,71 @@ def process_chart_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
             # Transform data to {x, y} format required by ChartDataItem model
             logger.info(f"Transforming chart data to {{x, y}} format required by ChartDataItem model")
             
-            if chart_type in ["bar", "line", "scatter", "area"] and len(series_keys) == 1:
+            if chart_type in ["bar", "line", "scatter", "area"] and not is_multi_series:
                 # Single series chart - transform to {x, y} format
-                metric_key = series_keys[0]
+                # First, check what keys actually exist in the data
+                value_key = None
                 for item in original_data:
-                    if x_axis_key in item and metric_key in item:
+                    possible_y_keys = [k for k, v in item.items() if k != x_axis_key and isinstance(v, (int, float))]
+                    if 'value' in possible_y_keys:
+                        value_key = 'value'
+                        break
+                    elif possible_y_keys:
+                        value_key = possible_y_keys[0]
+                        break
+                
+                # If no value key found in data, try using series_keys as fallback
+                if not value_key and len(series_keys) == 1:
+                    # Check if the series key actually exists in the data
+                    if original_data and series_keys[0] in original_data[0]:
+                        value_key = series_keys[0]
+                
+                for item in original_data:
+                    if x_axis_key in item and value_key and value_key in item:
                         transformed_data.append({
                             "x": item[x_axis_key],  # Always use 'x' for ChartDataItem
-                            "y": item[metric_key]   # Always use 'y' for ChartDataItem
+                            "y": item[value_key]    # Always use 'y' for ChartDataItem
                         })
                     else:
-                        logger.warning(f"Missing x ('{x_axis_key}') or y ('{metric_key}') key in item: {item} for single series {chart_type}")
-                logger.info(f"Transformed {len(transformed_data)} items for single series {chart_type} chart")
+                        logger.warning(f"Missing x ('{x_axis_key}') or y ('{value_key}') key in item: {item} for single series {chart_type}")
+                logger.info(f"Transformed {len(transformed_data)} items for single series {chart_type} chart using value_key='{value_key}'")
                 
             elif chart_type == "pie":
                 # Pie chart: transform to {x, y} format where x is the category and y is the value
+                # First, check what keys actually exist in the data
                 y_value_key = None
-                if len(series_keys) == 1:
-                    y_value_key = series_keys[0]
+                for item in original_data:
+                    possible_y_keys = [k for k, v in item.items() if k != x_axis_key and isinstance(v, (int, float))]
+                    if 'value' in possible_y_keys:
+                        y_value_key = 'value'
+                        break
+                    elif possible_y_keys:
+                        y_value_key = possible_y_keys[0]
+                        break
+                
+                # If no value key found in data, try using series_keys as fallback
+                if not y_value_key and len(series_keys) == 1:
+                    # Check if the series key actually exists in the data
+                    if original_data and series_keys[0] in original_data[0]:
+                        y_value_key = series_keys[0]
 
                 for item in original_data:
-                    current_y_key = y_value_key
-                    if not current_y_key:
-                        # Try to find a 'value' key or the first numeric key other than x_axis_key
-                        possible_y_keys = [k for k, v in item.items() if k != x_axis_key and isinstance(v, (int, float))]
-                        if 'value' in possible_y_keys:
-                            current_y_key = 'value'
-                        elif possible_y_keys:
-                            current_y_key = possible_y_keys[0]
-                    
-                    if x_axis_key in item and current_y_key and current_y_key in item:
+                    if x_axis_key in item and y_value_key and y_value_key in item:
                         transformed_data.append({
                             "x": item[x_axis_key],      # Always use 'x' for ChartDataItem
-                            "y": item[current_y_key]    # Always use 'y' for ChartDataItem
+                            "y": item[y_value_key]    # Always use 'y' for ChartDataItem
                         })
                     else:
-                        logger.warning(f"Pie chart: Missing x ('{x_axis_key}') or deduced y key ('{current_y_key}') in item: {item}")
-                logger.info(f"Transformed {len(transformed_data)} items for pie chart")
+                        logger.warning(f"Pie chart: Missing x ('{x_axis_key}') or deduced y key ('{y_value_key}') in item: {item}")
+                logger.info(f"Transformed {len(transformed_data)} items for pie chart using y_value_key='{y_value_key}'")
 
-            elif chart_type in ["bar", "multiBar", "stackedArea"] and len(series_keys) > 1:
+            elif chart_type == "line" and is_multi_series:
+                # Multi-series line chart - keep flat format for frontend compatibility
+                logger.info(f"Line chart with multiple series ({series_keys}) - keeping flat format")
+                # Data is already in the correct format for line charts
+                transformed_data = original_data
+                
+            elif chart_type in ["bar", "multiBar", "stackedArea", "area"] and is_multi_series:
                 # Multi-series chart - create PydanticMultiSeriesChartDataItem format
                 # If original type was 'bar' but we have multiple series, treat as 'multiBar'
                 if chart_type == "bar":
@@ -219,15 +255,30 @@ def process_chart_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
                 
             else:
                 # Fallback: try to intelligently transform unknown chart types
-                logger.warning(f"Unhandled chart data transformation for chartType '{chart_type}' with series_keys {series_keys}. Attempting intelligent transformation.")
-                if len(series_keys) == 1:
-                    # Treat as single series
-                    metric_key = series_keys[0]
+                logger.warning(f"Unhandled chart data transformation for chartType '{chart_type}' with is_multi_series={is_multi_series}. Attempting intelligent transformation.")
+                if not is_multi_series:
+                    # Treat as single series - first check what keys actually exist in the data
+                    value_key = None
                     for item in original_data:
-                        if x_axis_key in item and metric_key in item:
+                        possible_y_keys = [k for k, v in item.items() if k != x_axis_key and isinstance(v, (int, float))]
+                        if 'value' in possible_y_keys:
+                            value_key = 'value'
+                            break
+                        elif possible_y_keys:
+                            value_key = possible_y_keys[0]
+                            break
+                    
+                    # If no value key found in data, try using series_keys as fallback
+                    if not value_key and len(series_keys) == 1:
+                        # Check if the series key actually exists in the data
+                        if original_data and series_keys[0] in original_data[0]:
+                            value_key = series_keys[0]
+                    
+                    for item in original_data:
+                        if x_axis_key in item and value_key and value_key in item:
                             transformed_data.append({
                                 "x": item[x_axis_key],
-                                "y": item[metric_key]
+                                "y": item[value_key]
                             })
                 else:
                     # Keep original if no transformation logic applies
@@ -238,6 +289,16 @@ def process_chart_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
 
     processed_chart["data"] = transformed_data
 
+    # Ensure chartConfig has complete MetricConfig objects with default values
+    chart_config_settings = processed_chart.get("chartConfig", {})
+    for metric_key, metric_config in chart_config_settings.items():
+        if isinstance(metric_config, dict):
+            # Ensure all required MetricConfig fields have default values
+            metric_config.setdefault("unit", "")
+            metric_config.setdefault("formatter", "")
+            metric_config.setdefault("precision", 2)
+            # label and color should already be provided by Claude
+    
     try:
         validated_chart = ChartData(**processed_chart)
         logger.info(f"Successfully processed chart: {validated_chart.config.title if validated_chart.config else 'Untitled Chart'}")

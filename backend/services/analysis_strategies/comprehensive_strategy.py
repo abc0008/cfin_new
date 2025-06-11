@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 # Updated for PlanPlanPlan.md item 1.1 and user-provided path
 PROMPT_PATH = files('services.analysis_strategies').joinpath(
-    'prebuilt_prompts/Claude Financial Analysis Prompt.md'
+    'prebuilt_prompts/comprehensive_financial_analysis_prompt.md'
 )
 COMPREHENSIVE_SYSTEM_PROMPT: str = PROMPT_PATH.read_text(encoding='utf-8')
 

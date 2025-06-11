@@ -270,7 +270,10 @@ export default function Workspace() {
     }
   };
 
-  // Run financial analysis when a document is selected
+  // DISABLED: Automatic analysis on document selection
+  // This useEffect was previously triggering basic_financial analysis automatically
+  // when a document was selected. Now analysis must be triggered manually via buttons.
+  /*
   useEffect(() => {
     const runAnalysis = async () => {
       if (!selectedDocument) {
@@ -336,6 +339,7 @@ export default function Workspace() {
     // console.log('[useEffect runAnalysis] Effect triggered. selectedDocument:', selectedDocument ? selectedDocument.metadata.id : 'null');
     runAnalysis();
   }, [selectedDocument, analysisResults, sessionId, handleAnalysisResult]); // Added analysisResults, sessionId, and handleAnalysisResult to dependencies
+  */
 
   const handleSendMessage = async (messageText: string) => {
     if (!sessionId) {
@@ -474,7 +478,9 @@ export default function Workspace() {
       const result = await analysisApi.runAnalysis(
         [documentId],
         analysisType,
-        { knowledgeBase, userQuery }
+        {}, // empty parameters object
+        knowledgeBase,
+        userQuery
       );
 
       setAnalysisResults(prevResults => {
@@ -680,7 +686,13 @@ export default function Workspace() {
               <TabsContent value="analysis" className="p-0 flex flex-col flex-1">
                 <div className="flex-shrink-0">
                   <AnalysisControls 
-                    onRunAnalysis={runManualAnalysis}
+                    onRunAnalysis={(analysisType, knowledgeBase, userQuery) => {
+                      if (selectedDocument) {
+                        runManualAnalysis(selectedDocument.metadata.id, analysisType, knowledgeBase, userQuery);
+                      } else {
+                        setAnalysisError('Please select a document to analyze');
+                      }
+                    }}
                     isLoading={analysisLoading}
                   />
                 </div>

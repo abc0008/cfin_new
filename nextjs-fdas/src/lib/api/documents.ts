@@ -91,13 +91,13 @@ export const documentsApi = {
         DocumentUploadResponseSchema as any
       );
       
-      console.log(`API Client - uploadDocument: Upload successful, document ID: ${data.document_id}`);
+      console.log(`API Client - uploadDocument: Upload successful, document ID: ${data.documentId}`);
       
       // For now, return a placeholder ProcessedDocument until re-processing is complete
       const uploadData = data as any; // Cast to any to avoid linter errors for placeholder mapping
       return {
         metadata: {
-          id: uploadData.document_id,
+          id: uploadData.documentId,
           filename: uploadData.filename,
           uploadTimestamp: new Date().toISOString(),
           fileSize: uploadData.fileSize,
@@ -445,7 +445,7 @@ export const documentsApi = {
       // Return placeholder document with the ID
       return {
         metadata: {
-          id: data.document_id,
+          id: data.documentId,
           filename: data.filename,
           uploadTimestamp: new Date().toISOString(),
           fileSize: file.size,

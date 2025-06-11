@@ -54,7 +54,7 @@ class ChartData(BaseModel):
     """Data structure for a chart, including type, config, data points, and chart-specific config."""
     chart_type: str = Field(alias="chartType")
     config: ChartConfig
-    data: Union[List[ChartDataItem], List[PydanticMultiSeriesChartDataItem]]
+    data: Union[List[ChartDataItem], List[PydanticMultiSeriesChartDataItem], List[Dict[str, Any]]]
     chart_config: Dict[str, Any] = Field(alias="chartConfig")
     
     model_config = ConfigDict(

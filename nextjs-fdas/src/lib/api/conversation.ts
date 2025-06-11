@@ -219,7 +219,8 @@ class ConversationApiService {
     try {
       await this.request(
         `/conversation/${conversationId}/document/${documentId}`,
-        'POST'
+        'POST',
+        {} // Empty body, document ID is in the path
       );
       console.log(`Document ${documentId} added to conversation ${conversationId}`);
       return true;

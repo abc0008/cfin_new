@@ -334,8 +334,8 @@ export const conversationsApi = {
   async addDocumentToConversation(conversationId: string, documentId: string): Promise<void> {
     try {
       await apiService.post(
-        `/conversation/${conversationId}/documents`,
-        { document_id: documentId }
+        `/conversation/${conversationId}/document/${documentId}`,
+        {} // No body needed, document ID is in the path
       );
     } catch (error) {
       console.error('Error adding document to conversation:', error);
@@ -371,7 +371,7 @@ export const conversationsApi = {
   async removeDocumentFromConversation(conversationId: string, documentId: string): Promise<void> {
     try {
       await apiService.delete(
-        `/conversation/${conversationId}/documents/${documentId}`
+        `/conversation/${conversationId}/document/${documentId}`
       );
     } catch (error) {
       console.error('Error removing document from conversation:', error);
