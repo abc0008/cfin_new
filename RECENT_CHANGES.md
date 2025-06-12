@@ -2,6 +2,69 @@
 
 This document outlines the major changes made to improve the CFIN platform's visualization handling and document upload reliability.
 
+## 🔧 **LATEST UPDATE - December 6, 2024**
+
+### **Critical Document Upload Fix - FastAPI Response Serialization** ✅
+**Problem**: Despite previous UUID serialization fixes, frontend was still receiving `undefined` for document IDs, causing polling requests to `/api/documents/undefined`.
+
+**Root Cause**: FastAPI wasn't using Pydantic model aliases when serializing responses. Backend was correctly passing UUID objects, but responses were serialized with snake_case field names (`document_id`) while frontend expected camelCase (`documentId`).
+
+**Files Changed**:
+1. **Backend API Routes** - Added `response_model_by_alias=True` to all endpoints
+2. **Frontend API Client** - Updated to use consistent camelCase field access
+
+#### **Backend Fix: FastAPI Response Serialization**
+**Files Modified**:
+- `/backend/app/routes/document.py`
+- `/backend/app/routes/conversation.py` 
+- `/backend/app/routes/analysis.py`
+
+**Change Pattern**:
+```python
+# BEFORE (missing alias configuration):
+@router.post("/upload", response_model=DocumentUploadResponse)
+
+# AFTER (with alias configuration):
+@router.post("/upload", response_model=DocumentUploadResponse, response_model_by_alias=True)
+```
+
+**Impact**: All API endpoints now serialize responses using camelCase field names as defined in Pydantic model aliases.
+
+#### **Frontend Fix: Consistent Field Access**
+**File Modified**: `/nextjs-fdas/src/lib/api/documents.ts`
+
+**Lines 452 & 99-100**:
+```typescript
+// BEFORE (accessing snake_case with fallback):
+const documentId = uploadData.document_id || uploadData.documentId;
+id: data.document_id,
+fileSize: file.size,
+mimeType: file.type,
+
+// AFTER (accessing camelCase from validated schema):
+const documentId = uploadData.documentId;
+id: data.documentId,
+fileSize: data.fileSize,
+mimeType: data.contentType,
+```
+
+**Critical Implementation Details**:
+1. **Pydantic Configuration**: Models use `alias_generator=to_camel` and `populate_by_name=True`
+2. **FastAPI Serialization**: `response_model_by_alias=True` forces use of aliases in JSON output
+3. **Frontend Schema Validation**: `DocumentUploadResponseSchema` expects camelCase field names
+4. **Consistent Field Mapping**: All field access now uses camelCase consistently
+
+**Error Flow Resolution**:
+1. ❌ **Before**: Frontend uploads document → Backend returns `{"document_id": "uuid"}` → Frontend tries `data.documentId` → Gets `undefined` → Polls `/api/documents/undefined`
+2. ✅ **After**: Frontend uploads document → Backend returns `{"documentId": "uuid"}` → Frontend accesses `data.documentId` → Gets valid UUID → Polls `/api/documents/{valid-uuid}`
+
+**Testing Verification**:
+- Server restart required for changes to take effect
+- Upload should now return valid document ID
+- Polling requests should use proper UUID instead of "undefined"
+
+---
+
 ## 🎯 Primary Objectives Completed
 
 ### 1. **Cumulative Visualization Display** ✅
