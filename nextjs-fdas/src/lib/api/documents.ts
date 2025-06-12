@@ -91,13 +91,17 @@ export const documentsApi = {
         DocumentUploadResponseSchema as any
       );
       
-      console.log(`API Client - uploadDocument: Upload successful, document ID: ${data.documentId}`);
+      console.log(`API Client - uploadDocument: Upload successful, document ID: ${data.document_id}`);
+      console.log(`API Client - uploadDocument: Full response data:`, JSON.stringify(data, null, 2));
       
       // For now, return a placeholder ProcessedDocument until re-processing is complete
       const uploadData = data as any; // Cast to any to avoid linter errors for placeholder mapping
+      const documentId = uploadData.document_id || uploadData.documentId;
+      console.log(`API Client - uploadDocument: Extracted document ID: ${documentId}`);
+      
       return {
         metadata: {
-          id: uploadData.documentId,
+          id: documentId, // Use snake_case from backend, fallback to camelCase
           filename: uploadData.filename,
           uploadTimestamp: new Date().toISOString(),
           fileSize: uploadData.fileSize,
@@ -445,7 +449,7 @@ export const documentsApi = {
       // Return placeholder document with the ID
       return {
         metadata: {
-          id: data.documentId,
+          id: data.document_id,
           filename: data.filename,
           uploadTimestamp: new Date().toISOString(),
           fileSize: file.size,

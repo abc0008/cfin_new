@@ -623,7 +623,7 @@ class ConversationService:
             
             charts_data = visualizations.get("charts", [])
             tables_data = visualizations.get("tables", [])
-            metrics_data = visualizations.get("metrics", []) # New: Extract metrics
+            metrics_data = result.get("metrics", []) # Extract metrics from top level, not visualizations
 
             logger.info(f"Received visualization data: {len(charts_data)} charts, {len(tables_data)} tables, {len(metrics_data)} metrics")
             
@@ -644,8 +644,8 @@ class ConversationService:
             for chart_item in charts_data:
                 processed_chart_item = {
                     "title": chart_item.get("config", {}).get("title", "Chart"),
-                    "visualization_type": chart_item.get("chartType", "chart"), # Matches frontend expectations
-                    "data": chart_item  # Store the entire chart item as data
+                    "visualization_type": "chart", # Frontend expects 'chart' as the block_type for all chart types
+                    "data": chart_item  # Store the entire chart item as data (includes chartType)
                 }
                 items_for_analysis_blocks.append(processed_chart_item)
             
@@ -1028,7 +1028,7 @@ When analyzing financial documents, focus on:
         # Keywords for visualization_analysis (explicit visualization)
         visualization_keywords = ["visualize", "chart", "graph", "plot", "table", "display"] # "show me" is too ambiguous, removed.
         # Keywords for visualization_analysis (analytical queries that benefit from structured output)
-        analytical_keywords = ["analyze", "analysis", "calculate", "ratio", "trend", "compare"]
+        analytical_keywords = ["analyze", "analysis", "calculate", "ratio", "trend", "compare", "deposits", "loans", "revenue", "profit", "assets", "liabilities"]
         # Keywords for visualization_analysis (summary/structured information)
         summary_keywords = [
             "summarize performance", "key financial changes", "what are the main metrics",

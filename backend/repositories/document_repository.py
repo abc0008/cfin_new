@@ -598,12 +598,12 @@ class DocumentRepository:
     def document_to_upload_response(self, document: Document) -> DocumentUploadResponse:
         """Convert a database document model to an upload response schema."""
         return DocumentUploadResponse(
-            document_id=document.id,
+            document_id=document.id,  # Keep as UUID object for proper validation
             filename=document.filename,
             status=document.processing_status.value if document.processing_status else "pending",
             message=f"Document uploaded and processing has {'started' if document.processing_status == ProcessingStatusEnum.PENDING else 'completed'}",
-            contentType=document.mime_type,
-            fileSize=document.file_size
+            content_type=document.mime_type,
+            file_size=document.file_size
         )
     
     def citation_to_api_schema(self, citation: Citation) -> CitationSchema:

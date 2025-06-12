@@ -265,6 +265,13 @@ class ClaudeService:
         except RateLimitError as e:
             # Re-raise rate limit errors for upstream handling
             raise
+        except Exception as e:
+            # Check for credit balance errors
+            if "credit balance is too low" in str(e).lower():
+                logger.error(f"Anthropic API credit balance too low: {str(e)}")
+                raise ValueError("Anthropic API credit balance is insufficient. Please add credits to your account.")
+            # Re-raise other errors
+            raise
         
         # Update rate limit state from response headers if available
         if hasattr(resp, 'response_headers') and resp.response_headers:
@@ -446,7 +453,7 @@ class ClaudeService:
         """
         if not self.client:
             logger.error(f"Claude client not available for full text extraction from {doc.filename}.")
-            return f"Error: Claude client not initialized for {doc.filename}."
+            raise ValueError("Claude API client is not available. Text extraction requires Claude API.")
             
         # Upload to Files API if not already done
         if not doc.claude_file_id:
@@ -739,8 +746,21 @@ class ClaudeService:
             return document_type, periods
             
         except Exception as e:
-            logger.exception(f"Error in document type analysis: {e}")
-            return DocumentContentType.OTHER, []
+            if "credit balance is too low" in str(e).lower() or "anthropic api credit balance" in str(e).lower():
+                logger.warning(f"Claude API unavailable due to credit balance. Using fallback classification for {filename}")
+                # Fallback: simple filename-based classification
+                filename_lower = filename.lower()
+                if "balance" in filename_lower or "bs" in filename_lower:
+                    return DocumentContentType.BALANCE_SHEET, ["Unknown Period"]
+                elif "income" in filename_lower or "profit" in filename_lower or "loss" in filename_lower:
+                    return DocumentContentType.INCOME_STATEMENT, ["Unknown Period"] 
+                elif "cash" in filename_lower or "flow" in filename_lower:
+                    return DocumentContentType.CASH_FLOW, ["Unknown Period"]
+                else:
+                    return DocumentContentType.OTHER, ["Unknown Period"]
+            else:
+                logger.exception(f"Error in document type analysis: {e}")
+                return DocumentContentType.OTHER, []
 
     async def _extract_financial_data_with_citations(self, pdf_content_base64: str, filename: str, document_type: DocumentContentType) -> Tuple[Dict[str, Any], List[Any]]:
         """
@@ -850,8 +870,16 @@ Follow these guidelines:
             return parsed_financial_json, citations
             
         except Exception as e:
-            logger.error(f"Error extracting structured financial data: {str(e)}", exc_info=True)
-            return {"error_extracting_structured_data": str(e)}, []
+            if "credit balance is too low" in str(e).lower() or "anthropic api credit balance" in str(e).lower():
+                logger.warning(f"Claude API unavailable due to credit balance. Returning minimal financial data for {filename}")
+                return {
+                    "error_extracting_structured_data": "Claude API credit balance insufficient",
+                    "fallback_note": f"Document {filename} uploaded successfully but structured analysis unavailable",
+                    "document_readable": True
+                }, []
+            else:
+                logger.error(f"Error extracting structured financial data: {str(e)}", exc_info=True)
+                return {"error_extracting_structured_data": str(e)}, []
 
     async def analyze_pdf_content(self, pdf_data: bytes, filename: str, use_cached_file_id: str = None) -> ProcessedDocument:
         """

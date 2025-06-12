@@ -45,10 +45,16 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
   const processAnalysisResults = useCallback((results: AnalysisResult[], msgs: any[]) => {
     // Check for analysis_blocks in messages first
     if (msgs.length > 0) {
-      console.log(`Checking ${msgs.length} messages for visualization data...`);
+      console.log(`Checking ${msgs.length} messages for cumulative visualization data...`);
       
-      // Find the latest assistant message with analysis_blocks
-      for (let i = msgs.length - 1; i >= 0; i--) {
+      // Collect visualizations from ALL assistant messages with analysis_blocks (cumulative)
+      const allCharts: ChartData[] = [];
+      const allTables: TableData[] = [];
+      const allMetrics: FinancialMetric[] = [];
+      let latestAnalysisText: string | undefined;
+      
+      // Process ALL assistant messages (not just the latest)
+      for (let i = 0; i < msgs.length; i++) {
         const msg = msgs[i];
         if (msg.role === 'assistant') {
           console.log(`Examining assistant message ${i}:`, 
@@ -58,9 +64,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
           if (msg.analysis_blocks && msg.analysis_blocks.length > 0) {
             console.log(`Found ${msg.analysis_blocks.length} analysis blocks in message ${msg.id || i}`);
             
-            const charts: ChartData[] = [];
-            const tables: TableData[] = [];
-            const metrics: FinancialMetric[] = [];
+            // Process blocks from this message and add to cumulative arrays
             
             // Detailed logging of block structure
             console.log('Analysis blocks structure:', JSON.stringify(msg.analysis_blocks[0], null, 2).substring(0, 200) + '...');
@@ -74,11 +78,11 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
                 // Check the structure to determine where the chart data is stored
                 if (block.content.chart_data) {
                   console.log(`Found chart data in block ${index}: ${block.content.chart_data.chartType}`);
-                  charts.push(block.content.chart_data);
+                  allCharts.push(block.content.chart_data);
                 } else if (block.content.chartType) {
                   // Direct chart data structure
                   console.log(`Found direct chart data in block ${index}: ${block.content.chartType}`);
-                  charts.push(block.content);
+                  allCharts.push(block.content);
                 }
               }
               
@@ -87,31 +91,44 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
                 // Check the structure to determine where the table data is stored
                 if (block.content.table_data) {
                   console.log(`Found table data in block ${index}: ${block.content.table_data.tableType}`);
-                  tables.push(block.content.table_data);
+                  allTables.push(block.content.table_data);
                 } else if (block.content.tableType) {
                   // Direct table data structure
                   console.log(`Found direct table data in block ${index}: ${block.content.tableType}`);
-                  tables.push(block.content);
+                  allTables.push(block.content);
                 }
               }
               
-              // Extract metrics if available
-              if (block.content && block.content.metrics) {
+              // Extract metrics
+              if (block.block_type === 'metric' && block.content) {
+                // Handle direct metric blocks
+                console.log(`Found metric block ${index}: ${block.title || 'No title'}`);
+                allMetrics.push(block.content);
+              } else if (block.content && block.content.metrics) {
+                // Handle nested metrics arrays
                 console.log(`Found ${block.content.metrics.length} metrics in block ${index}`);
-                metrics.push(...block.content.metrics);
+                allMetrics.push(...block.content.metrics);
               }
             });
             
-            // Return visualization data extracted from analysis blocks
-            console.log(`Returning visualization data from analysis_blocks: ${charts.length} charts, ${tables.length} tables, ${metrics.length} metrics`);
-            return {
-              charts,
-              tables,
-              metrics,
-              analysisText: msg.analysis_blocks.find(b => b.block_type === 'text_summary')?.content || undefined
-            };
+            // Check for text summary in this message
+            const textSummary = msg.analysis_blocks.find(b => b.block_type === 'text_summary')?.content;
+            if (textSummary) {
+              latestAnalysisText = textSummary;
+            }
           }
         }
+      }
+      
+      // Return cumulative visualization data if any was found
+      if (allCharts.length > 0 || allTables.length > 0 || allMetrics.length > 0) {
+        console.log(`Returning cumulative visualization data from analysis_blocks: ${allCharts.length} charts, ${allTables.length} tables, ${allMetrics.length} metrics`);
+        return {
+          charts: allCharts,
+          tables: allTables,
+          metrics: allMetrics,
+          analysisText: latestAnalysisText
+        };
       }
     }
 

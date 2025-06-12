@@ -14,6 +14,7 @@ CFIN (Financial Document Analysis System) is an AI-powered platform for analyzin
 - **AI Integration**: Anthropic Claude API (primary), LangChain/LangGraph (secondary)
 - **Storage**: Local filesystem or AWS S3
 - **Key Dependencies**: anthropic, langchain, fastapi, sqlalchemy, pydantic
+- **Backend Start Terminal Command**: cd /Users/alexcardell/AlexCoding_Local/cfin/backend && PYTHONPATH=$PYTHONPATH:/Users/alexcardell/AlexCoding_Local/cfin/backend python -m uvicorn app.main:app --reload --port 8000
 
 ### Frontend
 - **Framework**: Next.js 14 with App Router
