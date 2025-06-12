@@ -53,7 +53,7 @@ async def get_langchain_service():
 # --- Pydantic models for API response ---
 # Definitions are now in models/analysis.py and imported above
 
-@router.post("/run", response_model=AnalysisApiResponse)
+@router.post("/run", response_model=AnalysisApiResponse, response_model_by_alias=True)
 async def run_analysis_endpoint(
     analysis_request: AnalysisRequest,
     analysis_service: AnalysisService = Depends(get_analysis_service)
@@ -144,7 +144,7 @@ async def run_analysis_endpoint(
         logger.exception(f"Unhandled error during analysis run: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to run analysis: {str(e)}")
 
-@router.post("/run-with-tools", response_model=AnalysisApiResponse, deprecated=True)
+@router.post("/run-with-tools", response_model=AnalysisApiResponse, response_model_by_alias=True, deprecated=True)
 async def run_analysis_with_tools(
     analysis_request: AnalysisRequest,
     analysis_service: AnalysisService = Depends(get_analysis_service)
@@ -156,7 +156,7 @@ async def run_analysis_with_tools(
     return await run_analysis_endpoint(analysis_request, analysis_service)
 
 # Get endpoint for retrieving results
-@router.get("/{analysis_id}", response_model=AnalysisApiResponse)
+@router.get("/{analysis_id}", response_model=AnalysisApiResponse, response_model_by_alias=True)
 async def get_analysis_result(
     analysis_id: str,
     analysis_service: AnalysisService = Depends(get_analysis_service)
@@ -209,7 +209,7 @@ async def get_analysis_result(
         logger.exception(f"Error retrieving analysis {analysis_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving analysis: {str(e)}")
 
-@router.get("/document/{document_id}", response_model=List[Dict[str, Any]])
+@router.get("/document/{document_id}", response_model=List[Dict[str, Any]], response_model_by_alias=True)
 async def list_document_analyses(
     document_id: str,
     analysis_type: Optional[str] = None,
@@ -347,7 +347,7 @@ def generate_mock_ratios() -> List[FinancialRatio]:
         )
     ]
 
-@router.get("/{analysis_id}/enhanced", response_model=Dict[str, Any])
+@router.get("/{analysis_id}/enhanced", response_model=Dict[str, Any], response_model_by_alias=True)
 async def get_enhanced_analysis(
     analysis_id: str,
     analysis_service: AnalysisService = Depends(get_analysis_service)
@@ -421,7 +421,7 @@ async def get_enhanced_analysis(
         logger.error(f"Error getting enhanced analysis: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error retrieving enhanced analysis: {str(e)}")
 
-@router.get("/{analysis_id}/chart/{chart_type}", response_model=Dict[str, Any])
+@router.get("/{analysis_id}/chart/{chart_type}", response_model=Dict[str, Any], response_model_by_alias=True)
 async def get_chart_data(
     analysis_id: str,
     chart_type: str,

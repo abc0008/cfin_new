@@ -117,4 +117,7 @@ class DocumentUploadResponse(BaseModel):
     content_type: str = Field(alias="contentType")
     file_size: int = Field(alias="fileSize")
     
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, 
+        populate_by_name=True
+    )

@@ -47,7 +47,7 @@ async def get_current_user_id():
     # In a real application, this would validate the JWT token and return the user ID
     return "default-user"
 
-@router.post("", response_model=ConversationState, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ConversationState, response_model_by_alias=True, status_code=status.HTTP_201_CREATED)
 async def create_conversation(
     conversation_data: ConversationCreateRequest,
     conversation_service: ConversationService = Depends(get_conversation_service),
@@ -83,7 +83,7 @@ async def create_conversation(
             detail=f"Error creating conversation: {str(e)}"
         )
 
-@router.post("/{session_id}/message", response_model=MessageResponse)
+@router.post("/{session_id}/message", response_model=MessageResponse, response_model_by_alias=True)
 async def send_message(
     session_id: str,
     message: MessageRequest,
@@ -174,7 +174,7 @@ def is_financial_analysis_request(message: str) -> bool:
     
     return False
 
-@router.get("/{conversation_id}/history", response_model=List[Message])
+@router.get("/{conversation_id}/history", response_model=List[Message], response_model_by_alias=True)
 async def get_conversation_history(
     conversation_id: str,
     limit: int = Query(50, ge=1, le=100),
@@ -268,7 +268,7 @@ async def get_conversation_history(
     
     return api_messages
 
-@router.get("", response_model=List[Dict[str, Any]])
+@router.get("", response_model=List[Dict[str, Any]], response_model_by_alias=True)
 async def list_conversations(
     limit: int = Query(10, ge=1, le=50),
     offset: int = Query(0, ge=0),
@@ -432,7 +432,7 @@ async def add_document_to_conversation(
             detail=f"Error adding document to conversation: {str(e)}"
         )
 
-@router.get("/{conversation_id}/document", response_model=List[Dict[str, Any]])
+@router.get("/{conversation_id}/document", response_model=List[Dict[str, Any]], response_model_by_alias=True)
 async def get_conversation_documents(
     conversation_id: str,
     conversation_service: ConversationService = Depends(get_conversation_service),

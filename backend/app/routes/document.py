@@ -27,7 +27,7 @@ async def get_document_service(db: AsyncSession = Depends(get_db)):
     document_repository = DocumentRepository(db)
     return DocumentService(document_repository)
 
-@router.post("/upload", response_model=DocumentUploadResponse)
+@router.post("/upload", response_model=DocumentUploadResponse, response_model_by_alias=True)
 async def upload_document(
     file: UploadFile = File(...),
     user_id: str = Form("default-user"),  # In a real app, this would come from auth
@@ -67,7 +67,7 @@ async def count_documents(
     count = await document_repository.count_documents(user_id)
     return {"count": count}
 
-@router.get("", response_model=List[DocumentMetadata])
+@router.get("", response_model=List[DocumentMetadata], response_model_by_alias=True)
 async def list_documents(
     user_id: str = "default-user",  # In a real app, this would come from auth
     page: int = Query(1, ge=1),
@@ -83,7 +83,7 @@ async def list_documents(
     # Convert to API schema
     return [document_repository.document_to_metadata_schema(doc) for doc in documents]
 
-@router.get("/{document_id}", response_model=ProcessedDocument)
+@router.get("/{document_id}", response_model=ProcessedDocument, response_model_by_alias=True)
 async def get_document(
     document_id: str,
     document_repository: DocumentRepository = Depends(get_document_repository)
@@ -97,7 +97,7 @@ async def get_document(
     
     return document_repository.document_to_api_schema(document)
 
-@router.get("/{document_id}/citations", response_model=List[Citation])
+@router.get("/{document_id}/citations", response_model=List[Citation], response_model_by_alias=True)
 async def get_document_citations(
     document_id: str,
     document_repository: DocumentRepository = Depends(get_document_repository)
@@ -114,7 +114,7 @@ async def get_document_citations(
     # Convert to API schema
     return [document_repository.citation_to_api_schema(citation) for citation in citations]
 
-@router.get("/{document_id}/citations/{citation_id}", response_model=Citation)
+@router.get("/{document_id}/citations/{citation_id}", response_model=Citation, response_model_by_alias=True)
 async def get_citation(
     document_id: str,
     citation_id: str,
