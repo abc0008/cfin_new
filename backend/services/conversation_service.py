@@ -204,7 +204,9 @@ class ConversationService:
         conversation_id: str,
         content: str,
         role: str,
-        citation_ids: Optional[List[str]] = None
+        citation_ids: Optional[List[str]] = None,
+        referenced_documents: Optional[List[str]] = None,
+        referenced_analyses: Optional[List[str]] = None
     ) -> Optional[Message]:
         """
         Add a message to a conversation.
@@ -235,7 +237,9 @@ class ConversationService:
             conversation_id=conversation_id,
             content=content,
             role=role,
-            citation_ids=citation_ids
+            citation_ids=citation_ids,
+            referenced_documents=referenced_documents or [],
+            referenced_analyses=referenced_analyses or []
         )
     
     async def get_conversation_messages(
@@ -411,7 +415,9 @@ class ConversationService:
         self,
         conversation_id: str,
         content: str,
-        citation_ids: Optional[List[str]] = None
+        citation_ids: Optional[List[str]] = None,
+        referenced_documents: Optional[List[str]] = None,
+        referenced_analyses: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Process a user message and generate an AI response.
@@ -434,7 +440,9 @@ class ConversationService:
             conversation_id=conversation_id,
             content=content,
             role="user",
-            citation_ids=citation_ids
+            citation_ids=citation_ids,
+            referenced_documents=referenced_documents,
+            referenced_analyses=referenced_analyses
         )
         
         if not user_message:
@@ -521,6 +529,7 @@ class ConversationService:
         message_history = []
         for msg in messages:
             if msg.id != user_message.id:  # Skip the message we just added
+                
                 message_history.append({
                     "role": msg.role,
                     "content": msg.content

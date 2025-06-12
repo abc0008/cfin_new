@@ -109,7 +109,7 @@ class ConversationApiService {
   /**
    * Create a new conversation
    */
-  async createConversation(title: string = 'New Conversation', documentIds: string[] = []): Promise<{ session_id: string }> {
+  async createConversation(title: string = 'New Conversation', documentIds: string[] = []): Promise<{ sessionId?: string; session_id?: string }> {
     try {
       // Validate request data against schema
       const validatedData = validateRequest(ConversationCreateRequestSchema, {
@@ -118,13 +118,13 @@ class ConversationApiService {
         userId: 'default-user' // This is handled by the backend, but we'll include it for completeness
       });
       
-      const response = await this.request<{ session_id: string }>(
+      const response = await this.request<{ sessionId?: string; session_id?: string }>(
         `/conversation`,
         'POST',
         validatedData
       );
       
-      console.log(`Created conversation session: ${response.session_id}`);
+      console.log(`Created conversation session: ${response.sessionId || response.session_id}`);
       return response;
     } catch (error) {
       console.error('Error creating conversation:', error);
@@ -158,11 +158,15 @@ class ConversationApiService {
 
     try {
       // Format the request body to match the backend's expected format
+      // The backend expects camelCase due to alias_generator=to_camel
       const requestBody = {
-        session_id: sessionId,  // Use snake_case for backend compatibility
+        sessionId: sessionId,
         content: message,
-        document_ids: documentIds,  // Use snake_case for backend compatibility
-        user_id: 'default-user'  // Use snake_case for backend compatibility
+        userId: 'default-user',
+        referencedDocuments: documentIds,
+        referencedAnalyses: [],
+        citationLinks: [],
+        citationIds: []
       };
       
       const response = await this.request<Message>(

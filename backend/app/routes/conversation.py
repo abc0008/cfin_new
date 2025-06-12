@@ -17,6 +17,7 @@ from utils.database import get_db
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/conversation", tags=["conversation"])
 
+
 # Dependencies
 async def get_document_repository(db: AsyncSession = Depends(get_db)):
     return DocumentRepository(db)
@@ -107,7 +108,9 @@ async def send_message(
         result = await conversation_service.process_user_message(
             conversation_id=session_id,
             content=message.content,
-            citation_ids=message.citation_links
+            citation_ids=message.citation_links,
+            referenced_documents=message.referenced_documents,
+            referenced_analyses=message.referenced_analyses
         )
         if not result.get("success", True):
             logger.warning(f"Error processing message: {result.get('error', 'Unknown error')}")
@@ -115,12 +118,14 @@ async def send_message(
             assistant_message = result.get("message")
             if isinstance(assistant_message, dict):
                 return MessageResponse(**assistant_message)
-            return assistant_message
+            # Convert ORM object to MessageResponse with proper field validation
+            return MessageResponse.model_validate(assistant_message, from_attributes=True)
         # Ensure the returned message is a MessageResponse
         message_data = result.get("message")
         if isinstance(message_data, dict):
             return MessageResponse(**message_data)
-        return message_data
+        # Convert ORM object to MessageResponse with proper field validation
+        return MessageResponse.model_validate(message_data, from_attributes=True)
     except ValueError as e:
         logger.error(f"Bad request while processing message: {str(e)}")
         raise HTTPException(

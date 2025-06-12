@@ -74,8 +74,10 @@ export default function Workspace() {
           // Create a new conversation session
           const response = await conversationApi.createConversation('New Conversation');
           if (mounted) {
-            setSessionId(response.session_id);
-            console.log('Created conversation session:', response.session_id);
+            // The backend returns sessionId in camelCase due to alias_generator
+            const sessionIdValue = response.sessionId || response.session_id;
+            setSessionId(sessionIdValue);
+            console.log('Created conversation session:', sessionIdValue);
           }
         } catch (error) {
           console.error('Error initializing session:', error);
@@ -387,7 +389,7 @@ export default function Workspace() {
       }
 
       // Generate stable ID for assistant response
-      const responseContent = response.response || '';
+      const responseContent = response.content || '';
       const messageId = generateMessageId('assistant', responseContent);
       
       // Check if a message with this ID already exists
@@ -405,10 +407,10 @@ export default function Workspace() {
           role: 'assistant',
           content: responseContent,
           timestamp: new Date().toISOString(),
-          referencedDocuments: response.referenced_documents || [],
-          referencedAnalyses: response.referenced_analyses || [],
-          citationReferences: response.citation_references || [],
-          analysis_blocks: response.analysis_blocks || [],
+          referencedDocuments: response.referencedDocuments || [],
+          referencedAnalyses: response.referencedAnalyses || [],
+          citationLinks: response.citationLinks || [],
+          analysis_blocks: response.analysisBlocks || [],
         }
       }));
     } catch (error) {

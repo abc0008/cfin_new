@@ -391,8 +391,12 @@ Format your responses in well-structured markdown.
             pre_api_memory = self._monitor_memory_usage("before_claude_api_call")
             self._optimize_memory_if_needed(pre_api_memory)
             
-            # Set up the client
-            client = Anthropic(api_key=api_key)
+            # Set up the client with Files API beta headers
+            import settings
+            default_headers = {
+                "anthropic-beta": settings.ANTHROPIC_BETA
+            }
+            client = Anthropic(api_key=api_key, default_headers=default_headers)
             
             # Prepare request parameters
             params = {
@@ -1193,13 +1197,24 @@ IMPORTANT INSTRUCTIONS:
             document_count = len([item for item in user_content if item.get('type') == 'document'])
             logger.info(f"Calling Anthropic API with {len(anthropic_messages)} messages and {document_count} documents")
             
+            
             # Use a model that supports citations
             model_name = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
             logger.info(f"Using Claude model: {model_name}")
             
-            # Create the Anthropic client
+            # Create the Anthropic client with Files API beta headers
             from anthropic import Anthropic
-            anthropic_client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+            import settings
+            
+            # Use the same headers as the main Claude service to enable Files API
+            default_headers = {
+                "anthropic-beta": settings.ANTHROPIC_BETA
+            }
+            
+            anthropic_client = Anthropic(
+                api_key=os.environ.get("ANTHROPIC_API_KEY"),
+                default_headers=default_headers
+            )
             
             # Call the API
             try:

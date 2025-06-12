@@ -196,7 +196,9 @@ class ConversationRepository:
         conversation_id: str, 
         content: str, 
         role: str,
-        citation_ids: Optional[List[str]] = None
+        citation_ids: Optional[List[str]] = None,
+        referenced_documents: Optional[List[str]] = None,
+        referenced_analyses: Optional[List[str]] = None
     ) -> Optional[Message]:
         """
         Add a message to a conversation.
@@ -224,7 +226,9 @@ class ConversationRepository:
             conversation_id=conversation_id,
             content=content,
             role=role,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            referenced_documents=referenced_documents or [],
+            referenced_analyses=referenced_analyses or []
         )
         
         # Add to database

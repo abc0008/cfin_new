@@ -2,7 +2,7 @@ from enum import Enum
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid
-from pydantic import BaseModel, Field, UUID4, field_serializer, AliasChoices, ConfigDict
+from pydantic import BaseModel, Field, UUID4, field_serializer, field_validator, AliasChoices, ConfigDict
 import logging
 
 from models.citation import Citation, ContentBlock
@@ -103,6 +103,45 @@ class MessageResponse(BaseModel):
                     logger.warning(f"Error validating citation: {e} for {getattr(message_citation_orm.citation, 'id', 'unknown ID')}")
                     pass
         return processed_citations
+
+    @field_validator('analysis_blocks', mode='before')
+    @classmethod
+    def validate_analysis_blocks(cls, v: Any) -> List[Dict[str, Any]]:
+        """Convert ORM objects to dictionaries before validation."""
+        if not v:
+            return []
+        
+        processed_blocks = []
+        for analysis_block_orm in v:
+            try:
+                # Convert ORM object to dictionary
+                if hasattr(analysis_block_orm, '__dict__'):
+                    # Handle datetime serialization more safely
+                    created_at_str = None
+                    if hasattr(analysis_block_orm, 'created_at') and analysis_block_orm.created_at:
+                        try:
+                            created_at_str = analysis_block_orm.created_at.isoformat()
+                        except Exception:
+                            created_at_str = str(analysis_block_orm.created_at)
+                    
+                    block_dict = {
+                        'id': getattr(analysis_block_orm, 'id', ''),
+                        'block_type': getattr(analysis_block_orm, 'block_type', ''),
+                        'title': getattr(analysis_block_orm, 'title', ''),
+                        'content': getattr(analysis_block_orm, 'content', {}),
+                        'created_at': created_at_str
+                    }
+                    processed_blocks.append(block_dict)
+                elif isinstance(analysis_block_orm, dict):
+                    # If it's already a dictionary, use it as-is
+                    processed_blocks.append(analysis_block_orm)
+                else:
+                    logger.warning(f"Unexpected analysis block type: {type(analysis_block_orm)}")
+            except Exception as e:
+                logger.warning(f"Error converting analysis block: {e} for {getattr(analysis_block_orm, 'id', 'unknown ID')}")
+                # Don't fail completely, just skip this block
+                continue
+        return processed_blocks
 
 
 class ConversationHistoryResponse(BaseModel):
