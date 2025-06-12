@@ -1173,9 +1173,15 @@ Follow these guidelines:
                     logger.warning(f"Reached maximum turns ({max_turns}) for visualization analysis")
                     break
             
+            # Prepare analysis text, ensuring it's not empty
+            current_analysis_text = accumulated_text.strip()
+            if not current_analysis_text:
+                logger.warning("accumulated_text was empty in analyze_with_visualization_tools. Using default fallback text.")
+                current_analysis_text = "Here's the information based on your query and the provided documents."
+
             # Return structured result
             result = {
-                "analysis_text": accumulated_text.strip(),
+                "analysis_text": current_analysis_text,
                 "visualizations": {
                     "charts": accumulated_charts,
                     "tables": accumulated_tables
@@ -1183,7 +1189,7 @@ Follow these guidelines:
                 "metrics": accumulated_metrics
             }
             
-            logger.info(f"Visualization analysis completed: {len(accumulated_charts)} charts, {len(accumulated_tables)} tables, {len(accumulated_metrics)} metrics")
+            logger.info(f"Visualization analysis completed: {len(accumulated_charts)} charts, {len(accumulated_tables)} tables, {len(accumulated_metrics)} metrics. Analysis text length: {len(current_analysis_text)}")
             return result
             
         except Exception as e:

@@ -607,9 +607,16 @@ class ConversationService:
             
             # Extract analysis text and visualization data
             analysis_text = result.get("analysis_text", "")
-            visualizations = result.get("visualizations", {"charts": [], "tables": []})
+            # Ensure visualizations is a dict and provide defaults for charts, tables, and metrics
+            visualizations = result.get("visualizations", {})
+            if not isinstance(visualizations, dict): # Handle cases where visualizations might not be a dict
+                visualizations = {}
             
-            logger.info(f"Received visualization data: {len(visualizations.get('charts', []))} charts, {len(visualizations.get('tables', []))} tables")
+            charts_data = visualizations.get("charts", [])
+            tables_data = visualizations.get("tables", [])
+            metrics_data = visualizations.get("metrics", []) # New: Extract metrics
+
+            logger.info(f"Received visualization data: {len(charts_data)} charts, {len(tables_data)} tables, {len(metrics_data)} metrics")
             
             # Add assistant message to conversation
             assistant_message = await self.add_message(
@@ -622,40 +629,52 @@ class ConversationService:
                 raise ValueError("Failed to add assistant message to conversation")
             
             # Process visualizations and store as analysis blocks
-            charts = visualizations.get("charts", [])
-            tables = visualizations.get("tables", [])
+            items_for_analysis_blocks = []
             
-            visualization_list = []
-            
-            # Process charts - store the chart data directly without modification
-            # since it's already been processed by _process_chart_input
-            for chart in charts:
-                chart_data = {
-                    "title": chart.get("config", {}).get("title", "Chart"),
-                    "visualization_type": chart.get("chartType", "chart"),
-                    "chart_data": chart  # Store the entire processed chart data
+            # Process charts
+            for chart_item in charts_data:
+                processed_chart_item = {
+                    "title": chart_item.get("config", {}).get("title", "Chart"),
+                    "visualization_type": chart_item.get("chartType", "chart"), # Matches frontend expectations
+                    "data": chart_item  # Store the entire chart item as data
                 }
-                visualization_list.append(chart_data)
+                items_for_analysis_blocks.append(processed_chart_item)
             
-            # Process tables - store the table data directly without modification
-            # since it's already been processed by _process_table_input
-            for table in tables:
-                table_data = {
-                    "title": table.get("config", {}).get("title", "Table"),
-                    "visualization_type": "table",
-                    "table_data": table  # Store the entire processed table data
+            # Process tables
+            for table_item in tables_data:
+                processed_table_item = {
+                    "title": table_item.get("config", {}).get("title", "Table"),
+                    "visualization_type": "table", # Matches frontend expectations
+                    "data": table_item  # Store the entire table item as data
                 }
-                visualization_list.append(table_data)
+                items_for_analysis_blocks.append(processed_table_item)
+
+            # New: Process metrics
+            for metric_item in metrics_data:
+                processed_metric_item = {
+                    "title": metric_item.get("name", metric_item.get("title", "Metric")), # Use 'name' or 'title'
+                    "visualization_type": "metric", # Or "key_figure" - using "metric"
+                    "data": metric_item  # Store the entire metric item as data
+                }
+                items_for_analysis_blocks.append(processed_metric_item)
             
-            # Store visualizations as analysis blocks
-            if visualization_list:
-                logger.info(f"Storing {len(visualization_list)} visualization blocks for message {assistant_message.id}")
+            # Store all items (charts, tables, metrics) as analysis blocks
+            if items_for_analysis_blocks:
+                logger.info(f"Storing {len(items_for_analysis_blocks)} analysis blocks for message {assistant_message.id}")
                 await self._process_visualizations(
                     message_id=assistant_message.id,
-                    visualizations=visualization_list
+                    visualizations=items_for_analysis_blocks # Pass the combined list
                 )
+
+                # New: Refresh assistant_message to load the analysis_blocks relationship
+                try:
+                    await self.conversation_repository.db.refresh(assistant_message, attribute_names=['analysis_blocks'])
+                    logger.info(f"Refreshed assistant_message {assistant_message.id} to load analysis_blocks")
+                except Exception as e:
+                    logger.error(f"Failed to refresh assistant_message {assistant_message.id}: {str(e)}")
+                    # Continue without refresh if it fails, though the response might be incomplete
             else:
-                logger.warning(f"No visualization data to store for message {assistant_message.id}")
+                logger.warning(f"No visualization data (charts, tables, metrics) to store for message {assistant_message.id}")
             
             return {
                 "success": True,
@@ -864,14 +883,19 @@ When analyzing financial documents, focus on:
             title = viz.get("title", f"Visualization {i+1}")
             block_type = viz.get("visualization_type", "chart")
             
-            if not block_type in ["bar", "line", "pie", "area", "scatter"]:
-                block_type = "chart"  # Default to chart if unrecognized
+            # Ensure block_type is one of the known types, or a new one like "metric"
+            # Existing types: "bar", "line", "pie", "area", "scatter", "table"
+            # New type: "metric"
+            # The `visualization_type` from the item (e.g., "chart", "table", "metric") is used directly.
+            # `add_analysis_block` in repository should handle `block_type=viz.get("visualization_type")`
+            # and `content=viz.get("data")`
             
+            # The content of the analysis block should be the 'data' part of the viz item
             await self.conversation_repository.add_analysis_block(
                 message_id=message_id,
-                block_type=block_type,
+                block_type=viz.get("visualization_type", "unknown"), # Use the type from the item directly
                 title=title,
-                content=viz
+                content=viz.get("data") # Store the 'data' part of the item
             )
     
     async def add_document_to_conversation(
@@ -989,24 +1013,54 @@ When analyzing financial documents, focus on:
         if not document_texts or len(document_texts) == 0:
             logger.info(f"No documents available for conversation {conversation_id}, using simple_qa approach")
             return "simple_qa"
-        
-        # If message explicitly mentions citations or refers to specific parts of a document
-        if any(term in message_content.lower() for term in ["cite", "citation", "reference", "page", "section", "paragraph"]):
-            logger.info(f"User message for conversation {conversation_id} mentions citations, using citations approach")
-            return "citations"
-        
-        # If message requires visualization (chart or table)
-        if any(term in message_content.lower() for term in ["visualize", "chart", "graph", "plot", "table", "show me", "display"]):
+
+        lower_message_content = message_content.lower()
+
+        # Keywords for visualization_analysis (explicit visualization)
+        visualization_keywords = ["visualize", "chart", "graph", "plot", "table", "display"] # "show me" is too ambiguous, removed.
+        # Keywords for visualization_analysis (analytical queries that benefit from structured output)
+        analytical_keywords = ["analyze", "analysis", "calculate", "ratio", "trend", "compare"]
+        # Keywords for visualization_analysis (summary/structured information)
+        summary_keywords = [
+            "summarize performance", "key financial changes", "what are the main metrics",
+            "financial health", "breakdown of", "details on" # "details on" will be checked with financial context later
+        ]
+        # Keywords for citations
+        citation_keywords = ["cite", "citation", "reference", "page", "section", "paragraph"]
+
+        # Check for visualization keywords
+        if any(term in lower_message_content for term in visualization_keywords):
             logger.info(f"User message for conversation {conversation_id} requests visualization, using visualization_analysis approach")
             return "visualization_analysis"
+
+        # Check for analytical and summary keywords that should lead to visualization_analysis
+        # This includes previous "full_graph" keywords and new summary keywords.
+        analytical_or_summary_triggered = False
+        if any(term in lower_message_content for term in analytical_keywords):
+            analytical_or_summary_triggered = True
         
-        # If message requires financial analysis
-        if any(term in message_content.lower() for term in ["analyze", "analysis", "calculate", "ratio", "trend", "compare"]):
-            logger.info(f"User message for conversation {conversation_id} requests financial analysis, using full_graph approach")
-            return "full_graph"
+        for term in summary_keywords:
+            if term == "details on":
+                # Check for "details on [financial concept]" - simplistic check for now
+                if "details on" in lower_message_content and ("financial" in lower_message_content or "metric" in lower_message_content or "kpi" in lower_message_content):
+                    analytical_or_summary_triggered = True
+                    break
+            elif term in lower_message_content:
+                analytical_or_summary_triggered = True
+                break
+
+        if analytical_or_summary_triggered:
+            logger.info(f"User message for conversation {conversation_id} requests analysis/summary, using visualization_analysis approach")
+            return "visualization_analysis"
+
+        # Check for citation keywords IF no analytical/visualization keywords were strongly triggered
+        # This gives priority to analytical/visualization paths if there's an overlap.
+        if any(term in lower_message_content for term in citation_keywords):
+            logger.info(f"User message for conversation {conversation_id} mentions citations and no strong analytical/viz keywords, using citations approach")
+            return "citations"
         
         # Default to simple QA for basic questions
-        logger.info(f"Using default simple_qa approach for conversation {conversation_id}")
+        logger.info(f"Using default simple_qa approach for conversation {conversation_id} (no specific keywords matched)")
         return "simple_qa"
     
     async def _process_with_langgraph(
