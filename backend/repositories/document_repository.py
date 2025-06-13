@@ -186,33 +186,32 @@ class DocumentRepository:
             content_data = {
                 "content": pdf_content,
                 "id": document_id,
-                "filename": document.filename
+                "filename": document.filename,
+                "mime_type": document.mime_type
             }
             
-            # Add raw text if available - first try document.raw_text, then extracted_data
-            logger.info(f"[PDF-VISIBILITY-FIX] Document {document_id} raw_text check: present={document.raw_text is not None}")
-            logger.info(f"[PDF-VISIBILITY-FIX] Document {document_id} extracted_data check: present={document.extracted_data is not None}, type={type(document.extracted_data).__name__ if document.extracted_data else 'None'}")
+            # Priority: Add claude_file_id for Files API integration (native PDF support)
+            if document.claude_file_id:
+                content_data["claude_file_id"] = document.claude_file_id
+                logger.info(f"Document {document_id} has claude_file_id: {document.claude_file_id} (native PDF support available)")
+            else:
+                logger.warning(f"Document {document_id} missing claude_file_id - cannot use native PDF support")
             
-            if document.extracted_data:
-                if isinstance(document.extracted_data, dict):
-                    logger.info(f"[PDF-VISIBILITY-FIX] Document {document_id} extracted_data keys: {list(document.extracted_data.keys())}")
-                    if "raw_text" in document.extracted_data:
-                        logger.info(f"[PDF-VISIBILITY-FIX] Document {document_id} has raw_text in extracted_data ({len(str(document.extracted_data['raw_text']))} chars)")
-                    else:
-                        logger.info(f"[PDF-VISIBILITY-FIX] Document {document_id} missing raw_text in extracted_data")
-                else:
-                    logger.info(f"[PDF-VISIBILITY-FIX] Document {document_id} extracted_data is not a dictionary")
-            
-            if document.raw_text:
+            # Add raw text if available (optional for PDFs with claude_file_id)
+            # For PDFs, prefer claude_file_id over raw_text for native PDF support
+            if document.mime_type == "application/pdf" and document.claude_file_id:
+                logger.info(f"PDF document {document_id} uses claude_file_id for native support - raw_text not required")
+                content_data["raw_text"] = None  # Explicitly set to None for PDFs with file_id
+            elif document.raw_text:
                 content_data["raw_text"] = document.raw_text
-                logger.info(f"[PDF-VISIBILITY-FIX] Using document.raw_text for document {document_id}: {len(document.raw_text)} characters")
+                logger.info(f"Using document.raw_text for document {document_id}: {len(document.raw_text)} characters")
             elif document.extracted_data and isinstance(document.extracted_data, dict) and "raw_text" in document.extracted_data:
                 # Extract raw text from extracted_data as fallback
                 content_data["raw_text"] = document.extracted_data["raw_text"]
-                logger.info(f"[PDF-VISIBILITY-FIX] Using extracted_data.raw_text for document {document_id}: {len(str(document.extracted_data['raw_text']))} characters")
+                logger.info(f"Using extracted_data.raw_text for document {document_id}: {len(str(document.extracted_data['raw_text']))} characters")
             else:
-                logger.warning(f"[PDF-VISIBILITY-FIX] No raw text available for document {document_id} - all extraction attempts failed")
-                content_data["raw_text"] = "Document text not yet extracted"
+                logger.warning(f"No raw text available for document {document_id}")
+                content_data["raw_text"] = None
             
             # Add extracted data if available
             if document.extracted_data:

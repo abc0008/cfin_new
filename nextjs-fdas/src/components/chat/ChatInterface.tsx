@@ -5,6 +5,7 @@ import { Message, Citation } from '@/types';
 import { conversationApi } from '@/lib/api/conversation';
 import { Loader2, Send, FileText } from 'lucide-react';
 import { MessageRenderer } from './MessageRenderer';
+import { FollowUpQuestions } from './FollowUpQuestions';
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -13,6 +14,7 @@ interface ChatInterfaceProps {
   isLoading?: boolean;
   onCitationClick?: (citation: Citation) => void;
   onNavigateToHighlight?: (citation: Citation) => void;
+  conversationId?: string;
 }
 
 export function ChatInterface({ 
@@ -21,7 +23,8 @@ export function ChatInterface({
   activeDocuments = [],
   isLoading = false,
   onCitationClick,
-  onNavigateToHighlight
+  onNavigateToHighlight,
+  conversationId
 }: ChatInterfaceProps) {
   const [inputValue, setInputValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,7 +84,7 @@ export function ChatInterface({
   }, [activeDocuments, onNavigateToHighlight]);
 
   // Memoize the renderMessage function to prevent unnecessary re-renders
-  const renderMessage = useCallback((message: Message) => {
+  const renderMessage = useCallback((message: Message, index: number) => {
     // Special case for loading message
     if (message.role === 'system' && message.content === 'AI is thinking...') {
       return (
@@ -94,28 +97,42 @@ export function ChatInterface({
       );
     }
 
+    const isLastAssistantMessage = message.role === 'assistant' && 
+      index === messages.length - 1 && 
+      !isLoading;
+
     return (
-      <div 
-        key={`${message.id}-${message.role}`} 
-        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
-      >
+      <div key={`${message.id}-${message.role}`}>
         <div 
-          className={`max-w-[80%] rounded-lg px-4 py-3 font-avenir-pro text-sm ${
-            message.role === 'user' 
-              ? 'bg-primary text-primary-foreground' 
-              : message.role === 'system' 
-                ? 'bg-muted text-muted-foreground italic' 
-                : 'bg-card border border-border text-foreground shadow-sm'
-          }`}
+          className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
         >
-          <MessageRenderer 
-            message={message} 
-            onCitationClick={handleCitationClick}
-          />
+          <div 
+            className={`max-w-[80%] rounded-lg px-4 py-3 font-avenir-pro text-sm ${
+              message.role === 'user' 
+                ? 'bg-primary text-primary-foreground' 
+                : message.role === 'system' 
+                  ? 'bg-muted text-muted-foreground italic' 
+                  : 'bg-card border border-border text-foreground shadow-sm'
+            }`}
+          >
+            <MessageRenderer 
+              message={message} 
+              onCitationClick={handleCitationClick}
+            />
+          </div>
         </div>
+        {/* Show follow-up questions after the last assistant message */}
+        {isLastAssistantMessage && conversationId && (
+          <FollowUpQuestions
+            key={`followup-${message.id}`} // Force remount for each new message
+            conversationId={conversationId}
+            onQuestionClick={(question) => setInputValue(question)}
+            disabled={isSubmitting || isLoading}
+          />
+        )}
       </div>
     );
-  }, [handleCitationClick]);
+  }, [handleCitationClick, messages.length, isLoading, conversationId, isSubmitting]);
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -153,7 +170,7 @@ export function ChatInterface({
             </div>
           </div>
         ) : (
-          messages.map((message) => renderMessage(message))
+          messages.map((message, index) => renderMessage(message, index))
         )}
         {isLoading && (
           <div className="flex justify-start">

@@ -606,6 +606,7 @@ export default function Workspace() {
               onSendMessage={handleSendMessage} 
               activeDocuments={selectedDocument ? [selectedDocument.metadata.id] : []}
               isLoading={isLoading}
+              conversationId={sessionId || undefined}
             />
           </div>
         </div>

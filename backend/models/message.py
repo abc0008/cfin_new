@@ -33,6 +33,7 @@ class Message(BaseModel):
     citations: Optional[List[Citation]] = Field(default_factory=list)
     content_blocks: Optional[List[ContentBlock]] = Field(default=None, alias="contentBlocks")
     analysis_blocks: Optional[List[Dict[str, Any]]] = Field(default=None, alias="analysisBlocks")
+    follow_up_questions: Optional[List[str]] = Field(default=None, alias="followUpQuestions")
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
@@ -82,6 +83,7 @@ class MessageResponse(BaseModel):
     citations_data: List[Any] = Field(default_factory=list, alias="citations")
     content_blocks: Optional[List[ContentBlock]] = Field(default=None, alias="contentBlocks")
     analysis_blocks: Optional[List[Dict[str, Any]]] = Field(default=None, alias="analysisBlocks")
+    follow_up_questions: Optional[List[str]] = Field(default=None, alias="followUpQuestions")
 
     model_config = ConfigDict(
         alias_generator=to_camel,

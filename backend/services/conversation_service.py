@@ -336,27 +336,7 @@ class ConversationService:
                     if raw_text is not None and not raw_text:
                         logger.warning(f"Empty raw_text for document {doc_id}")
                     
-                    # REMOVED PYPDF2 FALLBACK: Rely on raw_text from initial processing
-                    # If we don't have text but have binary content, try to extract it
-                    # if not raw_text and content_data and isinstance(content_data, bytes):
-                    #     try:
-                    #         # Try to extract text directly from PDF
-                    #         import PyPDF2
-                    #         from io import BytesIO
-                    #         
-                    #         logger.info(f"Attempting direct text extraction from binary PDF for document {doc_id}")
-                    #         pdf_reader = PyPDF2.PdfReader(BytesIO(content_data))
-                    #         extracted_text = ""
-                    #         
-                    #         for page_num in range(len(pdf_reader.pages)):
-                    #             page = pdf_reader.pages[page_num]
-                    #             extracted_text += page.extract_text() + "\n\n"
-                    #         
-                    #         if extracted_text.strip():
-                    #             raw_text = extracted_text
-                    #             logger.info(f"Successfully extracted {len(raw_text)} chars of text directly from PDF")
-                    #     except Exception as e:
-                    #         logger.warning(f"Failed to extract text from PDF: {str(e)}")
+                    # No fallback text extraction - use Files API claude_file_id instead
                 else:
                     logger.warning(f"Document content not found for {doc_id}")
                 
@@ -469,51 +449,41 @@ class ConversationService:
                         raw_text = content_obj.get("raw_text")
                         extracted_data = content_obj.get("extracted_data")
                         
-                        # Create proper document dictionary instead of just raw text
+                        # Get the document model to check for claude_file_id
+                        document = await self.document_repository.get_document(doc_info["id"])
+                        
+                        # Create proper document dictionary
                         doc_dict = {
                             "id": doc_info["id"],
                             "title": doc_info.get("filename", "Document"),
                             "type": "document"
                         }
                         
-                        # Add the raw text if available
-                        if raw_text:
-                            doc_dict["raw_text"] = raw_text
-                            
-                            # Add document to list as properly structured dictionary
+                        # Priority 1: Use claude_file_id for native PDF support (recommended approach)
+                        if document and document.claude_file_id:
+                            doc_dict["claude_file_id"] = document.claude_file_id
+                            doc_dict["filename"] = document.filename
                             document_texts.append(doc_dict)
-                            logger.info(f"Added document {doc_info['id']} dictionary to context (raw_text length: {len(raw_text)})")
+                            logger.info(f"Added document {doc_info['id']} with Files API file_id: {document.claude_file_id}")
+                        
+                        # Priority 2: Fallback to raw_text for non-PDF documents only
+                        elif raw_text and not (document and document.mime_type == "application/pdf"):
+                            doc_dict["raw_text"] = raw_text
+                            document_texts.append(doc_dict)
+                            logger.info(f"Added non-PDF document {doc_info['id']} with raw_text ({len(raw_text)} chars)")
+                        
+                        # Priority 3: Binary content for non-PDF documents
+                        elif content_data and isinstance(content_data, bytes) and not (document and document.mime_type == "application/pdf"):
+                            doc_dict["content"] = content_data
+                            document_texts.append(doc_dict)
+                            logger.info(f"Added non-PDF document {doc_info['id']} with binary content")
+                        
+                        # For PDFs without file_id, log a warning (should not happen in new uploads)
+                        elif document and document.mime_type == "application/pdf":
+                            logger.warning(f"PDF document {doc_info['id']} missing claude_file_id - cannot process with native PDF support")
+                        
                         else:
-                            # REMOVED PYPDF2 FALLBACK: Rely on raw_text from initial processing
-                            # Ensure doc_dict includes 'content' if no raw_text, so ClaudeService can use binary
-                            if content_data and isinstance(content_data, bytes):
-                                doc_dict["content"] = content_data # Pass binary if no raw_text
-                                document_texts.append(doc_dict)
-                                logger.info(f"Added document {doc_info['id']} with binary content (no raw_text) to context")
-                            # else: # Try to extract text from PDF if we have binary content
-                            # if content_data and isinstance(content_data, bytes):
-                            #     try:
-                            #         import PyPDF2
-                            #         from io import BytesIO
-                            #         logger.info(f"Trying to extract text directly from PDF for document {doc_info['id']}")
-                            #         
-                            #         pdf_reader = PyPDF2.PdfReader(BytesIO(content_data))
-                            #         extracted_text = ""
-                            #         
-                            #         for page_num in range(len(pdf_reader.pages)):
-                            #             page = pdf_reader.pages[page_num]
-                            #             page_text = page.extract_text()
-                            #             if page_text:
-                            #                 extracted_text += page_text + "\n\n"
-                            #         
-                            #         if extracted_text.strip():
-                            #             doc_dict["raw_text"] = extracted_text
-                            #             document_texts.append(doc_dict)
-                            #             logger.info(f"Added document {doc_info['id']} with extracted text to context (length: {len(extracted_text)})")
-                            #         else:
-                            #             logger.warning(f"Could not extract text from PDF for document {doc_info['id']}")
-                            else:
-                                logger.warning(f"No raw_text or PDF content available for document {doc_info['id']}")
+                            logger.warning(f"No usable content available for document {doc_info['id']}")
                 except Exception as e:
                     logger.error(f"Error processing document content for LLM: {str(e)}")
                     logger.exception(e)
@@ -594,11 +564,21 @@ class ConversationService:
             combined_doc_text = ""
             
             for doc in document_texts:
-                # Try to get file_id from extracted_data
-                if "extracted_data" in doc and isinstance(doc["extracted_data"], dict):
-                    if "file_id" in doc["extracted_data"] and doc["extracted_data"]["file_id"]:
+                # Priority 1: Use claude_file_id for Files API integration
+                if "claude_file_id" in doc and doc["claude_file_id"]:
+                    file_id = doc["claude_file_id"]
+                    logger.info(f"Using Files API claude_file_id {file_id} for visualization analysis")
+                    break  # Use first available file_id
+                
+                # Priority 2: Try to get file_id from extracted_data (legacy)
+                elif "extracted_data" in doc and isinstance(doc["extracted_data"], dict):
+                    if "claude_file_id" in doc["extracted_data"] and doc["extracted_data"]["claude_file_id"]:
+                        file_id = doc["extracted_data"]["claude_file_id"]
+                        logger.info(f"Using cached claude_file_id {file_id} from extracted_data for visualization analysis")
+                        break  # Use first available file_id
+                    elif "file_id" in doc["extracted_data"] and doc["extracted_data"]["file_id"]:
                         file_id = doc["extracted_data"]["file_id"]
-                        logger.info(f"Using cached file_id {file_id} for visualization analysis")
+                        logger.info(f"Using legacy file_id {file_id} from extracted_data for visualization analysis")
                         break  # Use first available file_id
                 
                 # Combine text as fallback
@@ -996,6 +976,115 @@ When analyzing financial documents, focus on:
             )
         
         return success
+    
+    async def generate_follow_up_questions(
+        self,
+        conversation_id: str,
+        limit: int = 3
+    ) -> List[str]:
+        """
+        Generate contextually relevant follow-up questions based on conversation history.
+        
+        Args:
+            conversation_id: ID of the conversation
+            limit: Maximum number of follow-up questions to generate (default: 3)
+            
+        Returns:
+            List of follow-up question strings
+        """
+        try:
+            # Get conversation and recent messages
+            conversation = await self.conversation_repository.get_conversation(conversation_id)
+            if not conversation:
+                logger.warning(f"Conversation {conversation_id} not found for follow-up generation")
+                return self._get_default_follow_up_questions()
+            
+            # Get the last few messages for context (last 6 messages or all if fewer)
+            messages = await self.conversation_repository.get_conversation_messages(conversation_id)
+            if not messages or len(messages) == 0:
+                logger.info(f"No messages found for conversation {conversation_id}, using default questions")
+                return self._get_default_follow_up_questions()
+            
+            # Take the last 6 messages for context (3 user-assistant pairs typically)
+            recent_messages = messages[-6:] if len(messages) > 6 else messages
+            
+            # Build conversation context for the prompt
+            conversation_context = ""
+            for msg in recent_messages:
+                role_label = "User" if msg.role == "user" else "Assistant"
+                conversation_context += f"{role_label}: {msg.content}\n"
+            
+            # Get document context if available
+            documents = await self.conversation_repository.get_conversation_documents(conversation_id)
+            document_context = ""
+            if documents:
+                doc_titles = [doc.filename for doc in documents[:3]]  # Limit to 3 documents
+                document_context = f"\nDocuments being discussed: {', '.join(doc_titles)}"
+            
+            # Create prompt for follow-up question generation
+            follow_up_prompt = f"""Based on the following conversation about financial documents, generate exactly {limit} relevant follow-up questions that would naturally continue the discussion. Focus on:
+1. Deeper analysis of mentioned financial metrics
+2. Related financial concepts or ratios
+3. Comparative analysis or trends
+4. Practical implications of the findings
+
+Conversation context:{document_context}
+
+{conversation_context}
+
+Generate exactly {limit} follow-up questions, each on a new line, without numbering or bullet points. Make them conversational and specific to the context discussed."""
+
+            # Use Haiku 3.5 for fast, cost-effective follow-up generation
+            try:
+                follow_up_response = await self.claude_service.generate_response(
+                    system_prompt="You are a financial analysis assistant that generates relevant follow-up questions for financial document discussions. Always provide exactly the requested number of questions, each on a separate line.",
+                    messages=[{"role": "user", "content": follow_up_prompt}],
+                    model="claude-3-5-haiku-20241022",  # Use Haiku 3.5 as specified
+                    max_tokens=500,  # Limit tokens since we only need a few questions
+                    temperature=0.7  # Slightly creative for varied questions
+                )
+                
+                # Parse the response into individual questions
+                if follow_up_response and follow_up_response.strip():
+                    questions = [
+                        q.strip() 
+                        for q in follow_up_response.strip().split('\n') 
+                        if q.strip() and not q.strip().startswith(('1.', '2.', '3.', '-', '*'))
+                    ]
+                    
+                    # Filter out empty questions and ensure we have valid questions
+                    valid_questions = [q for q in questions if len(q) > 10 and q.endswith('?')]
+                    
+                    if valid_questions:
+                        # Return the requested number of questions, or all if fewer
+                        return valid_questions[:limit]
+                    else:
+                        logger.warning(f"Generated follow-up questions were invalid for conversation {conversation_id}")
+                        return self._get_default_follow_up_questions()
+                else:
+                    logger.warning(f"Empty response from Claude for follow-up generation in conversation {conversation_id}")
+                    return self._get_default_follow_up_questions()
+                    
+            except Exception as claude_error:
+                logger.error(f"Claude API error generating follow-ups for conversation {conversation_id}: {str(claude_error)}")
+                return self._get_default_follow_up_questions()
+                
+        except Exception as e:
+            logger.error(f"Error generating follow-up questions for conversation {conversation_id}: {str(e)}")
+            return self._get_default_follow_up_questions()
+    
+    def _get_default_follow_up_questions(self) -> List[str]:
+        """
+        Get default follow-up questions as fallback.
+        
+        Returns:
+            List of default follow-up question strings
+        """
+        return [
+            "What trends do you see in the financial performance?",
+            "How does this compare to industry benchmarks?", 
+            "What are the key risk factors to consider?"
+        ]
     
     async def _decide_processing_approach(
         self,

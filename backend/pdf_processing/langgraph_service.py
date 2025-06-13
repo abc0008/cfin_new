@@ -1116,8 +1116,7 @@ IMPORTANT INSTRUCTIONS:
                         logger.error(f"❌ Error using Files API file_id {claude_file_id} for document {doc_id}: {str(e)}")
                         # Continue to fallback methods below
                 
-                # If Files API didn't work, skip text extraction entirely for PDFs
-                # This follows Anthropic's recommendation to use native PDF support
+                # If Files API didn't work, handle based on document type
                 if not processed_successfully:
                     # Check if this is a PDF document
                     is_pdf = (doc.get("mime_type") == "application/pdf" or 
@@ -1125,8 +1124,9 @@ IMPORTANT INSTRUCTIONS:
                              doc.get("filename", "").lower().endswith(".pdf"))
                     
                     if is_pdf:
-                        logger.warning(f"⚠️  PDF document {doc_id} without Files API file_id - skipping (use native PDF support)")
-                        continue
+                        logger.warning(f"⚠️  PDF document {doc_id} without Files API file_id - cannot process with native PDF support")
+                        logger.warning(f"    PDF documents require claude_file_id for proper multi-page analysis")
+                        continue  # Skip PDFs without file_id entirely
                     
                     # For non-PDF documents, fallback to text content
                     doc_content_text = None
@@ -1156,13 +1156,13 @@ IMPORTANT INSTRUCTIONS:
                         user_content.append(text_doc_block)
                         processed_successfully = True
                     else:
-                        logger.warning(f"❌ Could not find any usable content for document {doc_id}")
+                        logger.warning(f"❌ Could not find any usable content for non-PDF document {doc_id}")
             
             # If no documents were prepared, return an error message
             if not any(item.get("type") == "document" for item in user_content):
                 logger.warning("No documents were prepared for the Claude API")
                 return {
-                    "content": "I couldn't process the document content. Please ensure the documents were properly uploaded and contain readable text.",
+                    "content": "I couldn't process the document content. PDF documents require proper Files API integration for multi-page analysis. Please ensure documents were uploaded successfully and have valid file references.",
                     "citations": []
                 }
             

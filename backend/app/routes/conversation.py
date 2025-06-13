@@ -529,3 +529,53 @@ async def remove_document_from_conversation(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error removing document from conversation: {str(e)}"
         )
+
+@router.post("/{conversation_id}/generate-followups", response_model=List[str], response_model_by_alias=True)
+async def generate_follow_up_questions(
+    conversation_id: str,
+    limit: int = Query(3, ge=1, le=5, description="Number of follow-up questions to generate"),
+    conversation_service: ConversationService = Depends(get_conversation_service),
+    user_id: str = Depends(get_current_user_id)
+) -> List[str]:
+    """
+    Generate contextually relevant follow-up questions based on conversation history.
+    
+    Args:
+        conversation_id: The ID of the conversation
+        limit: Number of follow-up questions to generate (1-5, default: 3)
+        
+    Returns:
+        List of follow-up question strings
+    """
+    try:
+        # Check if the conversation exists and belongs to the user
+        conversation = await conversation_service.get_conversation(conversation_id)
+        if not conversation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Conversation {conversation_id} not found"
+            )
+        
+        if conversation.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to access this conversation"
+            )
+        
+        # Generate follow-up questions
+        follow_up_questions = await conversation_service.generate_follow_up_questions(
+            conversation_id=conversation_id,
+            limit=limit
+        )
+        
+        return follow_up_questions
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error generating follow-up questions: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating follow-up questions: {str(e)}"
+        )

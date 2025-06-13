@@ -233,6 +233,29 @@ class ConversationApiService {
       return false;
     }
   }
+
+  /**
+   * Generate follow-up questions for a conversation
+   */
+  async generateFollowUpQuestions(conversationId: string, limit: number = 3): Promise<string[]> {
+    try {
+      const questions = await this.request<string[]>(
+        `/conversation/${conversationId}/generate-followups?limit=${limit}`,
+        'POST'
+      );
+      
+      console.log(`Generated ${questions.length} follow-up questions for conversation ${conversationId}`);
+      return questions;
+    } catch (error) {
+      console.error('Error generating follow-up questions:', error);
+      // Return default questions as fallback
+      return [
+        "What trends do you see in the financial performance?",
+        "How does this compare to industry benchmarks?",
+        "What are the key risk factors to consider?"
+      ];
+    }
+  }
 }
 
 // Create a singleton instance

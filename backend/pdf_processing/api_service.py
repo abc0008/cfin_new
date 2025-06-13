@@ -375,7 +375,8 @@ class ClaudeService:
         system_prompt: str,
         messages: List[Dict[str, Any]],
         temperature: float = 0.7,
-        max_tokens: int = 4000
+        max_tokens: int = 4000,
+        model: Optional[str] = None
     ) -> str:
         """
         Generate a response from Claude based on a conversation with a system prompt.
@@ -385,6 +386,7 @@ class ClaudeService:
             messages: List of message dictionaries with 'role' and 'content' keys
             temperature: Temperature for generation (0.0 to 1.0)
             max_tokens: Maximum number of tokens to generate
+            model: Optional model override (e.g., "claude-3-5-haiku-20241022")
             
         Returns:
             Generated response text
@@ -403,10 +405,13 @@ class ClaudeService:
             
             logger.info(f"Sending request to Claude API with {len(formatted_messages)} messages")
 
+            # Use provided model or default to instance model
+            used_model = model or self.model
+            
             # --- BEGIN SDK TOKEN COUNTING (AWAITED AND ALIGNED V4) ---
             try:
                 params_for_count_native = {
-                    "model": self.model,
+                    "model": used_model,
                     "messages": self._sanitize_messages_for_token_count(list(formatted_messages))
                 }
 
@@ -422,7 +427,7 @@ class ClaudeService:
             
             # Call Claude API
             response = await self.client.messages.create(
-                model=self.model,
+                model=used_model,
                 system=system_prompt,
                 messages=formatted_messages,
                 temperature=temperature,
@@ -440,61 +445,18 @@ class ClaudeService:
 
     async def _extract_full_text(self, *, doc, pdf_bytes: bytes, prompt: str) -> str:
         """
-        Extract full text using Claude Files API for token efficiency.
-        Uses cached file ID if available, otherwise uploads the PDF first.
+        DEPRECATED: This method is deprecated in favor of using Claude's native PDF support.
         
-        Args:
-            doc: Document database model with claude_file_id, full_text, text_sha256 fields
-            pdf_bytes: Raw PDF bytes  
-            prompt: Extraction prompt to use
-            
-        Returns:
-            Extracted full text
+        Manual text extraction is no longer recommended when using Anthropic's Files API.
+        Instead, pass the file_id directly to Claude for native PDF processing.
+        
+        This method will be removed in a future version.
         """
-        if not self.client:
-            logger.error(f"Claude client not available for full text extraction from {doc.filename}.")
-            raise ValueError("Claude API client is not available. Text extraction requires Claude API.")
-            
-        # Upload to Files API if not already done
-        if not doc.claude_file_id:
-            doc.claude_file_id = await upload_pdf(doc.filename, pdf_bytes)
-            # Note: We'll save the document after extracting text to also cache the text
-            
-        # Build message using Files API reference
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "document",
-                        "source": {"type": "file", "file_id": doc.claude_file_id},
-                        "citations": {"enabled": True}
-                    },
-                    {
-                        "type": "text",
-                        "text": prompt
-                    }
-                ],
-            }
-        ]
-
-        # Use Sonnet for text extraction (high quality, but this is a one-time cost)
-        resp = await self._claude_call(
-            model=settings.MODEL_SONNET,
-            messages=messages,
-            max_tokens=4096,
+        logger.warning("_extract_full_text is deprecated. Use Claude's native PDF support with Files API instead.")
+        raise DeprecationWarning(
+            "_extract_full_text is deprecated. Use Claude's native PDF support via Files API. "
+            "Pass file_id directly to Claude instead of extracting text manually."
         )
-        
-        # Extract text from response
-        text = resp.content[0].text if resp.content else ""
-        
-        # Cache the extracted text and its hash
-        doc.full_text = text
-        doc.text_sha256 = sha256_str(text)
-        # Note: Repository save should be done by caller
-        
-        logger.info(f"Successfully extracted full text ({len(text)} chars) from {doc.filename} using Files API.")
-        return text
 
     async def get_document_text(self, doc_id: str, document_repo) -> str:
         """
@@ -536,18 +498,18 @@ class ClaudeService:
 
     async def process_pdf(self, pdf_data: bytes, filename: str) -> Tuple[str, ProcessedDocument, List[DocumentCitation]]:
         """
-        Process a PDF using Claude's PDF support. Extracts full text, structured data, and citations.
+        Process a PDF using Claude's native PDF support via Files API.
+        No manual text extraction - relies on Files API for full document access.
         
         Args:
             pdf_data: Raw bytes of the PDF file
             filename: Name of the PDF file
             
         Returns:
-            A tuple containing the full raw text, the processed document object, and a list of citations.
+            A tuple containing a processing note, the processed document object, and a list of citations.
         """
         if not self.client:
             logger.error("Cannot process PDF because Claude API client is not available")
-            # Return a placeholder for full_text as well in the error case
             # Construct minimal ProcessedDocument for error reporting
             document_id = str(uuid.uuid4())
             metadata = DocumentMetadata(
@@ -567,28 +529,32 @@ class ClaudeService:
                 confidence_score=0.0,
                 processing_status=ProcessingStatus.FAILED
             )
-            raise ValueError(error_message_text) # Or return error tuple: (error_message_text, processed_document_error, [])
+            raise ValueError(error_message_text)
         
-        true_full_pdf_text = ""
         processed_document: Optional[ProcessedDocument] = None
         citations_list: List[DocumentCitation] = []
+        claude_file_id: Optional[str] = None
 
         try:
             logger.info(f"Processing PDF: {filename} with Claude API using native PDF support.")
             
             pdf_base64 = base64.b64encode(pdf_data).decode('utf-8')
             
-            # Step 1: Analyze document to determine type and periods
-            # Claude's PDF support automatically extracts text and provides visual understanding
+            # Step 1: Upload to Files API once and reuse the file_id
+            from pdf_processing.claude_file_client import upload_pdf
+            claude_file_id = await upload_pdf(filename, pdf_data)
+            logger.info(f"Generated Claude file_id {claude_file_id} for {filename}")
+            
+            # Step 2: Analyze document to determine type and periods using file_id
             logger.info(f"Analyzing document type for {filename}")
-            document_type, periods = await self._analyze_document_type(pdf_base64, filename)
+            document_type, periods = await self._analyze_document_type_with_file_id(claude_file_id, filename)
             logger.info(f"Document {filename} classified as: {document_type.value} with periods: {periods}")
             
-            # Step 2: Extract structured financial data and citations
+            # Step 3: Extract structured financial data and citations using file_id
             logger.info(f"Extracting structured financial data and citations for {filename}")
             # This call now returns structured_data (JSON-like dict) and citations_list
-            structured_financial_data, citations_from_extraction = await self._extract_financial_data_with_citations(
-                pdf_content_base64=pdf_base64,
+            structured_financial_data, citations_from_extraction = await self._extract_financial_data_with_citations_by_file_id(
+                file_id=claude_file_id,
                 filename=filename, 
                 document_type=document_type
             )
@@ -609,6 +575,11 @@ class ClaudeService:
                     logger.info(f"Updating document type for {filename} from {document_type.value} to FINANCIAL_REPORT based on extracted financial data")
                     document_type = DocumentContentType.FINANCIAL_REPORT
             
+            # Add the file_id to extracted_data for database storage
+            if structured_financial_data and isinstance(structured_financial_data, dict):
+                structured_financial_data['claude_file_id'] = claude_file_id
+                logger.info(f"Added claude_file_id {claude_file_id} to extracted_data for {filename}")
+            
             document_id_str = str(uuid.uuid4())
             confidence_score = 0.8  # Default confidence score, consider adjusting based on extraction success
             
@@ -626,14 +597,14 @@ class ClaudeService:
                 content_type=document_type,
                 extraction_timestamp=datetime.now(),
                 periods=periods,
-                extracted_data=structured_financial_data, # This is now purely structured data
+                extracted_data=structured_financial_data, # This now includes claude_file_id
                 confidence_score=confidence_score,
                 processing_status=ProcessingStatus.COMPLETED
             )
             
             # Claude's native PDF support handles text extraction automatically via Files API
             # No manual text extraction needed - Claude processes PDFs natively
-            processing_note = f"PDF {filename} processed using Claude's native PDF support with token optimization"
+            processing_note = f"PDF {filename} processed using Claude's native PDF support via Files API"
             return processing_note, processed_document, citations_list
             
         except Exception as e:
@@ -657,7 +628,7 @@ class ClaudeService:
                 confidence_score=0.0,
                 processing_status=ProcessingStatus.FAILED
             )
-            # Return the error text as true_full_pdf_text in this failure case
+            # Return the error text as processing note in this failure case
             return error_text, processed_document_err, []
 
     async def _analyze_document_type(self, pdf_base64: str, filename: str) -> Tuple[DocumentContentType, List[str]]:
@@ -761,6 +732,121 @@ class ClaudeService:
             else:
                 logger.exception(f"Error in document type analysis: {e}")
                 return DocumentContentType.OTHER, []
+
+    async def _extract_financial_data_with_citations_by_file_id(self, file_id: str, filename: str, document_type: DocumentContentType) -> Tuple[Dict[str, Any], List[Any]]:
+        """
+        Extract financial data from a PDF using Claude's native PDF support with existing file_id.
+        Optimized version that reuses uploaded file_id instead of uploading again.
+        
+        Args:
+            file_id: Existing Claude file ID from previous upload
+            filename: Name of the PDF file
+            document_type: Type of document being processed
+            
+        Returns:
+            Tuple of extracted structured data dictionary and list of citations
+        """
+        if not self.client:
+            logger.error("Cannot extract financial data because Claude API client is not available")
+            raise ValueError("Claude API client is not available. Check your API key.")
+        
+        try:
+            logger.info(f"Extracting structured financial data with citations from: {filename} using file_id {file_id}")
+            
+            doc_type_str = document_type.value if document_type else "financial document"
+            
+            system_prompt = """You are a specialized financial document analysis assistant. Extract structured financial data from the document accurately using Claude's native PDF support.
+
+Follow these guidelines:
+1. Analyze both the text and visual elements (charts, tables, graphs) in the document.
+2. Extract values with their correct time periods, labels, and units.
+3. Present the data in a structured JSON format.
+4. Provide citations for extracted data points when possible.
+5. Any textual narrative should be brief and clearly separated from the JSON structure."""
+            
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "document",
+                            "source": {"type": "file", "file_id": file_id}
+                        },
+                        {
+                            "type": "text",
+                            "text": (
+                                f"From this {doc_type_str} document, provide a comprehensive JSON object "
+                                "containing all extracted financial data. The JSON should include key metrics, "
+                                "time periods, and values. Structure the JSON clearly with categories like "
+                                "revenue, expenses, assets, liabilities, etc. "
+                                "Include any visual data from charts and tables."
+                            )
+                        }
+                    ]
+                }
+            ]
+            
+            # Use Sonnet for complex financial analysis
+            response = await self._claude_call(
+                model=settings.MODEL_SONNET,
+                max_tokens=4000,
+                system=system_prompt,
+                messages=messages
+            )
+            
+            processed_response_content = self._process_claude_response(response)
+            text_output_from_claude = processed_response_content.get("text", "").strip()
+            citations = processed_response_content.get("citations", [])
+            
+            claude_preamble_text = ""
+            parsed_financial_json = {}
+            
+            # Extract JSON from Claude's response
+            json_pattern = re.compile(r"^(.*?)(```json\s*(\{[\s\S]*?\})\s*```|(\{[\s\S]*\}))[\s\S]*$", re.DOTALL | re.MULTILINE)
+            match = json_pattern.search(text_output_from_claude)
+
+            if match:
+                claude_preamble_text = match.group(1).strip()
+                json_str_from_regex = match.group(3) if match.group(3) else match.group(4)
+                
+                if json_str_from_regex:
+                    try:
+                        parsed_financial_json = json.loads(json_str_from_regex)
+                        logger.info("Successfully parsed financial JSON from Claude's response.")
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse JSON from extracted part: {e}. JSON string: {json_str_from_regex[:200]}...")
+                        claude_preamble_text = text_output_from_claude
+                        parsed_financial_json = {"error_parsing_financial_json": f"Failed to parse: {str(e)}", "original_text_payload": json_str_from_regex}
+                else: 
+                    logger.warning("JSON regex matched but no JSON string was captured. Treating all as preamble text.")
+                    claude_preamble_text = text_output_from_claude
+            else:
+                logger.warning("Could not find a distinct JSON block in Claude's response using regex. Assuming all is preamble/non-JSON text.")
+                claude_preamble_text = text_output_from_claude
+
+            # Ensure parsed_financial_json is always a dict
+            if not isinstance(parsed_financial_json, dict):
+                logger.warning(f"Parsed financial data was not a dictionary (type: {type(parsed_financial_json)}). Wrapping it.")
+                parsed_financial_json = {"financial_data_payload": parsed_financial_json, "parsing_error_occurred": True}
+            
+            # Include Claude's textual output if present
+            if claude_preamble_text:
+                parsed_financial_json['claude_textual_output_accompanying_json'] = claude_preamble_text
+                logger.info(f"Captured Claude's preamble text, length: {len(claude_preamble_text)}")
+            
+            return parsed_financial_json, citations
+            
+        except Exception as e:
+            if "credit balance is too low" in str(e).lower() or "anthropic api credit balance" in str(e).lower():
+                logger.warning(f"Claude API unavailable due to credit balance. Returning minimal financial data for {filename}")
+                return {
+                    "error_extracting_structured_data": "Claude API credit balance insufficient",
+                    "fallback_note": f"Document {filename} uploaded successfully but structured analysis unavailable",
+                    "document_readable": True
+                }, []
+            else:
+                logger.error(f"Error extracting structured financial data: {str(e)}", exc_info=True)
+                return {"error_extracting_structured_data": str(e)}, []
 
     async def _extract_financial_data_with_citations(self, pdf_content_base64: str, filename: str, document_type: DocumentContentType) -> Tuple[Dict[str, Any], List[Any]]:
         """
@@ -1305,6 +1391,58 @@ Follow these guidelines:
                     "content": "I apologize, but I'm unable to process your request at this time. Please try again later.",
                     "citations": []
                 }
+
+    async def _validate_file_id(self, file_id: str, filename: str) -> bool:
+        """
+        Validate that a Claude Files API file_id is still valid.
+        
+        Args:
+            file_id: Claude file ID to validate
+            filename: Filename for logging purposes
+            
+        Returns:
+            True if file_id is valid, False if expired or invalid
+        """
+        try:
+            # Make a simple request to check if file exists
+            # This is a lightweight way to validate without full document processing
+            test_messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "document",
+                            "source": {"type": "file", "file_id": file_id}
+                        },
+                        {
+                            "type": "text",
+                            "text": "Can you confirm this document is accessible? Just respond with 'Yes' or 'No'."
+                        }
+                    ]
+                }
+            ]
+            
+            response = await self._claude_call(
+                model=settings.MODEL_HAIKU,  # Use fast model for validation
+                messages=test_messages,
+                max_tokens=10,
+                temperature=0
+            )
+            
+            # If we get any response, the file_id is valid
+            logger.info(f"File ID {file_id} for {filename} is valid")
+            return True
+            
+        except Exception as e:
+            # Common error patterns for expired/invalid file IDs
+            error_str = str(e).lower()
+            if any(keyword in error_str for keyword in ["file not found", "expired", "invalid file", "not accessible"]):
+                logger.warning(f"File ID {file_id} for {filename} appears to be expired or invalid: {str(e)}")
+                return False
+            else:
+                # Other errors might be temporary - assume file_id is valid
+                logger.warning(f"Could not validate file ID {file_id} for {filename} due to error: {str(e)}")
+                return True
 
     def _sanitize_messages_for_token_count(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Prepare messages for the count_tokens endpoint by removing/transforming unsupported

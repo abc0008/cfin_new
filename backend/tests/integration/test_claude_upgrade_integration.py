@@ -181,7 +181,8 @@ class TestClaudeUpgradeIntegration:
             service = ClaudeService()
             
             # Test optimized text retrieval with caching
-            with patch.object(service, '_extract_full_text', return_value="Fresh extracted text") as mock_extract:
+            # Note: _extract_full_text is deprecated in favor of Files API
+            with patch.object(service, '_extract_full_text', side_effect=DeprecationWarning("Method deprecated")) as mock_extract:
                 # Should return cached text, not extract fresh
                 result = await service.get_document_text("test_doc_id", mock_repo)
                 

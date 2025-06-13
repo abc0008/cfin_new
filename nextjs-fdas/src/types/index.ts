@@ -73,6 +73,7 @@ export interface Message {
     content: any;
     created_at: string;
   }>;
+  followUpQuestions?: string[];
 }
 
 export interface ConversationState {
