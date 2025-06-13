@@ -12,6 +12,7 @@ import {
   ReferenceLine
 } from 'recharts';
 import { ChartData } from '@/types/visualization';
+import { formatValue } from '@/utils/formatters';
 import { CHART_COLORS_STROKE_FILL } from './chartColors';
 
 interface AreaChartProps {
@@ -193,13 +194,14 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
         <ResponsiveContainer width="100%" height="100%">
           <RechartsAreaChart
             data={chartData}
-            margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+            margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
           >
             <defs>
               {dataKeys.map((key, index) => {
-                const color = config.colors?.[index] || CHART_COLORS_STROKE_FILL[index % CHART_COLORS_STROKE_FILL.length].fill;
+                const color = config.colors?.[index] || CHART_COLORS_STROKE_FILL[index % CHART_COLORS_STROKE_FILL.length].stroke;
+                const safeKey = key.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '');
                 return (
-                  <linearGradient key={key} id={`color${key}`} x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient key={key} id={`color${safeKey}`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={color} stopOpacity={0.8}/>
                     <stop offset="95%" stopColor={color} stopOpacity={0.1}/>
                   </linearGradient>
@@ -207,8 +209,8 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
               })}
               {/* Fallback gradient */}
               <linearGradient id="colorfallback" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={CHART_COLORS_STROKE_FILL[0].fill} stopOpacity={0.8}/>
-                <stop offset="95%" stopColor={CHART_COLORS_STROKE_FILL[0].fill} stopOpacity={0.1}/>
+                <stop offset="5%" stopColor={CHART_COLORS_STROKE_FILL[0].stroke} stopOpacity={0.8}/>
+                <stop offset="95%" stopColor={CHART_COLORS_STROKE_FILL[0].stroke} stopOpacity={0.1}/>
               </linearGradient>
             </defs>
             
@@ -233,6 +235,18 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
                 hasNegativeValues ? minValue * 1.1 : 0,
                 maxValue * 1.1
               ]}
+              tickFormatter={(value) => {
+                // Format Y-axis ticks based on the first data key's config
+                if (chartConfig && dataKeys.length > 0) {
+                  const firstDataKey = dataKeys[0];
+                  const metricConfig = chartConfig[firstDataKey];
+                  if (metricConfig && metricConfig.formatter) {
+                    return formatValue(value, metricConfig.formatter, metricConfig.precision);
+                  }
+                }
+                // Default formatting with compact notation for readability
+                return formatValue(value, 'compact', 1);
+              }}
             >
               {config.yAxisLabel && (
                 <Label
@@ -244,6 +258,16 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
               )}
             </YAxis>
             <Tooltip
+              formatter={(value, name) => {
+                // Format tooltip values based on metric config
+                if (chartConfig && typeof name === 'string') {
+                  const metricConfig = chartConfig[name];
+                  if (metricConfig && metricConfig.formatter) {
+                    return [formatValue(Number(value), metricConfig.formatter, metricConfig.precision), metricConfig.label || name];
+                  }
+                }
+                return [formatValue(Number(value), 'compact', 1), name];
+              }}
               contentStyle={{
                 backgroundColor: 'white',
                 border: '1px solid #ccc',
@@ -251,10 +275,12 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
               }}
               cursor={{ stroke: '#666', strokeWidth: 1 }}
             />
-            {config.showLegend && (
+            {config.showLegend !== false && (
               <Legend
-                verticalAlign="top"
-                height={36}
+                verticalAlign="bottom"
+                align="center"
+                iconType="rect"
+                iconSize={10}
                 wrapperStyle={{ paddingTop: '10px' }}
               />
             )}
@@ -268,8 +294,9 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
             {dataKeys.length > 0 ? dataKeys.map((key, index) => {
               const colorObj = CHART_COLORS_STROKE_FILL[index % CHART_COLORS_STROKE_FILL.length];
               const customColor = config.colors?.[index];
+              const safeKey = key.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '');
               
-              console.log(`AreaChart - Rendering area ${index}: key=${key}, color=${customColor || colorObj.stroke}`);
+              console.log(`AreaChart - Rendering area ${index}: key=${key}, safeKey=${safeKey}, color=${customColor || colorObj.stroke}`);
               
               return (
                 <Area
@@ -277,7 +304,7 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
                   type="monotone"
                   dataKey={key}
                   stroke={customColor || colorObj.stroke}
-                  fill={`url(#color${key})`}
+                  fill={`url(#color${safeKey})`}
                   fillOpacity={1}
                   stackId={config.stacked || chartType === 'stackedArea' ? 'stack' : undefined}
                   dot={config.showDots ?? false}

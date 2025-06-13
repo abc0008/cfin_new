@@ -94,6 +94,7 @@ export default function ScatterChart({ data, height = 400, width = '100%', onDat
               dataKey={yAxisKey} 
               name={config.yAxisLabel || yAxisKey}
               label={{ value: config.yAxisLabel || yAxisKey, angle: -90, position: 'insideLeft' }}
+              tickFormatter={(value) => formatValue(value, 'compact', 1)}
               aria-label={config.yAxisLabel || yAxisKey}
             />
             
@@ -104,7 +105,15 @@ export default function ScatterChart({ data, height = 400, width = '100%', onDat
               labelFormatter={(label) => `${config.xAxisLabel || xAxisKey}: ${label}`}
             />
             
-            {config.showLegend !== false && <Legend />}
+            {config.showLegend !== false && (
+              <Legend 
+                verticalAlign="bottom"
+                align="center"
+                iconType="rect"
+                iconSize={10}
+                wrapperStyle={{ paddingTop: '10px' }}
+              />
+            )}
             
             {/* Add reference lines at x=0 and y=0 if needed */}
             <ReferenceLine x={0} stroke="#666" />

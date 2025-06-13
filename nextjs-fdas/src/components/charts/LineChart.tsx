@@ -134,7 +134,7 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
           <ResponsiveContainer width={width} height={height}>
             <RechartsLineChart
               data={rawDataPointsFromBackend}
-              margin={{ top: 10, right: 30, left: 20, bottom: 30 }}
+              margin={{ top: 10, right: 30, left: 20, bottom: 50 }}
             >
               {config.showGrid !== false && <CartesianGrid strokeDasharray="3 3" />}
               
@@ -153,6 +153,8 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
                 tick={{ fontSize: 12 }}
                 tickLine={true}
                 axisLine={true}
+                domain={['dataMin', 'dataMax']}
+                tickFormatter={(value) => formatValue(value, 'compact', 1)}
               >
                 {config.yAxisLabel && <Label value={config.yAxisLabel} angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />}
               </YAxis>
@@ -265,13 +267,22 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
             <ResponsiveContainer width="100%" height="100%">
               <RechartsLineChart
                 data={rawDataPointsFromBackend}
-                margin={{ top: 10, right: 30, left: 20, bottom: 30 }}
+                margin={{ top: 10, right: 30, left: 20, bottom: 50 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey={config.xAxisKey || categoryKey} />
-                <YAxis />
+                <YAxis 
+                  domain={['dataMin', 'dataMax']}
+                  tickFormatter={(value) => formatValue(value, 'compact', 1)}
+                />
                 <Tooltip />
-                <Legend />
+                <Legend 
+                  verticalAlign="bottom"
+                  align="center"
+                  iconType="line"
+                  iconSize={10}
+                  wrapperStyle={{ paddingTop: '10px' }}
+                />
                 {numericKeys.map((key, index) => (
                   <Line
                     key={key}
@@ -304,7 +315,7 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
         <ResponsiveContainer width="100%" height="100%">
         <RechartsLineChart
           data={processedData}
-          margin={{ top: 10, right: 30, left: 20, bottom: 30 }}
+          margin={{ top: 10, right: 30, left: 20, bottom: 50 }}
         >
           {config.showGrid !== false && <CartesianGrid strokeDasharray="3 3" />}
           
@@ -323,13 +334,17 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
             tick={{ fontSize: 12 }}
             tickLine={true}
             axisLine={true}
+            domain={['dataMin', 'dataMax']}
             tickFormatter={(value) => {
               // Format Y-axis ticks based on the first metric's config
               if (metricKeys.length > 0) {
                 const firstMetric = chartConfig[metricKeys[0]];
-                return formatValue(value, firstMetric.formatter, firstMetric.precision);
+                if (firstMetric && firstMetric.formatter) {
+                  return formatValue(value, firstMetric.formatter, firstMetric.precision);
+                }
               }
-              return value;
+              // Default formatting with commas for readability
+              return formatValue(value, 'compact', 1);
             }}
           >
             {config.yAxisLabel && <Label value={config.yAxisLabel} angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />}
@@ -363,10 +378,10 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
             }}
           />
           
-          {config.showLegend && (
+          {config.showLegend !== false && (
             <Legend
-              verticalAlign={config.legendPosition === 'top' || config.legendPosition === 'bottom' ? config.legendPosition : 'bottom'}
-              align={config.legendPosition === 'left' || config.legendPosition === 'right' ? config.legendPosition : 'center'}
+              verticalAlign="bottom"
+              align="center"
               iconType="line"
               iconSize={10}
               wrapperStyle={{ paddingTop: '10px' }}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { ChartData } from '@/types/visualization';
+import { formatValue } from '@/utils/formatters';
 import { PIE_CHART_COLORS } from './chartColors';
 
 interface PieChartProps {
@@ -68,10 +69,12 @@ const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%',
                 />
               ))}
             </Pie>
-            {config.showLegend && (
+            {config.showLegend !== false && (
               <Legend 
-                verticalAlign="bottom" 
-                height={36}
+                verticalAlign="bottom"
+                align="center"
+                iconType="rect"
+                iconSize={10}
                 wrapperStyle={{ 
                   paddingTop: '20px',
                   fontFamily: 'Avenir Pro, sans-serif',
@@ -80,6 +83,7 @@ const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%',
               />
             )}
             <Tooltip 
+              formatter={(value) => formatValue(Number(value), 'compact', 1)}
               contentStyle={{
                 backgroundColor: 'hsl(var(--card))',
                 border: '1px solid hsl(var(--border))',

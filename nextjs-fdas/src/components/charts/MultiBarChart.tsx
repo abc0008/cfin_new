@@ -12,6 +12,7 @@ import {
   ReferenceLine
 } from 'recharts';
 import { ChartData } from '@/types/visualization';
+import { formatValue } from '@/utils/formatters';
 import { CHART_COLORS } from './chartColors';
 
 interface MultiBarChartProps {
@@ -96,6 +97,7 @@ const MultiBarChart: React.FC<MultiBarChartProps> = ({ data, height = 400, width
                 hasNegativeValues ? minValue * 1.1 : 0,
                 maxValue * 1.1
               ]}
+              tickFormatter={(value) => formatValue(value, 'compact', 1)}
             >
               {config.yAxisLabel && (
                 <Label
@@ -107,6 +109,7 @@ const MultiBarChart: React.FC<MultiBarChartProps> = ({ data, height = 400, width
               )}
             </YAxis>
             <Tooltip
+              formatter={(value) => [formatValue(Number(value), 'compact', 1), '']}
               contentStyle={{
                 backgroundColor: 'white',
                 border: '1px solid #ccc',
@@ -114,10 +117,12 @@ const MultiBarChart: React.FC<MultiBarChartProps> = ({ data, height = 400, width
               }}
               cursor={{ fill: 'rgba(0, 0, 0, 0.1)' }}
             />
-            {config.showLegend && (
+            {config.showLegend !== false && (
               <Legend
-                verticalAlign="top"
-                height={36}
+                verticalAlign="bottom"
+                align="center"
+                iconType="rect"
+                iconSize={10}
                 wrapperStyle={{ paddingTop: '10px' }}
               />
             )}
