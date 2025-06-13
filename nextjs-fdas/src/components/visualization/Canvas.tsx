@@ -82,6 +82,13 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
                 } else if (block.content.chartType) {
                   // Direct chart data structure
                   console.log(`Found direct chart data in block ${index}: ${block.content.chartType}`);
+                  console.log('Chart data structure:', {
+                    hasConfig: !!block.content.config,
+                    hasChartConfig: !!block.content.chartConfig,
+                    chartConfigKeys: block.content.chartConfig ? Object.keys(block.content.chartConfig) : [],
+                    dataLength: Array.isArray(block.content.data) ? block.content.data.length : 'not array',
+                    sampleData: Array.isArray(block.content.data) && block.content.data.length > 0 ? block.content.data[0] : null
+                  });
                   allCharts.push(block.content);
                 }
               }

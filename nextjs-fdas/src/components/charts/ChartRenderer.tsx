@@ -25,6 +25,16 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   // Extract chart type from data
   const { chartType } = data;
 
+  console.log('ChartRenderer - Data received:', {
+    chartType,
+    hasData: !!data.data,
+    dataLength: Array.isArray(data.data) ? data.data.length : 'not array',
+    hasConfig: !!data.config,
+    hasChartConfig: !!data.chartConfig,
+    firstDataItem: Array.isArray(data.data) && data.data.length > 0 ? data.data[0] : null,
+    chartConfigKeys: data.chartConfig ? Object.keys(data.chartConfig) : []
+  });
+
   // Render the appropriate chart component based on chartType
   switch (chartType) {
     case 'bar':

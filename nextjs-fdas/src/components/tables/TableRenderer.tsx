@@ -124,8 +124,7 @@ export default function TableRenderer({
       {config.title && (
         <div className="p-4 pb-0 flex-shrink-0">
           <h3 className="text-lg font-semibold text-gray-800">{config.title}</h3>
-          {config.subtitle && <p className="text-sm text-gray-500">{config.subtitle}</p>}
-          {config.description && !config.subtitle && (
+          {config.description && (
             <p className="text-sm text-gray-500">{config.description}</p>
           )}
         </div>

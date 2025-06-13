@@ -22,8 +22,88 @@ interface AreaChartProps {
 }
 
 const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%', onDataPointClick }) => {
-  const { config, data: chartData } = data;
-  const dataKeys = chartData.length > 0 ? Object.keys(chartData[0]).filter(key => key !== 'name') : [];
+  // Ensure height is a number for ResponsiveContainer
+  const chartHeight = typeof height === 'string' && height.includes('%') ? 400 : height;
+  const { config, data: rawChartData, chartType, chartConfig } = data;
+  
+  // Debug logging
+  console.log('AreaChart - Debug Info:', {
+    chartType,
+    hasConfig: !!config,
+    hasChartConfig: !!chartConfig,
+    chartConfigKeys: chartConfig ? Object.keys(chartConfig) : [],
+    dataLength: Array.isArray(rawChartData) ? rawChartData.length : 0,
+    firstDataItem: Array.isArray(rawChartData) && rawChartData.length > 0 ? rawChartData[0] : null
+  });
+  
+  // Check if data is in multi-series format [{name: "series", data: [{x, y}]}]
+  const isMultiSeries = rawChartData.length > 0 && 
+    rawChartData[0].hasOwnProperty('name') && 
+    rawChartData[0].hasOwnProperty('data') &&
+    Array.isArray(rawChartData[0].data);
+  
+  let chartData = rawChartData;
+  let dataKeys = [];
+  
+  if (isMultiSeries) {
+    console.log('AreaChart - Transforming multi-series data to flat format for Recharts');
+    // Transform multi-series data to flat format for Recharts
+    const transformedData = new Map();
+    const xAxisKey = config.xAxisKey || 'category';
+    
+    // Collect all x values from all series
+    rawChartData.forEach(series => {
+      if (series.data && Array.isArray(series.data)) {
+        series.data.forEach(point => {
+          if (!transformedData.has(point.x)) {
+            transformedData.set(point.x, { [xAxisKey]: point.x });
+          }
+        });
+      }
+    });
+    
+    // Add y values for each series - use series.name as the key
+    rawChartData.forEach((series) => {
+      const seriesKey = series.name; // Use the series name directly
+      dataKeys.push(seriesKey);
+      
+      if (series.data && Array.isArray(series.data)) {
+        series.data.forEach(point => {
+          const row = transformedData.get(point.x);
+          if (row) {
+            row[seriesKey] = point.y;
+          }
+        });
+      }
+    });
+    
+    chartData = Array.from(transformedData.values());
+    
+    console.log('AreaChart - Multi-series transformation complete:', {
+      originalSeriesCount: rawChartData.length,
+      transformedDataLength: chartData.length,
+      dataKeys,
+      firstTransformedItem: chartData[0]
+    });
+  } else if (chartData.length > 0) {
+    // Check if data is in {x, y} format - this means single series data
+    if (chartData[0].hasOwnProperty('x') && chartData[0].hasOwnProperty('y')) {
+      // For {x, y} format, we need to transform it for AreaChart
+      // Use the first chartConfig key as the data key
+      const firstChartConfigKey = chartConfig ? Object.keys(chartConfig)[0] : 'value';
+      dataKeys = [firstChartConfigKey];
+      
+      // Transform the data to flat format
+      const xAxisKey = config.xAxisKey || 'category';
+      chartData = rawChartData.map(point => ({
+        [xAxisKey]: point.x,
+        [firstChartConfigKey]: point.y
+      }));
+    } else {
+      // Flat data format - extract keys normally
+      dataKeys = Object.keys(chartData[0]).filter(key => key !== (config.xAxisKey || 'name'));
+    }
+  }
 
   const handleAreaClick = (event: any) => {
     const payload = event?.payload;
@@ -40,10 +120,50 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
     );
   }
 
+  // Additional logging for debugging
+  console.log('AreaChart - Final processed data structure:', {
+    chartDataLength: chartData.length,
+    dataKeys,
+    firstChartItem: chartData[0],
+    hasChartConfig: !!chartConfig,
+    chartConfigKeys: chartConfig ? Object.keys(chartConfig) : [],
+    isMultiSeries,
+    xAxisKey: config.xAxisKey || 'category',
+    allChartData: chartData.slice(0, 3) // Show first 3 items for debugging
+  });
+
   // Calculate min and max values for Y axis
   const allValues = chartData.flatMap(item => 
     dataKeys.map(key => Number(item[key]))
   ).filter(value => !isNaN(value));
+  
+  console.log('AreaChart - Numeric values extracted:', {
+    allValues: allValues.slice(0, 10), // Show first 10 values
+    allValuesLength: allValues.length,
+    dataKeysUsed: dataKeys
+  });
+  
+  if (allValues.length === 0) {
+    console.warn('AreaChart - No valid numeric values found in data');
+    return (
+      <div className="w-full">
+        <div className="mb-4">
+          {config.title && (
+            <h3 className="text-lg font-semibold text-gray-900">{config.title}</h3>
+          )}
+          <p className="text-sm text-red-500">
+            Chart error: No valid numeric data found
+          </p>
+          <details className="mt-2">
+            <summary className="text-xs text-gray-500 cursor-pointer">Debug info</summary>
+            <pre className="text-xs text-gray-400 mt-1 overflow-auto max-h-32">
+              {JSON.stringify({ chartData: chartData.slice(0, 2), dataKeys, isMultiSeries }, null, 2)}
+            </pre>
+          </details>
+        </div>
+      </div>
+    );
+  }
   
   const minValue = Math.min(...allValues);
   const maxValue = Math.max(...allValues);
@@ -69,8 +189,8 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
         )}
       </div>
 
-      <figure style={{ width, height }} role="figure" aria-label={config.title || 'Area Chart'}>
-        <ResponsiveContainer>
+      <div style={{ width: width, height: chartHeight, minHeight: '300px' }}>
+        <ResponsiveContainer width="100%" height="100%">
           <RechartsAreaChart
             data={chartData}
             margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
@@ -85,11 +205,16 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
                   </linearGradient>
                 );
               })}
+              {/* Fallback gradient */}
+              <linearGradient id="colorfallback" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={CHART_COLORS_STROKE_FILL[0].fill} stopOpacity={0.8}/>
+                <stop offset="95%" stopColor={CHART_COLORS_STROKE_FILL[0].fill} stopOpacity={0.1}/>
+              </linearGradient>
             </defs>
             
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
-              dataKey="name"
+              dataKey={config.xAxisKey || 'category'}
               height={60}
               tick={{ fill: '#666', fontSize: 12 }}
             >
@@ -140,26 +265,41 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
             )}
 
             {/* Dynamically render areas based on data structure */}
-            {dataKeys.map((key, index) => {
-              const color = config.colors?.[index] || CHART_COLORS_STROKE_FILL[index % CHART_COLORS_STROKE_FILL.length];
+            {dataKeys.length > 0 ? dataKeys.map((key, index) => {
+              const colorObj = CHART_COLORS_STROKE_FILL[index % CHART_COLORS_STROKE_FILL.length];
+              const customColor = config.colors?.[index];
+              
+              console.log(`AreaChart - Rendering area ${index}: key=${key}, color=${customColor || colorObj.stroke}`);
+              
               return (
                 <Area
                   key={key}
                   type="monotone"
                   dataKey={key}
-                  stroke={color.stroke}
+                  stroke={customColor || colorObj.stroke}
                   fill={`url(#color${key})`}
                   fillOpacity={1}
-                  stackId={config.stacked ? 'stack' : undefined}
+                  stackId={config.stacked || chartType === 'stackedArea' ? 'stack' : undefined}
                   dot={config.showDots ?? false}
-                  activeDot={{ r: 6, stroke: color.stroke, strokeWidth: 2, onClick: handleAreaClick }}
+                  activeDot={{ r: 6, stroke: customColor || colorObj.stroke, strokeWidth: 2, onClick: handleAreaClick }}
                   onClick={handleAreaClick}
                 />
               );
-            })}
+            }) : (
+              <Area
+                key="fallback"
+                type="monotone"
+                dataKey="value"
+                stroke={CHART_COLORS_STROKE_FILL[0].stroke}
+                fill={`url(#colorfallback)`}
+                fillOpacity={1}
+                stackId={chartType === 'stackedArea' ? 'stack' : undefined}
+                onClick={handleAreaClick}
+              />
+            )}
           </RechartsAreaChart>
         </ResponsiveContainer>
-      </figure>
+      </div>
 
       {config.footer && (
         <p role="doc-footnote" className="text-sm text-gray-500 mt-4">

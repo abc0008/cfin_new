@@ -23,10 +23,12 @@ export interface ProcessedDocument {
 }
 
 export interface DocumentUploadResponse {
-  document_id: string;
+  documentId: string;
   filename: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   message: string;
+  contentType: string;
+  fileSize: number;
 }
 
 export interface Citation {

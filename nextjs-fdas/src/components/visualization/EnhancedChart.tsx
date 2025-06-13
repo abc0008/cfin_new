@@ -339,7 +339,7 @@ export const EnhancedChart: React.FC<EnhancedChartProps> = ({
             <Line type="monotone" dataKey="value" name="Value" stroke={CHART_COLORS[0]} activeDot={{ r: 8, onClick: handleDataPointClick }} />
           )}
         </LineChart>
-      ) : chartType === 'area' ? (
+      ) : chartType === 'area' || chartType === 'stackedArea' ? (
         <AreaChart data={formattedData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis {...xAxisProps} />
@@ -359,14 +359,21 @@ export const EnhancedChart: React.FC<EnhancedChartProps> = ({
                   type="monotone" 
                   dataKey={key} 
                   name={key} 
-                  stackId={index.toString()} 
+                  stackId={chartType === 'stackedArea' ? 'stack' : index.toString()} 
                   stroke={seriesColor || CHART_COLORS[index % CHART_COLORS.length]} 
                   fill={seriesColor ? `${seriesColor}70` : `${CHART_COLORS[index % CHART_COLORS.length]}70`} 
                 />
               );
             })
           ) : (
-            <Area type="monotone" dataKey="value" name="Value" stackId="1" stroke={CHART_COLORS[0]} fill={`${CHART_COLORS[0]}70`} />
+            <Area 
+              type="monotone" 
+              dataKey="value" 
+              name="Value" 
+              stackId={chartType === 'stackedArea' ? 'stack' : '1'} 
+              stroke={CHART_COLORS[0]} 
+              fill={`${CHART_COLORS[0]}70`} 
+            />
           )}
         </AreaChart>
       ) : chartType === 'scatter' ? (

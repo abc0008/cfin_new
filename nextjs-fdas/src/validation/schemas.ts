@@ -13,10 +13,10 @@ export const DocumentMetadataSchema = z.object({
 
 // Add the DocumentUploadResponseSchema to match the backend's response
 export const DocumentUploadResponseSchema = z.object({
-  documentId: z.string().uuid(),
+  documentId: z.string(),
   filename: z.string(),
   status: z.enum(['pending', 'processing', 'completed', 'failed']),
-  message: z.string().optional(),
+  message: z.string(),
   contentType: z.string(),
   fileSize: z.number().int().positive()
 });
@@ -164,8 +164,18 @@ export const MetricConfigSchema = z.object({
 export const ChartConfigSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
+  subtitle: z.string().optional(),
   xAxisKey: z.string(),
   yAxisKey: z.string().optional(),
+  xAxisLabel: z.string().optional(),
+  yAxisLabel: z.string().optional(),
+  showLegend: z.boolean().optional(),
+  legendPosition: z.enum(['top', 'bottom', 'left', 'right']).optional(),
+  showGrid: z.boolean().optional(),
+  stack: z.boolean().optional(),
+  colors: z.array(z.string()).optional(),
+  footer: z.string().optional(),
+  totalLabel: z.string().optional(),
   // Accept additional keys for flexibility
 }).catchall(z.any());
 
@@ -209,7 +219,12 @@ export const TableColumnSchema = z.object({
 export const TableConfigSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
-  columns: z.array(TableColumnSchema)
+  footer: z.string().optional(),
+  columns: z.array(TableColumnSchema),
+  showRowNumbers: z.boolean().optional(),
+  sortable: z.boolean().optional(),
+  pagination: z.boolean().optional(),
+  pageSize: z.number().optional()
 });
 
 export const TableDataSchema = z.object({
@@ -223,8 +238,7 @@ export const VisualizationDataSchema = z.object({
   tables: z.array(TableDataSchema),
   metrics: z.array(FinancialMetricSchema).optional(),
   monetaryValues: z.any().optional(),
-  percentages: z.any().optional(),
-  keywordFrequency: z.any().optional()
+  percentages: z.any().optional()
 });
 
 // Update AnalysisResultSchema to use VisualizationDataSchema

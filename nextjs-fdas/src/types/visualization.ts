@@ -30,8 +30,18 @@ export interface MetricConfig {
 export interface ChartConfig {
   title: string;
   description?: string;
+  subtitle?: string;
   xAxisKey: string;
   yAxisKey?: string;
+  xAxisLabel?: string;
+  yAxisLabel?: string;
+  showLegend?: boolean;
+  legendPosition?: 'top' | 'bottom' | 'left' | 'right';
+  showGrid?: boolean;
+  stack?: boolean;
+  colors?: string[];
+  footer?: string;
+  totalLabel?: string;
   [key: string]: any;
 }
 
@@ -79,12 +89,12 @@ export interface TableColumn {
 export interface TableConfig {
   title: string;
   description?: string;
-  subtitle?: string;
-  columns: TableColumn[];
-  pageSize?: number;
-  pagination?: boolean;
-  showRowNumbers?: boolean;
   footer?: string;
+  columns: TableColumn[];
+  showRowNumbers?: boolean;
+  sortable?: boolean;
+  pagination?: boolean;
+  pageSize?: number;
 }
 
 // Table data structure
@@ -103,7 +113,6 @@ export interface VisualizationData {
   // Legacy format fields - keep for backward compatibility
   monetaryValues?: any;
   percentages?: any;
-  keywordFrequency?: any;
 }
 
 // Interface for financial metrics to be displayed in cards

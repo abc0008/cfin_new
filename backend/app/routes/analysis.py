@@ -103,8 +103,7 @@ async def run_analysis_endpoint(
             charts=[ChartData(**c) if isinstance(c, dict) else c for c in charts_list],
             tables=[TableData(**t) if isinstance(t, dict) else t for t in tables_list],
             monetary_values=viz_data_input.get("monetary_values"), # Use snake_case key here
-            percentages=viz_data_input.get("percentages"),
-            keyword_frequency=viz_data_input.get("keyword_frequency") # Use snake_case key here
+            percentages=viz_data_input.get("percentages")
         )
 
         api_response = AnalysisApiResponse(
