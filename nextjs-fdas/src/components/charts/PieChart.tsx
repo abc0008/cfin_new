@@ -12,7 +12,24 @@ interface PieChartProps {
 }
 
 const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%', onDataPointClick }) => {
-  const { config, data: chartData } = data;
+  const { config, data: rawChartData } = data;
+  
+  // Ensure height is a number for ResponsiveContainer
+  const chartHeight = typeof height === 'string' && height.includes('%') ? 400 : height;
+  
+  // Transform data if it's in {x, y} format from backend
+  const chartData = rawChartData.map(item => {
+    if ('x' in item && 'y' in item) {
+      // Backend transformed format
+      return {
+        name: item.x,
+        value: item.y,
+        ...item // Preserve any additional properties
+      };
+    }
+    // Already in correct format
+    return item;
+  });
 
   const handleSliceClick = (event: any) => {
     const payload = event?.payload;
@@ -30,7 +47,7 @@ const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%',
   }
 
   return (
-    <div className="w-full bg-card rounded-lg shadow-sm border border-border p-6">
+    <div className="w-full bg-card rounded-lg shadow-sm border border-border p-4">
       {/* Header */}
       <div className="mb-6">
         <h3 className="font-avenir-pro-demi text-xl text-foreground tracking-tighter">{config.title}</h3>
@@ -43,9 +60,9 @@ const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%',
       </div>
 
       {/* Chart */}
-      <figure style={{ width, height }}>
-        <ResponsiveContainer>
-          <RechartsPieChart>
+      <figure className="flex justify-center items-center" style={{ width: width, height: chartHeight, minHeight: '300px' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <RechartsPieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
             <Pie
               data={chartData}
               dataKey="value"

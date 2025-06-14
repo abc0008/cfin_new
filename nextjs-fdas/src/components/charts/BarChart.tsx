@@ -21,12 +21,42 @@ interface BarChartProps {
   onDataPointClick?: (dataPoint: any) => void;
 }
 
+const CustomizedAxisTick = (props: any) => {
+  const { x, y, payload } = props;
+  const words = payload.value.split(' ');
+  const maxCharsPerLine = 10;
+  let line = '';
+  const lines = [];
+
+  for (const word of words) {
+    if ((line + word).length > maxCharsPerLine) {
+      lines.push(line.trim());
+      line = '';
+    }
+    line += `${word} `;
+  }
+  lines.push(line.trim());
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={16} textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize={12} fontFamily="Avenir Pro, sans-serif">
+        {lines.map((l, i) => (
+          <tspan x="0" dy={i > 0 ? "1.2em" : "0"} key={i}>{l}</tspan>
+        ))}
+      </text>
+    </g>
+  );
+};
+
 /**
  * BarChart component for rendering monetary values and comparing quantities
  * Uses Recharts library for rendering the chart
  */
 export default function BarChart({ data, height = 400, width = '100%', onDataPointClick }: BarChartProps) {
   const { config, chartConfig, data: rawChartData, chartType } = data;
+  
+  // Ensure height is a number for ResponsiveContainer
+  const chartHeight = typeof height === 'string' && height.includes('%') ? 400 : height;
   
   let processedData = rawChartData;
   // Expected categoryKey from config.xAxisKey or a fallback
@@ -40,50 +70,38 @@ export default function BarChart({ data, height = 400, width = '100%', onDataPoi
     }
   };
 
-  if (chartType === 'multiBar' && Array.isArray(rawChartData) && rawChartData.length > 0 && rawChartData[0].hasOwnProperty('name') && rawChartData[0].hasOwnProperty('data')) {
-    // Transform data for multiBar:
-    // from: [ { name: "SeriesA", data: [{x: "cat1", y: valA1}, ...] }, ... ]
-    // to:   [ { [categoryKey]: "cat1", SeriesA: valA1, SeriesB: valB1}, ... ]
-    // where SeriesA/SeriesB are keys from chartConfig
-    
-    const seriesKeysFromChartConfig = Object.keys(chartConfig);
-    const transformedDataMap = new Map();
-
-    rawChartData.forEach(seriesObject => {
-      // Find the key in chartConfig that corresponds to seriesObject.name (the series identifier in the raw data)
-      // This assumes seriesObject.name directly matches a key in chartConfig or its label.
-      const seriesDataKey = seriesKeysFromChartConfig.find(
-        key => chartConfig[key].label === seriesObject.name || key === seriesObject.name
-      );
-
-      if (seriesDataKey && Array.isArray(seriesObject.data)) {
-        seriesObject.data.forEach(point => {
-          const xValue = point.x; // This is the actual category value like "Net Interest Income"
-          if (!transformedDataMap.has(xValue)) {
-            transformedDataMap.set(xValue, { [categoryKey]: xValue });
-          }
-          transformedDataMap.get(xValue)[seriesDataKey] = point.y;
-        });
-      }
-    });
-    processedData = Array.from(transformedDataMap.values());
+  // Check if data is in {x, y} format (single bar chart from backend)
+  let metricKeys: string[] = [];
+  if (Array.isArray(rawChartData) && rawChartData.length > 0 && rawChartData[0].hasOwnProperty('x') && rawChartData[0].hasOwnProperty('y')) {
+    // Transform {x, y} data for single bar chart
+    const valueKey = Object.keys(chartConfig)[0] || 'value';
+    processedData = rawChartData.map(item => ({
+      [categoryKey]: item.x,
+      [valueKey]: item.y
+    }));
+    metricKeys = [valueKey];
+  } else if (chartType === 'bar' && chartConfig && Object.keys(chartConfig).length > 0) {
+    // For regular bar charts with chartConfig, the data might already be in the right format
+    metricKeys = Object.keys(chartConfig);
+  } else if (processedData && processedData.length > 0) {
+    // Extract metric keys from the data itself
+    const firstItem = processedData[0];
+    metricKeys = Object.keys(firstItem).filter(key => key !== categoryKey && typeof firstItem[key] === 'number');
   }
   
-  // Extract the keys that should be rendered as bars (all except the category axis)
-  // These are the keys from chartConfig (e.g., "2025", "2024" for multiBar)
-  const metricKeys = Object.keys(chartConfig);
-  
+  // Format Y-axis values to use compact formatting for consistency
+  const defaultFormatter = 'compact';
+  const defaultPrecision = 0;
+
   // Generate bars for each metric with their respective colors
   const bars = metricKeys.map((key, index) => {
-    const metricConfig: MetricConfig = chartConfig[key];
+    const metricConfig: MetricConfig = chartConfig?.[key];
     return (
       <Bar
         key={key}
         dataKey={key}
-        name={metricConfig.label}
-        fill={CHART_COLORS[index % CHART_COLORS.length] || '#8884d8'}
-        stroke={metricConfig.color ? undefined : '#7066bb'}
-        strokeWidth={1}
+        name={metricConfig?.label || key}
+        fill={metricConfig?.color || CHART_COLORS[index % CHART_COLORS.length] || '#8884d8'}
         radius={[4, 4, 0, 0]}
         onClick={handleBarClick}
       />
@@ -93,75 +111,130 @@ export default function BarChart({ data, height = 400, width = '100%', onDataPoi
   // Custom tooltip formatter to use metric config for formatting
   const formatTooltip = (value: number, name: string) => {
     // Find the metric config for this bar
-    const metricKey = metricKeys.find(key => chartConfig[key].label === name);
-    if (metricKey && chartConfig[metricKey]) {
+    const metricKey = metricKeys.find(key => chartConfig?.[key]?.label === name || key === name);
+    if (metricKey && chartConfig?.[metricKey]) {
       const metric = chartConfig[metricKey];
       return [formatValue(value, metric.formatter, metric.precision), metric.unit || ''];
     }
-    return [value, ''];
+    // Default formatting
+    return [formatValue(value, defaultFormatter, defaultPrecision), ''];
   };
 
+  // Check if we have data to display
+  if (!processedData || processedData.length === 0 || metricKeys.length === 0) {
+    return (
+      <div className="w-full bg-card rounded-lg shadow-sm border border-border p-4">
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">No data available for chart</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full h-full overflow-hidden rounded-lg bg-white shadow-sm flex flex-col">
-      {config.title && (
-        <div className="p-4 pb-0 flex-shrink-0">
-          <h3 className="text-lg font-semibold text-gray-800">{config.title}</h3>
-          {config.subtitle && <p className="text-sm text-gray-500">{config.subtitle}</p>}
-          {config.description && !config.subtitle && (
-            <p className="text-sm text-gray-500">{config.description}</p>
+    <div className="w-full bg-card rounded-lg shadow-sm border border-border p-4">
+      {/* Header */}
+      {(config.title || config.subtitle || config.description) && (
+        <div className="mb-6">
+          {config.title && (
+            <h3 className="font-avenir-pro-demi text-xl text-foreground tracking-tighter">
+              {config.title}
+            </h3>
           )}
-          {config.footer && (
-            <p className="text-xs text-gray-400 mt-1">{config.footer}</p>
+          {config.subtitle && (
+            <p className="font-avenir-pro-light text-sm text-muted-foreground mt-1">
+              {config.subtitle}
+            </p>
+          )}
+          {config.description && !config.subtitle && (
+            <p className="font-avenir-pro text-sm text-muted-foreground mt-2">
+              {config.description}
+            </p>
           )}
         </div>
       )}
       
-      <div className="flex-1 p-4" style={{ minHeight: height === "100%" ? "300px" : undefined }}>
-        <ResponsiveContainer width={width} height={height === "100%" ? "100%" : height}>
+      {/* Chart */}
+      <figure className="flex justify-center items-center" style={{ width: width, height: chartHeight, minHeight: '300px' }}>
+        <ResponsiveContainer width="100%" height="100%">
           <RechartsBarChart
             data={processedData}
-            margin={{ top: 10, right: 30, left: 20, bottom: 30 }}
-            barSize={config.stack ? 20 : 40}
-            barGap={config.stack ? 0 : 4}
-            barCategoryGap={config.stack ? '10%' : '20%'}
+            margin={{ top: 10, right: 20, left: 10, bottom: 50 }}
+            barSize={40}
+            barGap={8}
+            barCategoryGap={'20%'}
           >
-            {config.showGrid !== false && <CartesianGrid strokeDasharray="3 3" vertical={false} />}
+            {config.showGrid !== false && <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />}
             
             <XAxis
               dataKey={categoryKey}
               scale="point"
               padding={{ left: 20, right: 20 }}
-              tick={{ fontSize: 12 }}
-              tickLine={true}
-              axisLine={true}
+              tick={<CustomizedAxisTick />}
+              height={60}
+              interval={0}
+              tickLine={{ stroke: 'hsl(var(--border))' }}
+              axisLine={{ stroke: 'hsl(var(--border))' }}
             >
-              {config.xAxisLabel && <Label value={config.xAxisLabel} offset={-10} position="insideBottom" />}
+              {config.xAxisLabel && (
+                <Label 
+                  value={config.xAxisLabel} 
+                  offset={-10} 
+                  position="insideBottom"
+                  style={{ 
+                    fill: 'hsl(var(--muted-foreground))',
+                    fontFamily: 'Avenir Pro, sans-serif',
+                    fontSize: 14
+                  }}
+                />
+              )}
             </XAxis>
             
             <YAxis
-              tick={{ fontSize: 12 }}
-              tickLine={true}
-              axisLine={true}
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontFamily: 'Avenir Pro, sans-serif' }}
+              tickLine={{ stroke: 'hsl(var(--border))' }}
+              axisLine={{ stroke: 'hsl(var(--border))' }}
+              width={60}
               tickFormatter={(value) => {
-                // Format Y-axis ticks based on the first metric's config
-                if (metricKeys.length > 0) {
+                // Format Y-axis ticks based on the first metric's config or use default
+                if (metricKeys.length > 0 && chartConfig?.[metricKeys[0]]) {
                   const firstMetric = chartConfig[metricKeys[0]];
-                  return formatValue(value, firstMetric.formatter, firstMetric.precision);
+                  return formatValue(value, firstMetric.formatter || defaultFormatter, firstMetric.precision ?? defaultPrecision);
                 }
-                return value;
+                // Default to compact formatting with no decimals
+                return formatValue(value, defaultFormatter, defaultPrecision);
               }}
             >
-              {config.yAxisLabel && <Label value={config.yAxisLabel} angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />}
+              {config.yAxisLabel && (
+                <Label 
+                  value={config.yAxisLabel} 
+                  angle={-90} 
+                  position="insideLeft"
+                  offset={10} 
+                  style={{ 
+                    textAnchor: 'middle',
+                    fill: 'hsl(var(--muted-foreground))',
+                    fontFamily: 'Avenir Pro, sans-serif',
+                    fontSize: 13
+                  }}
+                />
+              )}
             </YAxis>
             
             <Tooltip
               formatter={formatTooltip}
               contentStyle={{
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                padding: '8px 12px',
+                backgroundColor: 'hsl(var(--card))',
+                border: '1px solid hsl(var(--border))',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                fontFamily: 'Avenir Pro, sans-serif',
+                fontSize: '14px',
+              }}
+              labelStyle={{
+                fontFamily: 'Avenir Pro, sans-serif',
+                fontWeight: '600',
+                color: 'hsl(var(--foreground))'
               }}
             />
             
@@ -169,23 +242,34 @@ export default function BarChart({ data, height = 400, width = '100%', onDataPoi
               <Legend
                 verticalAlign={config.legendPosition === 'top' || config.legendPosition === 'bottom' ? config.legendPosition : 'bottom'}
                 align={config.legendPosition === 'left' || config.legendPosition === 'right' ? config.legendPosition : 'center'}
-                iconType="circle"
+                iconType="rect"
                 iconSize={10}
-                wrapperStyle={{ paddingTop: '10px' }}
+                wrapperStyle={{ 
+                  paddingTop: '20px',
+                  fontFamily: 'Avenir Pro, sans-serif',
+                  fontSize: '14px'
+                }}
               />
             )}
             
             {bars}
           </RechartsBarChart>
         </ResponsiveContainer>
-      </div>
+      </figure>
 
-      {/* Display totalLabel if provided */}
+      {/* Footer */}
+      {config.footer && (
+        <div className="mt-6 pt-4 border-t border-border">
+          <p className="font-avenir-pro text-sm text-muted-foreground">
+            {config.footer}
+          </p>
+        </div>
+      )}
       {config.totalLabel && (
-        <div className="px-4 pb-4 flex-shrink-0">
-          <div className="text-sm text-gray-500 text-center">
+        <div className="mt-4">
+          <p className="font-avenir-pro-demi text-sm text-foreground">
             {config.totalLabel}
-          </div>
+          </p>
         </div>
       )}
     </div>

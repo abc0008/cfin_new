@@ -289,18 +289,16 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
               title="Key Performance Indicators"
             />
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
-              {visualizationData.charts && visualizationData.charts.length > 0 && (
-                <div className="h-full">
-                  <ChartRenderer data={visualizationData.charts[0]} onDataPointClick={handleDataPointClick} />
-                </div>
-              )}
-              {visualizationData.charts && visualizationData.charts.length > 1 && (
-                <div className="h-full">
-                  <ChartRenderer data={visualizationData.charts[1]} onDataPointClick={handleDataPointClick} />
-                </div>
-              )}
-            </div>
+            {/* Charts Grid - Flexibly displays all charts */}
+            {visualizationData.charts && visualizationData.charts.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
+                {visualizationData.charts.map((chart, index) => (
+                  <div key={index} className="h-full">
+                    <ChartRenderer data={chart} onDataPointClick={handleDataPointClick} />
+                  </div>
+                ))}
+              </div>
+            )}
             
             {visualizationData.tables && visualizationData.tables.length > 0 && (
               <div className="flex-1">

@@ -134,7 +134,7 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
           <ResponsiveContainer width={width} height={height}>
             <RechartsLineChart
               data={rawDataPointsFromBackend}
-              margin={{ top: 10, right: 30, left: 20, bottom: 50 }}
+              margin={{ top: 10, right: 30, left: 0, bottom: 50 }}
             >
               {config.showGrid !== false && <CartesianGrid strokeDasharray="3 3" />}
               
@@ -186,17 +186,17 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
     }
     
     return (
-      <div className="w-full overflow-hidden rounded-lg bg-white p-4 shadow-sm">
+      <div className="w-full bg-card rounded-lg shadow-sm border border-border p-6">
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">
+          <h3 className="font-avenir-pro-demi text-xl text-foreground tracking-tighter">
             {config?.title || 'Line Chart'}
           </h3>
-          <p className="text-sm text-red-500">
+          <p className="font-avenir-pro text-sm text-destructive">
             Chart configuration error: No metric configuration found
           </p>
           <details className="mt-2">
-            <summary className="text-xs text-gray-500 cursor-pointer">Debug info</summary>
-            <pre className="text-xs text-gray-400 mt-1 overflow-auto max-h-32">
+            <summary className="font-avenir-pro text-xs text-muted-foreground cursor-pointer">Debug info</summary>
+            <pre className="font-mono text-xs text-muted-foreground mt-1 overflow-auto max-h-32">
               {JSON.stringify({ config, chartConfig, dataLength: rawDataPointsFromBackend?.length }, null, 2)}
             </pre>
           </details>
@@ -267,7 +267,7 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
             <ResponsiveContainer width="100%" height="100%">
               <RechartsLineChart
                 data={rawDataPointsFromBackend}
-                margin={{ top: 10, right: 30, left: 20, bottom: 50 }}
+                margin={{ top: 10, right: 30, left: 0, bottom: 50 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey={config.xAxisKey || categoryKey} />
@@ -303,37 +303,65 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
   }
 
   return (
-    <div className="w-full overflow-hidden rounded-lg bg-white p-4 shadow-sm">
-      {config.title && (
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">{config.title}</h3>
-          {config.subtitle && <p className="text-sm text-gray-500">{config.subtitle}</p>}
+    <div className="w-full bg-card rounded-lg shadow-sm border border-border p-4">
+      {/* Header */}
+      {(config.title || config.subtitle || config.description) && (
+        <div className="mb-6">
+          {config.title && (
+            <h3 className="font-avenir-pro-demi text-xl text-foreground tracking-tighter">
+              {config.title}
+            </h3>
+          )}
+          {config.subtitle && (
+            <p className="font-avenir-pro-light text-sm text-muted-foreground mt-1">
+              {config.subtitle}
+            </p>
+          )}
+          {config.description && !config.subtitle && (
+            <p className="font-avenir-pro text-sm text-muted-foreground mt-2">
+              {config.description}
+            </p>
+          )}
         </div>
       )}
       
-      <div style={{ width: width, height: chartHeight, minHeight: '300px' }}>
+      {/* Chart */}
+      <figure className="flex justify-center items-center" style={{ width: width, height: chartHeight, minHeight: '300px' }}>
         <ResponsiveContainer width="100%" height="100%">
         <RechartsLineChart
           data={processedData}
-          margin={{ top: 10, right: 30, left: 20, bottom: 50 }}
+          margin={{ top: 10, right: 30, left: 0, bottom: 50 }}
+          onClick={onDataPointClick ? handleLineClick : undefined}
         >
-          {config.showGrid !== false && <CartesianGrid strokeDasharray="3 3" />}
+          {config.showGrid !== false && <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />}
           
           <XAxis
             dataKey={categoryKey}
             scale="auto"
             padding={{ left: 10, right: 10 }}
-            tick={{ fontSize: 12 }}
-            tickLine={true}
-            axisLine={true}
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, fontFamily: 'Avenir Pro, sans-serif' }}
+            tickLine={{ stroke: 'hsl(var(--muted-foreground))' }}
+            axisLine={{ stroke: 'hsl(var(--muted-foreground))' }}
           >
-            {config.xAxisLabel && <Label value={config.xAxisLabel} offset={-10} position="insideBottom" />}
+            {config.xAxisLabel && (
+              <Label 
+                value={config.xAxisLabel} 
+                offset={-10} 
+                position="insideBottom"
+                style={{ 
+                  fill: 'hsl(var(--muted-foreground))',
+                  fontFamily: 'Avenir Pro, sans-serif',
+                  fontSize: 14
+                }}
+              />
+            )}
           </XAxis>
           
           <YAxis
-            tick={{ fontSize: 12 }}
-            tickLine={true}
-            axisLine={true}
+            width={60}
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+            tickLine={{ stroke: 'hsl(var(--muted-foreground))' }}
+            axisLine={{ stroke: 'hsl(var(--muted-foreground))' }}
             domain={['dataMin', 'dataMax']}
             tickFormatter={(value) => {
               // Format Y-axis ticks based on the first metric's config
@@ -347,17 +375,36 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
               return formatValue(value, 'compact', 1);
             }}
           >
-            {config.yAxisLabel && <Label value={config.yAxisLabel} angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />}
+            {config.yAxisLabel && (
+              <Label 
+                value={config.yAxisLabel} 
+                angle={-90} 
+                position="insideLeft"
+                offset={10} 
+                style={{ 
+                  textAnchor: 'middle',
+                  fill: 'hsl(var(--muted-foreground))',
+                  fontFamily: 'Avenir Pro, sans-serif',
+                  fontSize: 13
+                }}
+              />
+            )}
           </YAxis>
           
           <Tooltip
             formatter={formatTooltip}
             contentStyle={{
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              border: '1px solid #e2e8f0',
-              borderRadius: '6px',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-              padding: '8px 12px',
+              backgroundColor: 'hsl(var(--card))',
+              border: '1px solid hsl(var(--border))',
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              fontFamily: 'Avenir Pro, sans-serif',
+              fontSize: '14px',
+            }}
+            labelStyle={{
+              fontFamily: 'Avenir Pro, sans-serif',
+              fontWeight: '600',
+              color: 'hsl(var(--foreground))'
             }}
             labelFormatter={(label) => {
               // Format the X-axis label in the tooltip (usually a date)
@@ -384,14 +431,34 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
               align="center"
               iconType="line"
               iconSize={10}
-              wrapperStyle={{ paddingTop: '10px' }}
+              wrapperStyle={{ 
+                paddingTop: '20px',
+                fontFamily: 'Avenir Pro, sans-serif',
+                fontSize: '14px'
+              }}
             />
           )}
           
           {lines}
         </RechartsLineChart>
         </ResponsiveContainer>
-      </div>
+      </figure>
+
+      {/* Footer */}
+      {config.footer && (
+        <div className="mt-6 pt-4 border-t border-border">
+          <p className="font-avenir-pro text-sm text-muted-foreground">
+            {config.footer}
+          </p>
+        </div>
+      )}
+      {config.totalLabel && (
+        <div className="mt-4">
+          <p className="font-avenir-pro-demi text-sm text-foreground">
+            {config.totalLabel}
+          </p>
+        </div>
+      )}
     </div>
   );
 } 

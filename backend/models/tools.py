@@ -16,8 +16,15 @@ class ToolSchema(BaseModel):
     name: str
     description: str
     input_schema: Dict[str, Any]
-    cache_control: Optional[Dict[str, str]] = Field(default=None, alias="cacheControl", description="Optional cache control settings")
-    processor: Optional[Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]] = Field(default=None, exclude=True)
+    cache_control: Optional[Dict[str, str]] = Field(
+        default=None,
+        alias="cacheControl",
+        description="Optional cache control settings"
+    )
+    processor: Optional[Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]] = Field(
+        default=None,
+        exclude=True
+    )
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
@@ -83,7 +90,17 @@ class ChartGenerationInputSchema(BaseModel):
 
 class ChartGenerationTool(ToolSchema):
     name: str = "generate_graph_data"
-    description: str = """Use this tool to generate structured JSON data for financial charts and graphs (bar, line, pie, area, scatter).\nSpecify the chartType, provide general config (title, axis labels), the data array, and chartConfig for each series/metric.\nThe 'data' array objects must contain a key matching 'config.xAxisKey' and keys matching the keys used in 'chartConfig'.\nFor pie charts, 'data' objects typically have 'name' and 'value' keys."""
+    description: str = """Use this tool to generate structured JSON data for financial charts and graphs (bar, line, pie, area, scatter).
+Specify the chartType, provide general config (title, axis labels), the data array, and chartConfig for each series/metric.
+
+For most charts (bar, line, area, scatter):
+- Set config.xAxisKey to specify which data field to use for the x-axis (required)
+- The 'data' array objects must contain a key matching 'config.xAxisKey' and keys matching the keys used in 'chartConfig'
+
+For pie charts:
+- config.xAxisKey can be omitted (defaults to 'name')
+- 'data' objects should have 'name' (category) and 'value' (numeric value) keys
+- Example: [{"name": "Category A", "value": 100}, {"name": "Category B", "value": 200}]"""
     input_schema: Dict[str, Any] = ChartGenerationInputSchema.model_json_schema()
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)

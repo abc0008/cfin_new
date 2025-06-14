@@ -27,6 +27,9 @@ interface ScatterChartProps {
  */
 export default function ScatterChart({ data, height = 400, width = '100%', onDataPointClick }: ScatterChartProps) {
   const { config, data: chartData, chartConfig } = data;
+  
+  // Ensure height is a number for ResponsiveContainer
+  const chartHeight = typeof height === 'string' && height.includes('%') ? 400 : height;
 
   const handlePointClick = (event: any) => {
     const payload = event?.payload;
@@ -43,14 +46,17 @@ export default function ScatterChart({ data, height = 400, width = '100%', onDat
     );
   }
 
-  // Determine x and y axis keys from config or use first two numeric properties
-  const xAxisKey = config.xAxisKey || Object.keys(chartData[0]).find(
-    key => typeof chartData[0][key] === 'number' && key !== 'z'
-  ) || 'x';
+  // Check if data is in transformed {x, y} format from backend
+  const isTransformedData = chartData.length > 0 && 'x' in chartData[0] && 'y' in chartData[0];
   
-  const yAxisKey = Object.keys(chartData[0]).find(
+  // Determine x and y axis keys
+  const xAxisKey = isTransformedData ? 'x' : (config.xAxisKey || Object.keys(chartData[0]).find(
+    key => typeof chartData[0][key] === 'number' && key !== 'z'
+  ) || 'x');
+  
+  const yAxisKey = isTransformedData ? 'y' : (Object.keys(chartData[0]).find(
     key => typeof chartData[0][key] === 'number' && key !== xAxisKey && key !== 'z'
-  ) || 'y';
+  ) || 'y');
   
   // Check if we have a z-axis value for bubble size
   const hasZValue = chartData.some(item => 'z' in item && typeof item.z === 'number');
@@ -65,35 +71,68 @@ export default function ScatterChart({ data, height = 400, width = '100%', onDat
   };
 
   return (
-    <div className="w-full">
-      {/* Title section */}
-      <div className="mb-4">
+    <div className="w-full bg-card rounded-lg shadow-sm border border-border p-4">
+      {/* Header */}
+      <div className="mb-6">
         {config.title && (
-          <h3 role="heading" aria-level={3} className="text-lg font-semibold text-gray-900">{config.title}</h3>
+          <h3 className="font-avenir-pro-demi text-xl text-foreground tracking-tighter">
+            {config.title}
+          </h3>
         )}
         {config.subtitle && (
-          <p role="doc-subtitle" className="text-sm text-gray-500">{config.subtitle}</p>
+          <p className="font-avenir-pro-light text-sm text-muted-foreground mt-1">
+            {config.subtitle}
+          </p>
         )}
         {config.description && !config.subtitle && (
-          <p role="doc-description" className="text-sm text-gray-500">{config.description}</p>
+          <p className="font-avenir-pro text-sm text-muted-foreground mt-2">
+            {config.description}
+          </p>
         )}
       </div>
 
-      {/* Chart container */}
-      <div role="figure" aria-label={`Scatter plot of ${config.title || 'data points'}`} style={{ width, height }}>
-        <ResponsiveContainer>
-          <RechartsScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" />
+      {/* Chart */}
+      <figure className="flex justify-center items-center" style={{ width: width, height: chartHeight, minHeight: '300px' }} role="figure" aria-label={`Scatter plot of ${config.title || 'data points'}`}>
+        <ResponsiveContainer width="100%" height="100%">
+          <RechartsScatterChart margin={{ top: 10, right: 20, left: 0, bottom: 50 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis 
               dataKey={xAxisKey} 
-              name={config.xAxisLabel || xAxisKey} 
-              label={{ value: config.xAxisLabel || xAxisKey, position: 'insideBottom', offset: -5 }}
+              name={config.xAxisLabel || xAxisKey}
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, fontFamily: 'Avenir Pro, sans-serif' }}
+              tickLine={{ stroke: 'hsl(var(--border))' }}
+              axisLine={{ stroke: 'hsl(var(--border))' }} 
+              label={{ 
+                value: config.xAxisLabel || xAxisKey, 
+                position: 'insideBottom', 
+                offset: -10,
+                style: {
+                  fill: 'hsl(var(--muted-foreground))',
+                  fontFamily: 'Avenir Pro, sans-serif',
+                  fontSize: 14
+                }
+              }}
               aria-label={config.xAxisLabel || xAxisKey}
             />
             <YAxis 
               dataKey={yAxisKey} 
               name={config.yAxisLabel || yAxisKey}
-              label={{ value: config.yAxisLabel || yAxisKey, angle: -90, position: 'insideLeft' }}
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, fontFamily: 'Avenir Pro, sans-serif' }}
+              tickLine={{ stroke: 'hsl(var(--border))' }}
+              axisLine={{ stroke: 'hsl(var(--border))' }}
+              width={60}
+              label={{ 
+                value: config.yAxisLabel || yAxisKey, 
+                angle: -90, 
+                position: 'insideLeft',
+                offset: 10,
+                style: {
+                  textAnchor: 'middle',
+                  fill: 'hsl(var(--muted-foreground))',
+                  fontFamily: 'Avenir Pro, sans-serif',
+                  fontSize: 13
+                }
+              }}
               tickFormatter={(value) => formatValue(value, 'compact', 1)}
               aria-label={config.yAxisLabel || yAxisKey}
             />
@@ -103,6 +142,19 @@ export default function ScatterChart({ data, height = 400, width = '100%', onDat
             <Tooltip 
               formatter={formatTooltipValue}
               labelFormatter={(label) => `${config.xAxisLabel || xAxisKey}: ${label}`}
+              contentStyle={{
+                backgroundColor: 'hsl(var(--card))',
+                border: '1px solid hsl(var(--border))',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                fontFamily: 'Avenir Pro, sans-serif',
+                fontSize: '14px',
+              }}
+              labelStyle={{
+                fontFamily: 'Avenir Pro, sans-serif',
+                fontWeight: '600',
+                color: 'hsl(var(--foreground))'
+              }}
             />
             
             {config.showLegend !== false && (
@@ -111,13 +163,17 @@ export default function ScatterChart({ data, height = 400, width = '100%', onDat
                 align="center"
                 iconType="rect"
                 iconSize={10}
-                wrapperStyle={{ paddingTop: '10px' }}
+                wrapperStyle={{ 
+                  paddingTop: '20px',
+                  fontFamily: 'Avenir Pro, sans-serif',
+                  fontSize: '14px'
+                }}
               />
             )}
             
             {/* Add reference lines at x=0 and y=0 if needed */}
-            <ReferenceLine x={0} stroke="#666" />
-            <ReferenceLine y={0} stroke="#666" />
+            <ReferenceLine x={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+            <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
             
             <Scatter
               name={config.title || "Data"}
@@ -128,16 +184,22 @@ export default function ScatterChart({ data, height = 400, width = '100%', onDat
             />
           </RechartsScatterChart>
         </ResponsiveContainer>
-      </div>
+      </figure>
 
-      {/* Footer section */}
+      {/* Footer */}
       {config.footer && (
-        <p role="doc-footnote" className="mt-2 text-xs text-gray-500 italic">{config.footer}</p>
+        <div className="mt-6 pt-4 border-t border-border">
+          <p className="font-avenir-pro text-sm text-muted-foreground">
+            {config.footer}
+          </p>
+        </div>
       )}
-
-      {/* Total section */}
       {config.totalLabel && (
-        <p role="doc-footnote" className="mt-4 text-sm font-medium text-gray-900">{config.totalLabel}</p>
+        <div className="mt-4">
+          <p className="font-avenir-pro-demi text-sm text-foreground">
+            {config.totalLabel}
+          </p>
+        </div>
       )}
     </div>
   );

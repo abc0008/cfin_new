@@ -31,7 +31,7 @@ export interface ChartConfig {
   title: string;
   description?: string;
   subtitle?: string;
-  xAxisKey: string;
+  xAxisKey?: string; // Optional for pie charts
   yAxisKey?: string;
   xAxisLabel?: string;
   yAxisLabel?: string;
@@ -39,9 +39,11 @@ export interface ChartConfig {
   legendPosition?: 'top' | 'bottom' | 'left' | 'right';
   showGrid?: boolean;
   stack?: boolean;
+  stacked?: boolean; // Alternative property name used by some components
   colors?: string[];
   footer?: string;
   totalLabel?: string;
+  showDots?: boolean; // For line/area charts
   [key: string]: any;
 }
 

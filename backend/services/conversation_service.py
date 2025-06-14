@@ -1028,6 +1028,8 @@ When analyzing financial documents, focus on:
 3. Comparative analysis or trends
 4. Practical implications of the findings
 
+NOTE: ONLY PROVIDE QUESTIONS THAT COULD BE ANSWERED BY THE FINANCIAL DOCUMENTS PROVIDED.
+
 Conversation context:{document_context}
 
 {conversation_context}
@@ -1083,7 +1085,7 @@ Generate exactly {limit} follow-up questions, each on a new line, without number
         return [
             "What trends do you see in the financial performance?",
             "How does this compare to industry benchmarks?", 
-            "What are the key risk factors to consider?"
+            "Breakdown the financial performance by category"
         ]
     
     async def _decide_processing_approach(

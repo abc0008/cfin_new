@@ -165,7 +165,7 @@ export const ChartConfigSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
   subtitle: z.string().optional(),
-  xAxisKey: z.string(),
+  xAxisKey: z.string().optional(), // Made optional for pie charts
   yAxisKey: z.string().optional(),
   xAxisLabel: z.string().optional(),
   yAxisLabel: z.string().optional(),
@@ -173,6 +173,7 @@ export const ChartConfigSchema = z.object({
   legendPosition: z.enum(['top', 'bottom', 'left', 'right']).optional(),
   showGrid: z.boolean().optional(),
   stack: z.boolean().optional(),
+  stacked: z.boolean().optional(), // Alternative property name for stacking
   colors: z.array(z.string()).optional(),
   footer: z.string().optional(),
   totalLabel: z.string().optional(),
@@ -192,18 +193,35 @@ export const ChartSeriesSchema = z.object({
   color: z.string().optional()
 });
 
+// Pie chart specific data format
+export const PieChartDataItemSchema = z.object({
+  name: z.string(),
+  value: z.number(),
+  label: z.string().optional(),
+  color: z.string().optional()
+}).catchall(z.any());
+
 export const ChartDataSchema = z.object({
   chartType: z.enum(['bar', 'multiBar', 'line', 'pie', 'area', 'stackedArea', 'scatter']),
   config: ChartConfigSchema,
   data: z.union([
-    z.array(ChartDataItemSchema),
-    z.array(ChartSeriesSchema),
-    z.array(z.record(z.any())) // Allow flat format for multi-series line charts
+    z.array(ChartDataItemSchema), // {x, y} format
+    z.array(ChartSeriesSchema), // Multi-series format
+    z.array(PieChartDataItemSchema), // Pie chart {name, value} format
+    z.array(z.record(z.any())) // Allow flat format for flexibility
   ]),
   chartConfig: z.record(MetricConfigSchema).optional(),
   xAxisTitle: z.string().optional(),
   yAxisTitle: z.string().optional(),
   legendPosition: z.enum(['top', 'right', 'bottom', 'left']).optional()
+}).refine((data) => {
+  // Validate that non-pie charts have xAxisKey
+  if (data.chartType !== 'pie' && !data.config.xAxisKey) {
+    return false;
+  }
+  return true;
+}, {
+  message: "xAxisKey is required in config for non-pie chart types"
 });
 
 export const TableColumnSchema = z.object({

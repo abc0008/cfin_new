@@ -133,8 +133,14 @@ def process_chart_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
 
     transformed_data = []
 
-    if not x_axis_key:
-        raise ToolSchemaValidationError(f"xAxisKey is missing in chart config. Input: {tool_input}")
+    # Pie charts don't need xAxisKey - they use 'name' and 'value' fields
+    if chart_type == "pie":
+        # For pie charts, we'll use 'name' as the category key
+        x_axis_key = config.get("xAxisKey", "name")
+    else:
+        # For other chart types, xAxisKey is required
+        if not x_axis_key:
+            raise ToolSchemaValidationError(f"xAxisKey is missing in chart config. Input: {tool_input}")
 
     # Determine if it's a multi-series chart based on data structure
     # Simple charts: data like [{'name': 'A', 'value': 10}] - single metric per item

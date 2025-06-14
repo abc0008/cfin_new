@@ -6,6 +6,7 @@ import LineChart from './LineChart';
 import PieChart from './PieChart';
 import ScatterChart from './ScatterChart';
 import AreaChart from './AreaChart';
+import MultiBarChart from './MultiBarChart';
 
 interface ChartRendererProps {
   data: ChartData;
@@ -39,44 +40,56 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   switch (chartType) {
     case 'bar':
       return (
-        <div className={`h-full ${className}`}>
-          <BarChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        <div className={`h-full flex justify-center ${className}`}>
+          <div className="w-full max-w-4xl">
+            <BarChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+          </div>
         </div>
       );
     
     case 'multiBar':
       return (
-        <div className={`h-full ${className}`}>
-          <BarChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        <div className={`h-full flex justify-center ${className}`}>
+          <div className="w-full max-w-4xl">
+            <MultiBarChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+          </div>
         </div>
       );
     
     case 'line':
       return (
-        <div className={`h-full ${className}`}>
-          <LineChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        <div className={`h-full flex justify-center ${className}`}>
+          <div className="w-full max-w-4xl">
+            <LineChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+          </div>
         </div>
       );
     
     case 'pie':
       return (
-        <div className={`h-full ${className}`}>
-          <PieChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        <div className={`h-full flex justify-center ${className}`}>
+          <div className="w-full max-w-3xl">
+            <PieChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+          </div>
         </div>
       );
     
     case 'area':
     case 'stackedArea':
       return (
-        <div className={`h-full ${className}`}>
-          <AreaChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        <div className={`h-full flex justify-center ${className}`}>
+          <div className="w-full max-w-4xl">
+            <AreaChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+          </div>
         </div>
       );
     
     case 'scatter':
       return (
-        <div className={`h-full ${className}`}>
-          <ScatterChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        <div className={`h-full flex justify-center ${className}`}>
+          <div className="w-full max-w-4xl">
+            <ScatterChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+          </div>
         </div>
       );
     
