@@ -208,15 +208,17 @@ class ClaudeService:
             logger.warning("LangGraph service not available, skipping initialization")
             self.langgraph_service = None
 
-    async def _claude_call(self, **kwargs) -> AnthropicMessage:
+    async def _claude_call(self, stream: bool = False, **kwargs):
         """
         Central wrapper for all Claude API calls with rate limiting and token efficiency.
+        Supports both streaming and non-streaming modes.
         
         Args:
+            stream: Whether to stream the response
             **kwargs: Arguments to pass to client.messages.create
             
         Returns:
-            Claude API response
+            Claude API response (AnthropicMessage if stream=False, AsyncStream if stream=True)
         """
         # Estimate tokens for rate limiting
         messages = kwargs.get("messages", [])
@@ -245,9 +247,9 @@ class ClaudeService:
             
             sdk_token_count_result = await self.client.messages.count_tokens(**params_for_count)
             sdk_actual_tokens = sdk_token_count_result.input_tokens
-            logger.info(f"Anthropic SDK estimated input tokens (tools call): {sdk_actual_tokens} (Custom estimate: {tokens_in})")
+            logger.info(f"Anthropic SDK estimated input tokens ({'streaming' if stream else 'non-streaming'}): {sdk_actual_tokens} (Custom estimate: {tokens_in})")
         except Exception as e:
-            logger.error(f"Error during SDK token counting (tools call): {e}", exc_info=True)
+            logger.error(f"Error during SDK token counting ({'streaming' if stream else 'non-streaming'}): {e}", exc_info=True)
         # --- END SDK TOKEN COUNTING (AWAITED AND ALIGNED V4) ---
 
         # Apply rate limiting based on current token bucket state
@@ -258,10 +260,18 @@ class ClaudeService:
 
         try:
             # Make the API call with token efficiency headers
-            resp = await self.client.messages.create(
-                extra_headers=self._extra_headers,
-                **kwargs
-            )
+            if stream:
+                # Use streaming mode - returns AsyncMessageStreamManager
+                resp = self.client.messages.stream(
+                    extra_headers=self._extra_headers,
+                    **kwargs
+                )
+            else:
+                # Use non-streaming mode (existing behavior)
+                resp = await self.client.messages.create(
+                    extra_headers=self._extra_headers,
+                    **kwargs
+                )
         except RateLimitError as e:
             # Re-raise rate limit errors for upstream handling
             raise
@@ -273,8 +283,8 @@ class ClaudeService:
             # Re-raise other errors
             raise
         
-        # Update rate limit state from response headers if available
-        if hasattr(resp, 'response_headers') and resp.response_headers:
+        # Update rate limit state from response headers if available (non-streaming only)
+        if not stream and hasattr(resp, 'response_headers') and resp.response_headers:
             ClaudeBucket.update(resp.response_headers)
         return resp
 
@@ -316,6 +326,137 @@ class ClaudeService:
             
         return result
 
+    async def _process_streaming_response(self, stream_manager, emit_callback=None):
+        """
+        Process streaming Claude API response and emit events for real-time updates.
+        Implements hybrid streaming: text content streams immediately, tools buffer until complete.
+        
+        Args:
+            stream_manager: AsyncMessageStreamManager from Claude API
+            emit_callback: Optional callback function to emit streaming events
+            
+        Returns:
+            Processed response dict with accumulated text, tool_calls, and citations
+        """
+        accumulated_text = ""
+        tool_calls = []
+        tool_buffer = {}  # Buffer incomplete tool calls by ID
+        citations = []
+        
+        try:
+            async with stream_manager as stream:
+                async for chunk in stream:
+                    if chunk.type == "message_start":
+                        # Message started - emit initial event
+                        if emit_callback:
+                            await emit_callback({
+                                "type": "message_start",
+                                "message_id": chunk.message.id
+                            })
+                    
+                    elif chunk.type == "content_block_start":
+                        if chunk.content_block.type == "text":
+                            # Text block started - emit event
+                            if emit_callback:
+                                await emit_callback({
+                                    "type": "text_start",
+                                    "block_index": chunk.index
+                                })
+                        elif chunk.content_block.type == "tool_use":
+                            # Tool use block started - buffer it
+                            tool_id = chunk.content_block.id
+                            tool_buffer[tool_id] = {
+                                "id": tool_id,
+                                "name": chunk.content_block.name,
+                                "input": {}
+                            }
+                            if emit_callback:
+                                await emit_callback({
+                                    "type": "tool_start",
+                                    "tool_id": tool_id,
+                                    "tool_name": chunk.content_block.name
+                                })
+                    
+                    elif chunk.type == "content_block_delta":
+                        if chunk.delta.type == "text_delta":
+                            # Stream text content immediately
+                            text_delta = chunk.delta.text
+                            accumulated_text += text_delta
+                            if emit_callback:
+                                await emit_callback({
+                                    "type": "text_delta",
+                                    "text": text_delta,
+                                    "accumulated_text": accumulated_text
+                                })
+                        elif chunk.delta.type == "input_json_delta":
+                            # Buffer tool input (don't stream incomplete JSON)
+                            # This accumulates the tool parameters - we'll process when complete
+                            pass
+                    
+                    elif chunk.type == "content_block_stop":
+                        if chunk.index is not None:
+                            # Content block completed
+                            if emit_callback:
+                                await emit_callback({
+                                    "type": "content_block_stop",
+                                    "block_index": chunk.index
+                                })
+                    
+                    elif chunk.type == "message_delta":
+                        # Message metadata updates
+                        if hasattr(chunk.delta, 'stop_reason') and chunk.delta.stop_reason:
+                            if emit_callback:
+                                await emit_callback({
+                                    "type": "message_delta",
+                                    "stop_reason": chunk.delta.stop_reason
+                                })
+                    
+                    elif chunk.type == "message_stop":
+                        # Message completed
+                        if emit_callback:
+                            await emit_callback({
+                                "type": "message_stop"
+                            })
+                
+                # After stream completes, get the final message with complete tool calls
+                final_message = await stream.get_final_message()
+                
+                # Extract complete tool calls from final message
+                if final_message and final_message.content:
+                    for content_block in final_message.content:
+                        if hasattr(content_block, 'type') and content_block.type == 'tool_use':
+                            tool_call = {
+                                "id": content_block.id,
+                                "name": content_block.name,
+                                "input": content_block.input
+                            }
+                            tool_calls.append(tool_call)
+                            
+                            # Emit tool completion event
+                            if emit_callback:
+                                await emit_callback({
+                                    "type": "tool_complete",
+                                    "tool_id": content_block.id,
+                                    "tool_name": content_block.name,
+                                    "tool_input": content_block.input
+                                })
+                
+                return {
+                    "text": accumulated_text,
+                    "tool_calls": tool_calls,
+                    "citations": citations
+                }
+                
+        except Exception as e:
+            logger.error(f"Error processing streaming response: {e}", exc_info=True)
+            # Return what we have so far
+            return {
+                "text": accumulated_text,
+                "tool_calls": tool_calls,
+                "citations": citations,
+                "error": str(e)
+            }
+
     async def execute_tool_interaction_turn(
         self,
         system_prompt: str,
@@ -323,10 +464,13 @@ class ClaudeService:
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4000,
         temperature: float = 0.7,
-        model_override: Optional[str] = None  # Added model_override
-    ) -> AnthropicMessage:
+        model_override: Optional[str] = None,
+        stream: bool = False,
+        emit_callback=None
+    ):
         """
         Execute a single turn of tool-based interaction with Claude.
+        Supports both streaming and non-streaming modes.
         
         Args:
             system_prompt: System prompt for the interaction
@@ -334,9 +478,12 @@ class ClaudeService:
             tools: Available tools for Claude to use
             max_tokens: Maximum tokens to generate
             temperature: Generation temperature
+            model_override: Optional model override
+            stream: Whether to stream the response
+            emit_callback: Optional callback for streaming events
             
         Returns:
-            Claude API response
+            Claude API response (AnthropicMessage if stream=False, processed dict if stream=True)
         """
         if not self.client:
             raise ValueError("Claude API client is not available")
@@ -347,12 +494,12 @@ class ClaudeService:
         # Choose optimal model based on tool complexity or override
         if model_override:
             optimal_model = model_override
-            logger.info(f"Executing tool interaction turn with overridden model: {optimal_model}, {len(tools_to_use) if tools_to_use else 0} tools available")
+            logger.info(f"Executing tool interaction turn with overridden model: {optimal_model}, {len(tools_to_use) if tools_to_use else 0} tools available, streaming: {stream}")
         else:
             tool_names = {tool.get("name", "") for tool in tools_to_use} if tools_to_use else set()
             estimated_tokens = sum(len(str(msg.get("content", ""))) for msg in messages) // 4
             optimal_model = choose_model(tool_names, estimated_tokens)
-            logger.info(f"Executing tool interaction turn with model_router selected model: {optimal_model}, {len(tools_to_use) if tools_to_use else 0} tools available")
+            logger.info(f"Executing tool interaction turn with model_router selected model: {optimal_model}, {len(tools_to_use) if tools_to_use else 0} tools available, streaming: {stream}")
         
         # Build request parameters
         request_params = {
@@ -360,7 +507,8 @@ class ClaudeService:
             "system": system_prompt,
             "messages": messages,
             "max_tokens": max_tokens,
-            "temperature": temperature
+            "temperature": temperature,
+            "stream": stream
         }
         
         # Add tools if available
@@ -368,7 +516,14 @@ class ClaudeService:
             request_params["tools"] = tools_to_use
             
         # Execute the API call
-        return await self._claude_call(**request_params)
+        response = await self._claude_call(**request_params)
+        
+        if stream:
+            # Process streaming response
+            return await self._process_streaming_response(response, emit_callback)
+        else:
+            # Return non-streaming response as before
+            return response
 
     async def generate_response(
         self,
@@ -376,10 +531,13 @@ class ClaudeService:
         messages: List[Dict[str, Any]],
         temperature: float = 0.7,
         max_tokens: int = 4000,
-        model: Optional[str] = None
-    ) -> str:
+        model: Optional[str] = None,
+        stream: bool = False,
+        emit_callback=None
+    ):
         """
         Generate a response from Claude based on a conversation with a system prompt.
+        Supports both streaming and non-streaming modes.
         
         Args:
             system_prompt: System prompt that guides Claude's behavior
@@ -387,14 +545,19 @@ class ClaudeService:
             temperature: Temperature for generation (0.0 to 1.0)
             max_tokens: Maximum number of tokens to generate
             model: Optional model override (e.g., "claude-3-5-haiku-20241022")
+            stream: Whether to stream the response
+            emit_callback: Optional callback for streaming events
             
         Returns:
-            Generated response text
+            Generated response text (str if stream=False, dict if stream=True)
         """
         if not self.client:
             # Mock response for testing or when API key is not available
             logger.warning("Using mock response because Claude API client is not available")
-            return "I'm sorry, I cannot process your request because the Claude API is not configured properly. Please check the API key."
+            error_msg = "I'm sorry, I cannot process your request because the Claude API is not configured properly. Please check the API key."
+            if stream:
+                return {"text": error_msg, "tool_calls": [], "citations": []}
+            return error_msg
         
         try:
             # Convert message format to Anthropic's format
@@ -403,7 +566,7 @@ class ClaudeService:
                 role = "user" if msg["role"] == "user" else "assistant"
                 formatted_messages.append({"role": role, "content": msg["content"]})
             
-            logger.info(f"Sending request to Claude API with {len(formatted_messages)} messages")
+            logger.info(f"Sending request to Claude API with {len(formatted_messages)} messages, streaming: {stream}")
 
             # Use provided model or default to instance model
             used_model = model or self.model
@@ -420,24 +583,33 @@ class ClaudeService:
                 
                 sdk_token_count_result_native = await self.client.messages.count_tokens(**params_for_count_native)
                 sdk_actual_tokens_native = sdk_token_count_result_native.input_tokens
-                logger.info(f"Anthropic SDK estimated input tokens (native PDF call): {sdk_actual_tokens_native}")
+                logger.info(f"Anthropic SDK estimated input tokens (generate_response {'streaming' if stream else 'non-streaming'}): {sdk_actual_tokens_native}")
             except Exception as e:
-                logger.error(f"Error during SDK token counting (native PDF call): {e}", exc_info=True)
+                logger.error(f"Error during SDK token counting (generate_response {'streaming' if stream else 'non-streaming'}): {e}", exc_info=True)
             # --- END SDK TOKEN COUNTING (AWAITED AND ALIGNED V4) ---
             
             # Call Claude API
-            response = await self.client.messages.create(
+            response = await self._claude_call(
                 model=used_model,
                 system=system_prompt,
                 messages=formatted_messages,
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
+                stream=stream
             )
             
-            return response.content[0].text
+            if stream:
+                # Process streaming response
+                return await self._process_streaming_response(response, emit_callback)
+            else:
+                # Return non-streaming response as before
+                return response.content[0].text
+                
         except Exception as e:
             logger.error(f"Error calling Claude API: {str(e)}")
             error_message = f"I apologize, but there was an error processing your request: {str(e)}"
+            if stream:
+                return {"text": error_message, "tool_calls": [], "citations": [], "error": str(e)}
             return error_message
 
     # Removed: _extract_full_text_from_pdf_claude method 
@@ -1310,6 +1482,208 @@ Follow these guidelines:
             logger.error(f"Error in analyze_with_visualization_tools: {e}", exc_info=True)
             return {
                 "analysis_text": f"Error during analysis: {str(e)}",
+                "visualizations": {"charts": [], "tables": []},
+                "metrics": []
+            }
+
+    async def analyze_with_visualization_tools_streaming(
+        self,
+        document_text: str,
+        user_query: str,
+        knowledge_base: Optional[str] = None,
+        file_id: Optional[str] = None,
+        emit_callback=None
+    ) -> Dict[str, Any]:
+        """
+        Streaming version of analyze_with_visualization_tools.
+        Provides real-time updates as text and tools are processed.
+        
+        Args:
+            document_text: Combined document text for analysis
+            user_query: User's question/request
+            knowledge_base: Optional knowledge base context
+            file_id: Optional Claude file ID for reference
+            emit_callback: Callback function for streaming events
+            
+        Returns:
+            Dict with analysis_text and visualizations (charts, tables)
+        """
+        try:
+            logger.info(f"Starting streaming analyze_with_visualization_tools for query: '{user_query[:100]}...'")
+            
+            # Build initial messages (same as non-streaming)
+            initial_messages = []
+            
+            if file_id:
+                initial_messages.append({
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "document",
+                            "source": {"type": "file", "file_id": file_id}
+                        },
+                        {
+                            "type": "text", 
+                            "text": f"Document context and user query:\n\n{user_query}"
+                        }
+                    ]
+                })
+            else:
+                context = f"Financial Document Content:\n{document_text}\n\nUser Query: {user_query}"
+                initial_messages.append({
+                    "role": "user",
+                    "content": context
+                })
+            
+            # Initialize conversation tracking
+            conversation_messages = initial_messages.copy()
+            accumulated_text = ""
+            accumulated_charts = []
+            accumulated_tables = []
+            accumulated_metrics = []
+            
+            max_turns = 5  # Limit iterations
+            
+            for turn in range(max_turns):
+                logger.info(f"Streaming visualization analysis turn {turn + 1}/{max_turns}")
+                
+                # Execute streaming tool interaction turn
+                processed_response = await self.execute_tool_interaction_turn(
+                    system_prompt=LOADED_DEFAULT_FINANCIAL_PROMPT,
+                    messages=conversation_messages,
+                    tools=self.tools_for_api,
+                    max_tokens=4000,
+                    temperature=0.7,
+                    stream=True,
+                    emit_callback=emit_callback
+                )
+                
+                # Extract data from processed streaming response
+                accumulated_text += processed_response.get("text", "")
+                tool_calls = processed_response.get("tool_calls", [])
+                contains_tool_use = len(tool_calls) > 0
+                
+                # Build assistant content blocks for conversation history
+                assistant_content_blocks = []
+                tool_results_for_next_turn = []
+                
+                # Add text content if any
+                if processed_response.get("text"):
+                    assistant_content_blocks.append({
+                        "type": "text",
+                        "text": processed_response["text"]
+                    })
+                
+                # Process tool calls
+                for tool_call in tool_calls:
+                    tool_name = tool_call["name"]
+                    tool_input = tool_call["input"]
+                    tool_use_id = tool_call["id"]
+                    
+                    logger.info(f"Processing streaming tool {tool_name} (ID: {tool_use_id})")
+                    
+                    # Add tool_use block to assistant content
+                    assistant_content_blocks.append({
+                        "type": "tool_use",
+                        "id": tool_use_id,
+                        "name": tool_name,
+                        "input": tool_input
+                    })
+                    
+                    # Process the tool
+                    try:
+                        from utils import tool_processing
+                        processed_data = tool_processing.process_visualization_input(
+                            tool_name, tool_input, tool_use_id
+                        )
+                        
+                        if processed_data:
+                            # Collect processed data
+                            if tool_name == "generate_graph_data":
+                                accumulated_charts.append(processed_data)
+                            elif tool_name == "generate_table_data":
+                                accumulated_tables.append(processed_data)
+                            elif tool_name == "generate_financial_metric":
+                                accumulated_metrics.append(processed_data)
+                            
+                            # Prepare tool result for next turn
+                            tool_results_for_next_turn.append({
+                                "type": "tool_result",
+                                "tool_use_id": tool_use_id,
+                                "content": json.dumps(processed_data)
+                            })
+                            
+                            # Emit tool completion event
+                            if emit_callback:
+                                await emit_callback({
+                                    "type": "tool_complete",
+                                    "tool_id": tool_use_id,
+                                    "tool_name": tool_name,
+                                    "tool_input": tool_input,
+                                    "result": processed_data
+                                })
+                        else:
+                            tool_results_for_next_turn.append({
+                                "type": "tool_result", 
+                                "tool_use_id": tool_use_id,
+                                "content": "Tool processed but returned no data.",
+                                "is_error": True
+                            })
+                            
+                    except Exception as e:
+                        logger.error(f"Error processing streaming tool {tool_name}: {e}")
+                        tool_results_for_next_turn.append({
+                            "type": "tool_result",
+                            "tool_use_id": tool_use_id, 
+                            "content": f"Error: {str(e)}",
+                            "is_error": True
+                        })
+                
+                # Add assistant response to conversation
+                conversation_messages.append({
+                    "role": "assistant",
+                    "content": assistant_content_blocks
+                })
+                
+                # Add tool results for next turn if any
+                if tool_results_for_next_turn:
+                    conversation_messages.append({
+                        "role": "user",
+                        "content": tool_results_for_next_turn
+                    })
+                
+                # Check if we should continue (same logic as non-streaming)
+                if not contains_tool_use:
+                    logger.info(f"Streaming visualization analysis completed: no more tools")
+                    break
+                    
+                if turn == max_turns - 1:
+                    logger.warning(f"Reached maximum turns ({max_turns}) for streaming visualization analysis")
+                    break
+            
+            # Prepare analysis text, ensuring it's not empty
+            current_analysis_text = accumulated_text.strip()
+            if not current_analysis_text:
+                logger.warning("accumulated_text was empty in streaming analyze_with_visualization_tools. Using default fallback text.")
+                current_analysis_text = "Here's the information based on your query and the provided documents."
+
+            # Return structured result
+            result = {
+                "analysis_text": current_analysis_text,
+                "visualizations": {
+                    "charts": accumulated_charts,
+                    "tables": accumulated_tables
+                },
+                "metrics": accumulated_metrics
+            }
+            
+            logger.info(f"Streaming visualization analysis completed: {len(accumulated_charts)} charts, {len(accumulated_tables)} tables, {len(accumulated_metrics)} metrics. Analysis text length: {len(current_analysis_text)}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in streaming analyze_with_visualization_tools: {e}", exc_info=True)
+            return {
+                "analysis_text": f"Error during streaming analysis: {str(e)}",
                 "visualizations": {"charts": [], "tables": []},
                 "metrics": []
             }

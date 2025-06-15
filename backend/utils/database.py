@@ -34,6 +34,9 @@ SessionLocal = sessionmaker(
     expire_on_commit=False,
 )
 
+# Alias for backward compatibility
+AsyncSessionLocal = SessionLocal
+
 # Create Base class for models
 Base = declarative_base()
 

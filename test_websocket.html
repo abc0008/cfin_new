@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Connection Test</h1>
+    <div id="status">Not connected</div>
+    <div id="messages"></div>
+    <button onclick="connect()">Connect</button>
+    <button onclick="disconnect()">Disconnect</button>
+    <button onclick="sendPing()">Send Ping</button>
+    
+    <script>
+        let ws = null;
+        const conversationId = 'test-conversation-123';
+        
+        function log(message) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML += `<div>${new Date().toISOString()}: ${message}</div>`;
+            console.log(message);
+        }
+        
+        function updateStatus(status) {
+            document.getElementById('status').textContent = status;
+        }
+        
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Already connected');
+                return;
+            }
+            
+            const wsUrl = `ws://localhost:8000/ws/conversation/${conversationId}`;
+            log(`Connecting to ${wsUrl}`);
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    log('WebSocket connected!');
+                    updateStatus('Connected');
+                };
+                
+                ws.onmessage = (event) => {
+                    log(`Received: ${event.data}`);
+                };
+                
+                ws.onerror = (error) => {
+                    log(`WebSocket error: ${error}`);
+                    updateStatus('Error');
+                };
+                
+                ws.onclose = (event) => {
+                    log(`WebSocket closed: code=${event.code}, reason=${event.reason}`);
+                    updateStatus('Disconnected');
+                };
+            } catch (error) {
+                log(`Error creating WebSocket: ${error}`);
+            }
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        function sendPing() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const message = JSON.stringify({ type: 'ping' });
+                ws.send(message);
+                log(`Sent: ${message}`);
+            } else {
+                log('WebSocket not connected');
+            }
+        }
+        
+        // Auto-connect on load
+        window.onload = () => {
+            setTimeout(connect, 1000);
+        };
+    </script>
+</body>
+</html>

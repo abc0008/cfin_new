@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Error Diagnostic</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .error { color: #ff6b6b; }
+        .success { color: #51cf66; }
+        .info { color: #4dabf7; }
+        .warning { color: #ffd43b; }
+        .log-entry { margin: 5px 0; }
+        .header { font-size: 1.2em; font-weight: bold; margin: 20px 0 10px 0; }
+        button { 
+            background: #4dabf7;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover { background: #339af0; }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Connection Diagnostic</h1>
+    
+    <div class="header">Configuration:</div>
+    <div id="config"></div>
+    
+    <div class="header">Controls:</div>
+    <button onclick="testBackendAPI()">Test Backend API</button>
+    <button onclick="testWebSocket()">Test WebSocket</button>
+    <button onclick="clearLogs()">Clear Logs</button>
+    
+    <div class="header">Diagnostic Log:</div>
+    <div id="logs"></div>
+    
+    <script>
+        const logsDiv = document.getElementById('logs');
+        const configDiv = document.getElementById('config');
+        
+        // Configuration
+        const backendUrl = 'http://localhost:8000';
+        const wsProtocol = 'ws:';
+        const wsHost = 'localhost:8000';
+        const conversationId = 'test-conv-' + Date.now();
+        
+        // Display configuration
+        configDiv.innerHTML = `
+            <div class="log-entry info">Backend URL: ${backendUrl}</div>
+            <div class="log-entry info">WebSocket URL: ${wsProtocol}//${wsHost}/ws/conversation/${conversationId}</div>
+            <div class="log-entry info">Browser: ${navigator.userAgent}</div>
+        `;
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logsDiv.appendChild(entry);
+            console.log(`[${type}]`, message);
+        }
+        
+        function clearLogs() {
+            logsDiv.innerHTML = '';
+            log('Logs cleared', 'info');
+        }
+        
+        async function testBackendAPI() {
+            log('Testing backend API connectivity...', 'info');
+            
+            try {
+                const response = await fetch(`${backendUrl}/`);
+                const data = await response.json();
+                log(`Backend API response: ${JSON.stringify(data)}`, 'success');
+                
+                // Test CORS
+                log('Testing CORS headers...', 'info');
+                log(`CORS Allow-Origin: ${response.headers.get('Access-Control-Allow-Origin') || 'Not set'}`, 'info');
+                log(`CORS Allow-Credentials: ${response.headers.get('Access-Control-Allow-Credentials') || 'Not set'}`, 'info');
+                
+            } catch (error) {
+                log(`Backend API error: ${error.message}`, 'error');
+                log('Backend server may not be running on port 8000', 'error');
+            }
+        }
+        
+        function testWebSocket() {
+            log('=' .repeat(50), 'info');
+            log('Starting WebSocket connection test...', 'info');
+            
+            const wsUrl = `${wsProtocol}//${wsHost}/ws/conversation/${conversationId}`;
+            log(`Attempting to connect to: ${wsUrl}`, 'info');
+            
+            let ws;
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                log('WebSocket object created', 'success');
+                
+                // Set up event handlers
+                ws.onopen = (event) => {
+                    log('WebSocket connection opened!', 'success');
+                    log(`ReadyState: ${ws.readyState} (1 = OPEN)`, 'info');
+                    log(`Protocol: ${ws.protocol || 'none'}`, 'info');
+                    log(`Extensions: ${ws.extensions || 'none'}`, 'info');
+                    
+                    // Send test ping
+                    setTimeout(() => {
+                        if (ws.readyState === WebSocket.OPEN) {
+                            log('Sending ping message...', 'info');
+                            ws.send(JSON.stringify({ type: 'ping' }));
+                        }
+                    }, 1000);
+                };
+                
+                ws.onmessage = (event) => {
+                    log(`Message received: ${event.data}`, 'success');
+                    
+                    try {
+                        const data = JSON.parse(event.data);
+                        log(`Message type: ${data.type}`, 'info');
+                        
+                        if (data.type === 'connected') {
+                            log('Server confirmed connection!', 'success');
+                        } else if (data.type === 'pong') {
+                            log('Received pong response!', 'success');
+                            
+                            // Send test message
+                            log('Sending test message...', 'info');
+                            ws.send(JSON.stringify({
+                                type: 'message',
+                                content: 'Test message from diagnostic tool',
+                                options: {}
+                            }));
+                        }
+                    } catch (e) {
+                        log(`Error parsing message: ${e.message}`, 'error');
+                    }
+                };
+                
+                ws.onerror = (event) => {
+                    log('WebSocket error occurred!', 'error');
+                    log(`Error event type: ${event.type}`, 'error');
+                    log(`Current readyState: ${ws.readyState}`, 'error');
+                    
+                    // Try to determine the error type
+                    if (ws.readyState === WebSocket.CLOSED) {
+                        log('Connection was closed during error', 'error');
+                    } else if (ws.readyState === WebSocket.CONNECTING) {
+                        log('Error occurred while connecting', 'error');
+                        log('Possible causes:', 'warning');
+                        log('- Backend server not running', 'warning');
+                        log('- Incorrect WebSocket URL', 'warning');
+                        log('- Firewall blocking connection', 'warning');
+                        log('- CORS issues (though WebSocket CORS is different)', 'warning');
+                    }
+                };
+                
+                ws.onclose = (event) => {
+                    log(`WebSocket closed - Code: ${event.code}, Reason: ${event.reason || 'none'}`, 'warning');
+                    log(`Was clean close: ${event.wasClean}`, 'info');
+                    
+                    // Interpret close codes
+                    const closeCodes = {
+                        1000: 'Normal closure',
+                        1001: 'Going away (e.g., server shutdown)',
+                        1002: 'Protocol error',
+                        1003: 'Unsupported data',
+                        1005: 'No status received (abnormal closure)',
+                        1006: 'Abnormal closure (e.g., connection lost)',
+                        1007: 'Invalid frame payload data',
+                        1008: 'Policy violation',
+                        1009: 'Message too big',
+                        1010: 'Mandatory extension negotiation failed',
+                        1011: 'Internal server error',
+                        1015: 'TLS handshake failure'
+                    };
+                    
+                    if (closeCodes[event.code]) {
+                        log(`Close code meaning: ${closeCodes[event.code]}`, 'info');
+                    }
+                    
+                    if (event.code === 1006) {
+                        log('Connection lost without proper close handshake', 'error');
+                        log('This often indicates:', 'warning');
+                        log('- Network connectivity issues', 'warning');
+                        log('- Server crashed or was terminated', 'warning');
+                        log('- Proxy or firewall interference', 'warning');
+                    }
+                };
+                
+            } catch (error) {
+                log(`Failed to create WebSocket: ${error.message}`, 'error');
+                log(`Error stack: ${error.stack}`, 'error');
+            }
+            
+            // Clean up after 30 seconds
+            setTimeout(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    log('Closing connection after 30 seconds...', 'info');
+                    ws.close();
+                }
+            }, 30000);
+        }
+        
+        // Run initial tests
+        log('WebSocket Diagnostic Tool loaded', 'success');
+        log('Click buttons above to run tests', 'info');
+        
+        // Auto-run backend test
+        setTimeout(() => {
+            testBackendAPI();
+        }, 500);
+    </script>
+</body>
+</html>

@@ -401,8 +401,22 @@ def process_table_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"TableData Pydantic validation failed for '{table_title}': {e}. Input: {json.dumps(tool_input, indent=2)}")
         raise ToolSchemaValidationError(f"Schema validation failed for table '{table_title}': {str(e)}", original_exception=e)
 
-def process_visualization_input(tool_name: str, tool_input: Dict[str, Any], block_id: str) -> Optional[Dict[str, Any]]:
+def process_visualization_input(tool_name: str, tool_input: Any, block_id: str) -> Optional[Dict[str, Any]]:
     try:
+        # Handle case where tool_input might be a string (from fine-grained streaming)
+        if isinstance(tool_input, str):
+            try:
+                tool_input = json.loads(tool_input)
+                logger.info(f"Parsed tool input from string for {tool_name} (ID: {block_id})")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse tool input JSON for {tool_name} (ID: {block_id}): {e}")
+                return None
+        
+        # Ensure we have a dictionary now
+        if not isinstance(tool_input, dict):
+            logger.error(f"Tool input is not a dictionary after processing for {tool_name} (ID: {block_id}): {type(tool_input)}")
+            return None
+            
         if tool_name == "generate_graph_data":
             return process_chart_input(tool_input)
         elif tool_name == "generate_table_data":

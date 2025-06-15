@@ -256,6 +256,44 @@ class ConversationApiService {
       ];
     }
   }
+
+  /**
+   * Check if a conversation exists
+   */
+  async checkConversationExists(conversationId: string): Promise<boolean> {
+    try {
+      await this.request<any>(
+        `/conversation/${conversationId}`,
+        'GET'
+      );
+      return true;
+    } catch (error) {
+      // If we get a 404, the conversation doesn't exist
+      if (error instanceof Error && error.message.includes('404')) {
+        return false;
+      }
+      // For other errors, we'll assume it doesn't exist
+      console.error('Error checking conversation existence:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get a specific message by ID (with analysis_blocks)
+   */
+  async getMessage(messageId: string): Promise<Message | null> {
+    try {
+      const response = await this.request<Message>(
+        `/conversation/message/${messageId}`,
+        'GET'
+      );
+      
+      return response;
+    } catch (error) {
+      console.error('Error getting message:', error);
+      return null;
+    }
+  }
 }
 
 // Create a singleton instance

@@ -57,20 +57,22 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
       for (let i = 0; i < msgs.length; i++) {
         const msg = msgs[i];
         if (msg.role === 'assistant') {
+          // Check for both camelCase (from backend) and snake_case (from types)
+          const analysisBlocks = (msg as any).analysisBlocks || msg.analysis_blocks;
           console.log(`Examining assistant message ${i}:`, 
                       msg.id ? `ID: ${msg.id}` : 'No ID',
-                      msg.analysis_blocks ? `Has ${msg.analysis_blocks.length} analysis blocks` : 'No analysis blocks');
+                      analysisBlocks ? `Has ${analysisBlocks.length} analysis blocks` : 'No analysis blocks');
           
-          if (msg.analysis_blocks && msg.analysis_blocks.length > 0) {
-            console.log(`Found ${msg.analysis_blocks.length} analysis blocks in message ${msg.id || i}`);
+          if (analysisBlocks && analysisBlocks.length > 0) {
+            console.log(`Found ${analysisBlocks.length} analysis blocks in message ${msg.id || i}`);
             
             // Process blocks from this message and add to cumulative arrays
             
             // Detailed logging of block structure
-            console.log('Analysis blocks structure:', JSON.stringify(msg.analysis_blocks[0], null, 2).substring(0, 200) + '...');
+            console.log('Analysis blocks structure:', JSON.stringify(analysisBlocks[0], null, 2).substring(0, 200) + '...');
             
             // Convert analysis blocks to the expected visualization data format
-            msg.analysis_blocks.forEach((block, index) => {
+            analysisBlocks.forEach((block, index) => {
               console.log(`Processing analysis block ${index}: type=${block.block_type}, title=${block.title || 'No title'}`);
               
               // Extract charts
@@ -119,7 +121,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             });
             
             // Check for text summary in this message
-            const textSummary = msg.analysis_blocks.find(b => b.block_type === 'text_summary')?.content;
+            const textSummary = analysisBlocks.find(b => b.block_type === 'text_summary')?.content;
             if (textSummary) {
               latestAnalysisText = textSummary;
             }

@@ -198,7 +198,8 @@ class ConversationRepository:
         role: str,
         citation_ids: Optional[List[str]] = None,
         referenced_documents: Optional[List[str]] = None,
-        referenced_analyses: Optional[List[str]] = None
+        referenced_analyses: Optional[List[str]] = None,
+        message_id: Optional[str] = None
     ) -> Optional[Message]:
         """
         Add a message to a conversation.
@@ -220,9 +221,9 @@ class ConversationRepository:
         # Update conversation last updated timestamp
         await self.update_conversation(conversation_id, {})
         
-        # Create message
+        # Create message with provided ID or generate new one
         message = Message(
-            id=str(uuid.uuid4()),
+            id=message_id or str(uuid.uuid4()),
             conversation_id=conversation_id,
             content=content,
             role=role,
@@ -272,7 +273,12 @@ class ConversationRepository:
             Message if found, None otherwise
         """
         result = await self.db.execute(
-            select(Message).where(Message.id == message_id)
+            select(Message)
+            .where(Message.id == message_id)
+            .options(
+                selectinload(Message.citations).selectinload(MessageCitation.citation),
+                selectinload(Message.analysis_blocks)
+            )
         )
         return result.scalars().first()
         
@@ -331,6 +337,10 @@ class ConversationRepository:
         result = await self.db.execute(
             select(Message)
             .where(Message.conversation_id == conversation_id)
+            .options(
+                selectinload(Message.citations).selectinload(MessageCitation.citation),
+                selectinload(Message.analysis_blocks)
+            )
             .order_by(Message.created_at.asc())
             .limit(limit)
             .offset(offset)

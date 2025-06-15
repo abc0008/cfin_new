@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, BarChart2, Upload, FileUp, Zap, ChevronRight, FileSearch } from 'lucide-react'
-import { ChatInterface } from '../../components/chat/ChatInterface'
+import { StreamingChatInterface } from '../../components/chat/StreamingChatInterface'
 import { UploadForm } from '../../components/document/UploadForm'
 import dynamic from 'next/dynamic'
 import { ProcessedDocument, AnalysisResult, Message } from '@/types'
@@ -601,12 +601,19 @@ export default function Workspace() {
             <p className="text-xs text-muted-foreground font-avenir-pro">Ask questions about your financial documents</p>
           </div>
           <div className="flex-1 overflow-hidden">
-            <ChatInterface 
+            <StreamingChatInterface 
               messages={messages} 
               onSendMessage={handleSendMessage} 
               activeDocuments={selectedDocument ? [selectedDocument.metadata.id] : []}
               isLoading={isLoading}
               conversationId={sessionId || undefined}
+              onMessageUpdate={(message) => {
+                // Add streaming message to the messages map
+                setMessagesMap(prev => ({
+                  ...prev,
+                  [message.id]: message
+                }));
+              }}
             />
           </div>
         </div>

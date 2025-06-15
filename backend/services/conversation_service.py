@@ -57,6 +57,7 @@ import os
 import uuid
 import json
 import logging
+from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 
 from repositories.conversation_repository import ConversationRepository
@@ -206,7 +207,8 @@ class ConversationService:
         role: str,
         citation_ids: Optional[List[str]] = None,
         referenced_documents: Optional[List[str]] = None,
-        referenced_analyses: Optional[List[str]] = None
+        referenced_analyses: Optional[List[str]] = None,
+        message_id: Optional[str] = None
     ) -> Optional[Message]:
         """
         Add a message to a conversation.
@@ -239,7 +241,8 @@ class ConversationService:
             role=role,
             citation_ids=citation_ids,
             referenced_documents=referenced_documents or [],
-            referenced_analyses=referenced_analyses or []
+            referenced_analyses=referenced_analyses or [],
+            message_id=message_id
         )
     
     async def get_conversation_messages(
@@ -715,6 +718,417 @@ class ConversationService:
                 "success": True,
                 "message": assistant_message
             }
+
+    async def process_user_message_streaming(
+        self,
+        conversation_id: str,
+        content: str,
+        citation_ids: Optional[List[str]] = None,
+        referenced_documents: Optional[List[str]] = None,
+        referenced_analyses: Optional[List[str]] = None,
+        emit_callback=None,
+        message_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Process a user message with streaming support and real-time updates.
+        
+        Args:
+            conversation_id: ID of the conversation
+            content: Message content
+            citation_ids: Optional list of citation IDs to include as context
+            referenced_documents: Optional list of document IDs
+            referenced_analyses: Optional list of analysis IDs
+            emit_callback: Callback function for streaming events
+            
+        Returns:
+            Dict containing success status and the assistant message
+        """
+        # Get conversation and validate it exists
+        conversation = await self.conversation_repository.get_conversation(conversation_id)
+        if not conversation:
+            raise ValueError(f"Conversation with ID {conversation_id} not found")
+        
+        # Add user message to conversation
+        user_message = await self.add_message(
+            conversation_id=conversation_id,
+            content=content,
+            role="user",
+            citation_ids=citation_ids,
+            referenced_documents=referenced_documents,
+            referenced_analyses=referenced_analyses
+        )
+        
+        if not user_message:
+            raise ValueError("Failed to add user message to conversation")
+        
+        # Get conversation context
+        context = await self.get_conversation_context(conversation_id)
+        
+        # Extract document texts for system prompt
+        document_texts = []
+        if context.get("documents"):
+            # Process each document (same logic as non-streaming version)
+            for doc_info in context["documents"]:
+                try:
+                    content_obj = await self.document_repository.get_document_content(doc_info["id"])
+                    content_data = None
+                    raw_text = None
+                    extracted_data = None
+                    
+                    if content_obj and isinstance(content_obj, dict):
+                        content_data = content_obj.get("content")
+                        raw_text = content_obj.get("raw_text")
+                        extracted_data = content_obj.get("extracted_data")
+                        
+                        document = await self.document_repository.get_document(doc_info["id"])
+                        
+                        doc_dict = {
+                            "id": doc_info["id"],
+                            "title": doc_info.get("filename", "Document"),
+                            "type": "document"
+                        }
+                        
+                        if document and document.claude_file_id:
+                            doc_dict["claude_file_id"] = document.claude_file_id
+                            doc_dict["filename"] = document.filename
+                            document_texts.append(doc_dict)
+                            logger.info(f"Added document {doc_info['id']} with Files API file_id: {document.claude_file_id}")
+                        elif raw_text and not (document and document.mime_type == "application/pdf"):
+                            doc_dict["raw_text"] = raw_text
+                            document_texts.append(doc_dict)
+                            logger.info(f"Added non-PDF document {doc_info['id']} with raw_text ({len(raw_text)} chars)")
+                        elif content_data and isinstance(content_data, bytes) and not (document and document.mime_type == "application/pdf"):
+                            doc_dict["content"] = content_data
+                            document_texts.append(doc_dict)
+                            logger.info(f"Added non-PDF document {doc_info['id']} with binary content")
+                        elif document and document.mime_type == "application/pdf":
+                            logger.warning(f"PDF document {doc_info['id']} missing claude_file_id - cannot process with native PDF support")
+                        else:
+                            logger.warning(f"No usable content available for document {doc_info['id']}")
+                except Exception as e:
+                    logger.error(f"Error processing document content for streaming LLM: {str(e)}")
+                    logger.exception(e)
+                    continue
+        
+        # Get conversation messages
+        messages = await self.conversation_repository.get_conversation_messages(
+            conversation_id=conversation_id,
+            limit=10
+        )
+        
+        # Convert messages to the format expected by Claude API
+        message_history = []
+        for msg in messages:
+            if msg.id != user_message.id:
+                message_history.append({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+        
+        # Decide which processing approach to use
+        approach = await self._decide_processing_approach(
+            conversation_id=conversation_id,
+            message_content=content,
+            document_texts=document_texts,
+            conversation_history=message_history
+        )
+        
+        # Initialize accumulated response data
+        accumulated_text = ""
+        accumulated_charts = []
+        accumulated_tables = []
+        accumulated_metrics = []
+        result = None  # Initialize result variable for debugging
+        
+        # Process using the selected approach with NON-streaming for visualizations
+        if approach == "visualization_analysis":
+            logger.info(f"Using NON-streaming visualization tools approach for conversation {conversation_id}")
+            
+            # Extract file_id from first document if available
+            file_id = None
+            combined_doc_text = ""
+            
+            for doc in document_texts:
+                if "claude_file_id" in doc and doc["claude_file_id"]:
+                    file_id = doc["claude_file_id"]
+                    logger.info(f"Using Files API claude_file_id {file_id} for NON-streaming visualization analysis")
+                    break
+                elif "extracted_data" in doc and isinstance(doc["extracted_data"], dict):
+                    if "claude_file_id" in doc["extracted_data"] and doc["extracted_data"]["claude_file_id"]:
+                        file_id = doc["extracted_data"]["claude_file_id"]
+                        logger.info(f"Using cached claude_file_id {file_id} from extracted_data for streaming visualization analysis")
+                        break
+                    elif "file_id" in doc["extracted_data"] and doc["extracted_data"]["file_id"]:
+                        file_id = doc["extracted_data"]["file_id"]
+                        logger.info(f"Using legacy file_id {file_id} from extracted_data for streaming visualization analysis")
+                        break
+                if "raw_text" in doc:
+                    combined_doc_text += f"\n\n{doc['raw_text']}"
+            
+            # Define streaming callback for visualization tools
+            async def visualization_emit_callback(event: Dict[str, Any]):
+                nonlocal accumulated_text, accumulated_charts, accumulated_tables, accumulated_metrics
+                
+                # Update accumulated data based on event type
+                if event.get("type") == "text_delta":
+                    accumulated_text += event.get("text", "")
+                elif event.get("type") == "tool_complete":
+                    tool_name = event.get("tool_name")
+                    tool_input = event.get("tool_input", {})
+                    
+                    # Process tool results in real-time
+                    try:
+                        from utils import tool_processing
+                        processed_data = tool_processing.process_visualization_input(
+                            tool_name, tool_input, event.get("tool_id")
+                        )
+                        
+                        if processed_data:
+                            if tool_name == "generate_graph_data":
+                                accumulated_charts.append(processed_data)
+                                # Emit chart completion event
+                                if emit_callback:
+                                    await emit_callback({
+                                        "type": "chart_ready",
+                                        "chart_data": processed_data,
+                                        "chart_index": len(accumulated_charts) - 1
+                                    })
+                            elif tool_name == "generate_table_data":
+                                accumulated_tables.append(processed_data)
+                                # Emit table completion event
+                                if emit_callback:
+                                    await emit_callback({
+                                        "type": "table_ready",
+                                        "table_data": processed_data,
+                                        "table_index": len(accumulated_tables) - 1
+                                    })
+                            elif tool_name == "generate_financial_metric":
+                                accumulated_metrics.append(processed_data)
+                                # Emit metric completion event
+                                if emit_callback:
+                                    await emit_callback({
+                                        "type": "metric_ready",
+                                        "metric_data": processed_data,
+                                        "metric_index": len(accumulated_metrics) - 1
+                                    })
+                    except Exception as e:
+                        logger.error(f"Error processing streaming tool result: {e}")
+                
+                # Forward event to client
+                if emit_callback:
+                    await emit_callback(event)
+            
+            # Use hybrid approach: streaming text but non-streaming tools
+            # First, stream the text response WITH document context
+            system_prompt = self._build_system_prompt(document_texts, [])
+            
+            # Create a wrapper callback to translate Claude events to WebSocket events
+            async def streaming_emit_callback(event: Dict[str, Any]):
+                # Translate Claude API events to our WebSocket events
+                if event.get("type") == "message_stop":
+                    # For visualization analysis, DO NOT send message_complete here
+                    # We'll send it after all visualizations are ready
+                    # Just forward the message_stop event for any listeners
+                    if emit_callback:
+                        await emit_callback(event)
+                else:
+                    # Forward other events as-is
+                    if emit_callback:
+                        await emit_callback(event)
+            
+            # Generate streaming text response first WITH PDF context
+            # Build message with file_id if available for PDF access
+            user_message_with_context = {"role": "user", "content": content}
+            if file_id:
+                # Include file reference for PDF access in streaming
+                user_message_with_context = {
+                    "role": "user", 
+                    "content": [
+                        {"type": "text", "text": content},
+                        {"type": "document", "source": {"type": "file", "file_id": file_id}}
+                    ]
+                }
+            
+            # FIRST, generate visualizations using NON-streaming analysis for complex JSON tools
+            # This prevents Claude from outputting JSON in the streaming text
+            result = await self.claude_service.analyze_with_visualization_tools(
+                document_text=combined_doc_text,
+                user_query=content,
+                file_id=file_id
+            )
+            
+            # Get the analysis text from the visualization result
+            analysis_text = result.get("analysis_text", "")
+            
+            # Stream the analysis text (without JSON blocks)
+            if analysis_text and emit_callback:
+                await emit_callback({
+                    "type": "text_delta",
+                    "text": analysis_text,
+                    "accumulated_text": analysis_text
+                })
+            logger.info(f"DEBUG: Visualization analysis result keys: {list(result.keys()) if result else 'No result'}")
+            
+            # Extract visualization results
+            visualizations = result.get("visualizations", {})
+            
+            # Store metrics in accumulated_metrics for later processing (metrics are at top level, not in visualizations)
+            accumulated_metrics = result.get("metrics", [])
+            
+            # Send visualization ready events after tools complete
+            if visualizations.get("charts"):
+                for i, chart in enumerate(visualizations["charts"]):
+                    if emit_callback:
+                        await emit_callback({
+                            "type": "chart_ready",
+                            "chart_data": chart,
+                            "chart_index": i
+                        })
+            
+            if visualizations.get("tables"):
+                for i, table in enumerate(visualizations["tables"]):
+                    if emit_callback:
+                        await emit_callback({
+                            "type": "table_ready", 
+                            "table_data": table,
+                            "table_index": i
+                        })
+            
+            if visualizations.get("metrics"):
+                for i, metric in enumerate(visualizations["metrics"]):
+                    if emit_callback:
+                        await emit_callback({
+                            "type": "metric_ready",
+                            "metric_data": metric,
+                            "metric_index": i
+                        })
+            
+            # Note: message_complete will be sent AFTER analysis blocks are stored
+                
+        else:
+            # For non-visualization approaches, use simple streaming
+            logger.info(f"Using streaming simple approach for conversation {conversation_id}")
+            
+            system_prompt = self._build_system_prompt(document_texts, [])
+            
+            # Create a wrapper callback to translate Claude events to WebSocket events
+            async def simple_streaming_emit_callback(event: Dict[str, Any]):
+                # Translate Claude API events to our WebSocket events
+                if event.get("type") == "message_stop":
+                    # Convert message_stop to message_complete
+                    if emit_callback:
+                        await emit_callback({
+                            "type": "message_complete",
+                            "timestamp": datetime.now().isoformat()
+                        })
+                else:
+                    # Forward other events as-is
+                    if emit_callback:
+                        await emit_callback(event)
+            
+            # Generate streaming response
+            streaming_result = await self.claude_service.generate_response(
+                system_prompt=system_prompt,
+                messages=message_history + [{"role": "user", "content": content}],
+                stream=True,
+                emit_callback=simple_streaming_emit_callback
+            )
+            
+            analysis_text = streaming_result.get("text", "")
+            visualizations = {"charts": [], "tables": []}
+            # Don't reset accumulated_metrics here - keep the empty initialization from above
+        
+        # Add assistant message to conversation with the provided message_id
+        assistant_message = await self.add_message(
+            conversation_id=conversation_id,
+            content=analysis_text,
+            role="assistant",
+            message_id=message_id
+        )
+        
+        if not assistant_message:
+            raise ValueError("Failed to add assistant message to conversation")
+        
+        # Debug logging for metrics
+        logger.info(f"DEBUG: result.get('metrics'): {result.get('metrics', []) if 'result' in locals() else 'result not available'}")
+        logger.info(f"DEBUG: accumulated_metrics: {accumulated_metrics}")
+        
+        # Process and store visualizations (same logic as non-streaming)
+        logger.info(f"Processing visualizations for conversation {conversation_id}: charts={len(visualizations.get('charts', []))}, tables={len(visualizations.get('tables', []))}, metrics={len(accumulated_metrics)}")
+        
+        if visualizations.get("charts") or visualizations.get("tables") or accumulated_metrics:
+            items_for_analysis_blocks = []
+            
+            # Process charts
+            for chart_item in visualizations.get("charts", []):
+                logger.info(f"Processing chart: {chart_item.get('config', {}).get('title', 'Unnamed Chart')}")
+                processed_chart_item = {
+                    "title": chart_item.get("config", {}).get("title", "Chart"),
+                    "visualization_type": "chart",
+                    "data": chart_item
+                }
+                items_for_analysis_blocks.append(processed_chart_item)
+            
+            # Process tables
+            for table_item in visualizations.get("tables", []):
+                logger.info(f"Processing table: {table_item.get('config', {}).get('title', 'Unnamed Table')}")
+                processed_table_item = {
+                    "title": table_item.get("config", {}).get("title", "Table"),
+                    "visualization_type": "table",
+                    "data": table_item
+                }
+                items_for_analysis_blocks.append(processed_table_item)
+            
+            # Process metrics
+            for metric_item in accumulated_metrics:
+                logger.info(f"Processing metric: {metric_item.get('name', metric_item.get('title', 'Unnamed Metric'))}")
+                processed_metric_item = {
+                    "title": metric_item.get("name", metric_item.get("title", "Metric")),
+                    "visualization_type": "metric",
+                    "data": metric_item
+                }
+                items_for_analysis_blocks.append(processed_metric_item)
+            
+            # Store analysis blocks
+            if items_for_analysis_blocks:
+                logger.info(f"Storing {len(items_for_analysis_blocks)} analysis blocks for streaming message {assistant_message.id}")
+                await self._process_visualizations(
+                    message_id=assistant_message.id,
+                    visualizations=items_for_analysis_blocks
+                )
+                
+                try:
+                    await self.conversation_repository.db.refresh(assistant_message, attribute_names=['analysis_blocks'])
+                    logger.info(f"Refreshed streaming assistant_message {assistant_message.id} to load analysis_blocks")
+                except Exception as e:
+                    logger.error(f"Failed to refresh streaming assistant_message {assistant_message.id}: {str(e)}")
+                
+                # NOW send message_complete event after analysis blocks are stored and refreshed
+                logger.info(f"Sending message_complete event for conversation {conversation_id} after analysis blocks stored")
+                if emit_callback:
+                    await emit_callback({
+                        "type": "message_complete",
+                        "message_id": assistant_message.id,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    logger.info(f"message_complete event sent for conversation {conversation_id} after analysis blocks")
+                else:
+                    logger.warning(f"No emit_callback available to send message_complete for conversation {conversation_id}")
+        else:
+            # For conversations without visualizations, still send message_complete
+            logger.info(f"Sending message_complete event for conversation {conversation_id} (no visualizations)")
+            if emit_callback:
+                await emit_callback({
+                    "type": "message_complete",
+                    "message_id": assistant_message.id,
+                    "timestamp": datetime.now().isoformat()
+                })
+                logger.info(f"message_complete event sent for conversation {conversation_id} (no visualizations)")
+        
+        return {
+            "success": True,
+            "message": assistant_message
+        }
     
     def _build_system_prompt(self, document_texts: List[Dict[str, Any]], citations: List[Dict[str, Any]]) -> str:
         """

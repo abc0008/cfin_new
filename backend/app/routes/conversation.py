@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, status
+from fastapi.responses import StreamingResponse
 from typing import List, Dict, Any
 import logging
+import json
+import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.message import ConversationCreateRequest, MessageRequest, MessageResponse
@@ -267,6 +270,43 @@ async def get_conversation_history(
         )
     
     return api_messages
+
+@router.get("/{conversation_id}", response_model=Dict[str, Any], response_model_by_alias=True)
+async def get_conversation(
+    conversation_id: str,
+    conversation_service: ConversationService = Depends(get_conversation_service),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Get a single conversation by ID.
+    """
+    try:
+        conversation = await conversation_service.get_conversation(conversation_id)
+        
+        if conversation.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to this conversation"
+            )
+        
+        return {
+            "id": conversation.id,
+            "title": conversation.title,
+            "userId": conversation.user_id,
+            "createdAt": conversation.created_at.isoformat(),
+            "updatedAt": conversation.updated_at.isoformat()
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error getting conversation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting conversation: {str(e)}"
+        )
 
 @router.get("", response_model=List[Dict[str, Any]], response_model_by_alias=True)
 async def list_conversations(
@@ -579,3 +619,162 @@ async def generate_follow_up_questions(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating follow-up questions: {str(e)}"
         )
+
+@router.get("/message/{message_id}")
+async def get_message(
+    message_id: str,
+    conversation_service: ConversationService = Depends(get_conversation_service),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Get a specific message by ID with analysis_blocks.
+    """
+    try:
+        # Get the message
+        message = await conversation_service.get_message(message_id)
+        if not message:
+            raise HTTPException(status_code=404, detail="Message not found")
+        
+        # Get the conversation to check permissions
+        conversation = await conversation_service.get_conversation(message.conversation_id)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        if conversation.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to access this message")
+        
+        # Get citations for this message
+        citations = await conversation_service.conversation_repository.get_message_citations(message.id)
+        
+        # Convert citations to Citation objects
+        citation_objects = []
+        for citation in citations:
+            # Get the document for this citation
+            document = await conversation_service.document_repository.get_document(citation.document_id)
+            doc_title = document.filename if document else "Unknown Document"
+            
+            citation_objects.append(
+                Citation(
+                    id=citation.id,
+                    document_id=citation.document_id,
+                    document_title=doc_title,
+                    content=citation.content,
+                    metadata=citation.metadata or {},
+                    type=citation.metadata.get("type", "unknown") if citation.metadata else "unknown"
+                )
+            )
+        
+        # Get analysis blocks for this message
+        analysis_blocks = []
+        if hasattr(message, 'analysis_blocks'):
+            for block in message.analysis_blocks:
+                analysis_blocks.append({
+                    "id": block.id,
+                    "block_type": block.block_type,
+                    "title": block.title,
+                    "content": block.content,
+                    "created_at": block.created_at.isoformat()
+                })
+        
+        # Create the API message
+        api_message = Message(
+            id=message.id,
+            sessionId=message.conversation_id,
+            timestamp=message.created_at,
+            role=message.role,
+            content=message.content,
+            citations=citation_objects,
+            contentBlocks=None,
+            analysisBlocks=analysis_blocks
+        )
+        
+        return api_message.model_dump(by_alias=True)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting message {message_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting message: {str(e)}"
+        )
+
+@router.post("/{session_id}/message/stream")
+async def send_message_streaming(
+    session_id: str,
+    message: MessageRequest,
+    conversation_service: ConversationService = Depends(get_conversation_service),
+):
+    """
+    Send a message to a conversation and get a streaming AI response.
+    Returns Server-Sent Events (SSE) for real-time streaming.
+    
+    Args:
+        session_id: The ID of the conversation session
+        message: The message content and optional citation IDs
+        
+    Returns:
+        StreamingResponse with Server-Sent Events
+    """
+    if message.session_id != session_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Session ID in path must match session ID in request body"
+        )
+    
+    async def generate_stream():
+        """Generate streaming response as Server-Sent Events."""
+        try:
+            # Define callback for streaming events
+            async def emit_callback(event: Dict[str, Any]):
+                # Format as Server-Sent Event
+                event_data = json.dumps(event)
+                yield f"data: {event_data}\n\n"
+            
+            # Process the message with streaming
+            result = await conversation_service.process_user_message_streaming(
+                conversation_id=session_id,
+                content=message.content,
+                citation_ids=message.citation_links,
+                referenced_documents=message.referenced_documents,
+                referenced_analyses=message.referenced_analyses,
+                emit_callback=emit_callback
+            )
+            
+            # Send final completion event
+            completion_event = {
+                "type": "message_complete",
+                "success": result.get("success", True),
+                "message_id": result.get("message", {}).get("id") if result.get("message") else None
+            }
+            
+            yield f"data: {json.dumps(completion_event)}\n\n"
+            
+        except ValueError as e:
+            error_event = {
+                "type": "error",
+                "error": "validation_error",
+                "message": str(e)
+            }
+            yield f"data: {json.dumps(error_event)}\n\n"
+            
+        except Exception as e:
+            logger.exception(f"Error in streaming message processing: {str(e)}")
+            error_event = {
+                "type": "error", 
+                "error": "server_error",
+                "message": f"An error occurred while processing the message: {str(e)}"
+            }
+            yield f"data: {json.dumps(error_event)}\n\n"
+    
+    # Return streaming response with SSE headers
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
