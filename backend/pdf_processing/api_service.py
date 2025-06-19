@@ -43,6 +43,7 @@ import re
 import uuid
 from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING, ForwardRef
 import logging
+import asyncio
 from anthropic import AsyncAnthropic, RateLimitError
 from anthropic.types import Message as AnthropicMessage
 from datetime import datetime
@@ -175,6 +176,8 @@ class ClaudeService:
         try:
             # Using Claude 3.7 Sonnet for token-efficient tool use and enhanced PDF support
             self.model = settings.MODEL_SONNET
+            self.max_tokens = 4000  # Default max tokens
+            self.temperature = 0.0  # Default temperature for deterministic outputs
             self.client = AsyncAnthropic(
                 api_key=self.api_key,
                 timeout=httpx.Timeout(90.0, connect=5.0), # Set overall timeout to 90s
@@ -425,10 +428,26 @@ class ClaudeService:
                 if final_message and final_message.content:
                     for content_block in final_message.content:
                         if hasattr(content_block, 'type') and content_block.type == 'tool_use':
+                            # Log the raw tool input from Claude
+                            logger.info(f"Raw tool input from Claude for {content_block.name}: type={type(content_block.input)}")
+                            if hasattr(content_block.input, '__dict__'):
+                                logger.info(f"Tool input attributes: {dir(content_block.input)}")
+                            
+                            # Convert input if it's a BaseModel to dict
+                            tool_input = content_block.input
+                            if hasattr(tool_input, 'model_dump'):
+                                # It's a Pydantic model, convert to dict
+                                tool_input = tool_input.model_dump()
+                                logger.info(f"Converted Pydantic model to dict for {content_block.name}")
+                            elif hasattr(tool_input, 'dict'):
+                                # Alternative method for older Pydantic
+                                tool_input = tool_input.dict()
+                                logger.info(f"Converted Pydantic model to dict using dict() for {content_block.name}")
+                            
                             tool_call = {
                                 "id": content_block.id,
                                 "name": content_block.name,
-                                "input": content_block.input
+                                "input": tool_input
                             }
                             tool_calls.append(tool_call)
                             
@@ -438,7 +457,7 @@ class ClaudeService:
                                     "type": "tool_complete",
                                     "tool_id": content_block.id,
                                     "tool_name": content_block.name,
-                                    "tool_input": content_block.input
+                                    "tool_input": tool_input  # Use the converted dict, not the raw input
                                 })
                 
                 return {
@@ -1547,20 +1566,57 @@ Follow these guidelines:
             for turn in range(max_turns):
                 logger.info(f"Streaming visualization analysis turn {turn + 1}/{max_turns}")
                 
-                # Execute streaming tool interaction turn
-                processed_response = await self.execute_tool_interaction_turn(
-                    system_prompt=LOADED_DEFAULT_FINANCIAL_PROMPT,
-                    messages=conversation_messages,
-                    tools=self.tools_for_api,
-                    max_tokens=4000,
-                    temperature=0.7,
-                    stream=True,
-                    emit_callback=emit_callback
-                )
+                # Execute tool interaction turn WITH streaming and retry logic for 500 errors
+                retries = 0
+                max_retries = 2
+                while retries <= max_retries:
+                    try:
+                        response = await self.execute_tool_interaction_turn(
+                            system_prompt=LOADED_DEFAULT_FINANCIAL_PROMPT,
+                            messages=conversation_messages,
+                            tools=self.tools_for_api,
+                            max_tokens=4000,
+                            temperature=0.7,
+                            stream=True,  # Enable streaming to get real-time text updates
+                            emit_callback=emit_callback  # Pass the callback to emit streaming events
+                        )
+                        break  # Success, exit retry loop
+                    except Exception as e:
+                        if "500" in str(e) or "Internal server error" in str(e):
+                            retries += 1
+                            if retries <= max_retries:
+                                logger.warning(f"Received 500 error on turn {turn + 1}, retry {retries}/{max_retries}: {str(e)}")
+                                await asyncio.sleep(2 * retries)  # Exponential backoff
+                                continue
+                        # Re-raise if not a 500 error or out of retries
+                        raise
                 
-                # Extract data from processed streaming response
-                accumulated_text += processed_response.get("text", "")
-                tool_calls = processed_response.get("tool_calls", [])
+                # Handle streaming response (response is now a dict from _process_streaming_response)
+                if isinstance(response, dict):
+                    # Extract text and tool calls from streaming response
+                    response_text = response.get("text", "")
+                    tool_calls = response.get("tool_calls", [])
+                    
+                    # The text has already been streamed in real-time by _process_streaming_response
+                    # Accumulate text from this turn
+                    if response_text and turn == 0:
+                        # First turn - use the response text as is
+                        accumulated_text = response_text
+                    elif response_text:
+                        # Subsequent turns - append new text if any
+                        accumulated_text += "\n" + response_text
+                    
+                    # Log tool calls for debugging
+                    if tool_calls:
+                        logger.info(f"Received {len(tool_calls)} tool calls from streaming response")
+                        for tc in tool_calls:
+                            logger.info(f"Tool call: {tc.get('name')} (ID: {tc.get('id')})")
+                else:
+                    # Fallback for unexpected response format
+                    logger.warning(f"Unexpected response format from streaming execute_tool_interaction_turn: {type(response)}")
+                    tool_calls = []
+                    response_text = ""
+                
                 contains_tool_use = len(tool_calls) > 0
                 
                 # Build assistant content blocks for conversation history
@@ -1568,10 +1624,10 @@ Follow these guidelines:
                 tool_results_for_next_turn = []
                 
                 # Add text content if any
-                if processed_response.get("text"):
+                if response_text:
                     assistant_content_blocks.append({
                         "type": "text",
-                        "text": processed_response["text"]
+                        "text": response_text
                     })
                 
                 # Process tool calls
@@ -1593,6 +1649,16 @@ Follow these guidelines:
                     # Process the tool
                     try:
                         from utils import tool_processing
+                        
+                        # Debug logging for tool input type and content
+                        logger.info(f"Tool {tool_name} (ID: {tool_use_id}) - input type: {type(tool_input)}")
+                        if isinstance(tool_input, str):
+                            logger.info(f"Tool {tool_name} (ID: {tool_use_id}) - string input preview: {tool_input[:200]}...")
+                        elif isinstance(tool_input, dict):
+                            logger.info(f"Tool {tool_name} (ID: {tool_use_id}) - dict input keys: {list(tool_input.keys())}")
+                        else:
+                            logger.warning(f"Tool {tool_name} (ID: {tool_use_id}) - unexpected input type: {type(tool_input)}")
+                        
                         processed_data = tool_processing.process_visualization_input(
                             tool_name, tool_input, tool_use_id
                         )

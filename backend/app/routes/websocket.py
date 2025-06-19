@@ -144,7 +144,7 @@ async def websocket_conversation(
             await manager.send_message(client_id, {
                 "type": "connected",
                 "conversation_id": conversation_id,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.utcnow().isoformat() + 'Z'
             })
             
             while True:
@@ -173,7 +173,7 @@ async def websocket_conversation(
                     # Respond to ping with pong
                     await manager.send_message(client_id, {
                         "type": "pong",
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": datetime.utcnow().isoformat() + 'Z'
                     })
                 else:
                     await manager.send_message(client_id, {

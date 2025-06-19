@@ -46,11 +46,50 @@ def process_financial_metric_input(tool_input: Dict[str, Any]) -> Dict[str, Any]
         raise ToolSchemaValidationError(f"Schema validation failed for financial metric '{processed_metric.get('name', 'Unknown Metric')}': {str(e)}", original_exception=e)
 
 def process_chart_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
+    logger.info(f"Starting process_chart_input with input type: {type(tool_input)}")
+    logger.info(f"Chart input keys: {list(tool_input.keys()) if isinstance(tool_input, dict) else 'not a dict'}")
+    
     if not isinstance(tool_input, dict):
         raise ToolSchemaValidationError(f"Chart input is not a dictionary: {type(tool_input)}")
-    if not all(key in tool_input for key in ["chartType", "config", "data", "chartConfig"]):
-        raise ToolSchemaValidationError(f"Chart input missing required keys (chartType, config, data, chartConfig). Input: {tool_input}")
-    processed_chart = tool_input.copy()
+        
+    # Check each required key individually for better error reporting
+    required_keys = ["chartType", "config", "data", "chartConfig"]
+    missing_keys = [key for key in required_keys if key not in tool_input]
+    if missing_keys:
+        logger.error(f"Chart input missing required keys: {missing_keys}")
+        logger.error(f"Available keys: {list(tool_input.keys())}")
+        raise ToolSchemaValidationError(f"Chart input missing required keys {missing_keys}. Available keys: {list(tool_input.keys())}. Input: {tool_input}")
+    
+    # Log the actual data content to understand structure
+    logger.info(f"Chart config type: {type(tool_input.get('config'))}")
+    logger.info(f"Chart data type: {type(tool_input.get('data'))}, length: {len(tool_input.get('data', [])) if isinstance(tool_input.get('data'), list) else 'not a list'}")
+    logger.info(f"Chart chartConfig type: {type(tool_input.get('chartConfig'))}")
+    
+    # Let's see the actual content of config to debug
+    config = tool_input.get('config', {})
+    if isinstance(config, str):
+        # Claude sent config as a JSON string, parse it
+        logger.warning(f"Chart config is a JSON string, parsing it")
+        try:
+            config = json.loads(config)
+            tool_input['config'] = config  # Update the tool_input with parsed config
+            logger.info(f"Successfully parsed config JSON string")
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse config JSON string: {e}")
+            raise ToolSchemaValidationError(f"Invalid JSON in config field: {e}")
+    
+    if isinstance(config, dict):
+        logger.info(f"Chart config keys: {list(config.keys())}")
+    else:
+        logger.error(f"Chart config is not a dict after parsing: {type(config)}, value: {config}")
+        raise ToolSchemaValidationError(f"Config must be a dictionary, got {type(config)}")
+    
+    try:
+        processed_chart = tool_input.copy()
+    except Exception as e:
+        logger.error(f"Error copying tool_input: {e}")
+        logger.error(f"Tool input type: {type(tool_input)}")
+        raise ToolSchemaValidationError(f"Failed to copy tool input: {e}")
     
     # Fix Claude sending JSON strings instead of actual lists/dicts
     if "data" in processed_chart:
@@ -126,10 +165,35 @@ def process_chart_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
     processed_chart["config"] = config
 
     # Transform data structure to match frontend expectations
-    original_data = processed_chart.get("data", [])
-    chart_type = processed_chart.get("chartType")
-    chart_config_settings = processed_chart.get("chartConfig", {})
-    x_axis_key = config.get("xAxisKey")
+    try:
+        original_data = processed_chart.get("data", [])
+        logger.info(f"Successfully got original_data: type={type(original_data)}")
+    except Exception as e:
+        logger.error(f"Error getting data from processed_chart: {e}")
+        logger.error(f"processed_chart type: {type(processed_chart)}")
+        raise
+    
+    try:
+        chart_type = processed_chart.get("chartType")
+        logger.info(f"Chart type: {chart_type}")
+    except Exception as e:
+        logger.error(f"Error getting chartType: {e}")
+        raise
+    
+    try:
+        chart_config_settings = processed_chart.get("chartConfig", {})
+        logger.info(f"Chart config settings type: {type(chart_config_settings)}")
+    except Exception as e:
+        logger.error(f"Error getting chartConfig: {e}")
+        raise
+    
+    try:
+        x_axis_key = config.get("xAxisKey")
+        logger.info(f"x_axis_key: {x_axis_key}")
+    except Exception as e:
+        logger.error(f"Error getting xAxisKey from config: {e}")
+        logger.error(f"config type: {type(config)}")
+        raise
 
     transformed_data = []
 
@@ -315,10 +379,30 @@ def process_chart_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
         raise ToolSchemaValidationError(f"Schema validation failed for chart '{chart_title}': {str(e)}", original_exception=e)
 
 def process_table_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
+    logger.info(f"Starting process_table_input with input type: {type(tool_input)}")
+    logger.info(f"Table input keys: {list(tool_input.keys()) if isinstance(tool_input, dict) else 'not a dict'}")
+    
     processed_table = tool_input.copy()
     if "tableType" not in processed_table or processed_table.get("tableType") is None:
         logger.warning(f"Missing 'tableType' in tool_input from Claude. Defaulting to 'comparison'. Input: {tool_input}")
         processed_table["tableType"] = "comparison"
+    
+    # Log the actual data content to understand structure
+    logger.info(f"Table config type: {type(processed_table.get('config'))}")
+    logger.info(f"Table data type: {type(processed_table.get('data'))}, length: {len(processed_table.get('data', [])) if isinstance(processed_table.get('data'), list) else 'not a list'}")
+    
+    # Handle config as JSON string (same issue as charts)
+    config = processed_table.get('config', {})
+    if isinstance(config, str):
+        # Claude sent config as a JSON string, parse it
+        logger.warning(f"Table config is a JSON string, parsing it")
+        try:
+            config = json.loads(config)
+            processed_table['config'] = config  # Update with parsed config
+            logger.info(f"Successfully parsed table config JSON string")
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse table config JSON string: {e}")
+            raise ToolSchemaValidationError(f"Invalid JSON in table config field: {e}")
     
     allowed_table_types = ["simple", "matrix", "comparison", "summary", "detailed"]
     current_table_type = processed_table.get("tableType")
@@ -375,10 +459,15 @@ def process_table_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
                 raise ToolSchemaValidationError(f"Invalid JSON in chartConfig: {str(e)}", original_exception=e)
     
     try:
+        # config was already parsed above
         config = processed_table.get("config", {})
-        if "description" not in config or config["description"] is None:
-            config["description"] = config.get("title", "")
-        processed_table["config"] = config
+        if isinstance(config, dict):
+            if "description" not in config or config["description"] is None:
+                config["description"] = config.get("title", "")
+            processed_table["config"] = config
+        else:
+            logger.error(f"Config is not a dict: {type(config)}")
+            raise ToolSchemaValidationError(f"Config must be a dictionary")
         if "columns" in config and isinstance(config["columns"], list):
             for column_config_item in config["columns"]:
                 if isinstance(column_config_item, dict):
@@ -403,6 +492,8 @@ def process_table_input(tool_input: Dict[str, Any]) -> Dict[str, Any]:
 
 def process_visualization_input(tool_name: str, tool_input: Any, block_id: str) -> Optional[Dict[str, Any]]:
     try:
+        logger.info(f"Processing {tool_name} (ID: {block_id}) - input type: {type(tool_input)}")
+        
         # Handle case where tool_input might be a string (from fine-grained streaming)
         if isinstance(tool_input, str):
             try:
@@ -410,11 +501,13 @@ def process_visualization_input(tool_name: str, tool_input: Any, block_id: str) 
                 logger.info(f"Parsed tool input from string for {tool_name} (ID: {block_id})")
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse tool input JSON for {tool_name} (ID: {block_id}): {e}")
+                logger.error(f"Raw string input was: {tool_input[:500]}...")
                 return None
         
         # Ensure we have a dictionary now
         if not isinstance(tool_input, dict):
             logger.error(f"Tool input is not a dictionary after processing for {tool_name} (ID: {block_id}): {type(tool_input)}")
+            logger.error(f"Actual input content: {str(tool_input)[:200]}...")
             return None
             
         if tool_name == "generate_graph_data":
@@ -427,5 +520,8 @@ def process_visualization_input(tool_name: str, tool_input: Any, block_id: str) 
             logger.warning(f"Unsupported tool: {tool_name} (ID: {block_id})")
             return None
     except Exception as e:
+        import traceback
         logger.error(f"Error processing {tool_name} input (ID: {block_id}): {e}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        logger.error(f"Input content that caused error: {json.dumps(tool_input, indent=2) if isinstance(tool_input, dict) else str(tool_input)[:500]}")
         return None 

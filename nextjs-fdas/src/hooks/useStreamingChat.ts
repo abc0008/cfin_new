@@ -140,35 +140,48 @@ export function useStreamingChat({
         
         if (streamingMessageId && streamingText) {
           // WebSocket streaming case - we have the streaming message ID
-          // First, create a temporary message for immediate display
-          const temporaryMessage: Message = {
-            id: streamingMessageId,
-            sessionId: conversationId,
-            timestamp: new Date().toISOString(),
-            role: 'assistant',
-            content: streamingText,
-            referencedDocuments: [],
-            referencedAnalyses: [],
-            citations: [],
-            content_blocks: null,
-            analysis_blocks: [] // Empty - will be replaced with database version
-          };
-          onMessageUpdate?.(temporaryMessage);
-          
-          // Then, fetch the complete message with analysis_blocks from the database
-          // Use a separate async function to handle the await
+          // Fetch the complete message from database to get correct timestamp and analysis_blocks
           const fetchCompleteMessage = async () => {
             try {
               console.log(`Fetching complete message ${streamingMessageId} from database`);
               const completeMessage = await conversationApi.getMessage(streamingMessageId);
               if (completeMessage) {
                 console.log(`Received complete message with ${completeMessage.analysis_blocks?.length || 0} analysis blocks`);
+                // Use the complete message with proper timestamp from database
                 onMessageUpdate?.(completeMessage);
               } else {
                 console.warn(`Could not fetch complete message ${streamingMessageId} from database`);
+                // Fallback: create temporary message with current time if database fetch fails
+                const temporaryMessage: Message = {
+                  id: streamingMessageId,
+                  sessionId: conversationId,
+                  timestamp: new Date().toISOString(),
+                  role: 'assistant',
+                  content: streamingText,
+                  referencedDocuments: [],
+                  referencedAnalyses: [],
+                  citations: [],
+                  content_blocks: null,
+                  analysis_blocks: []
+                };
+                onMessageUpdate?.(temporaryMessage);
               }
             } catch (error) {
               console.error(`Error fetching complete message ${streamingMessageId}:`, error);
+              // Fallback: create temporary message with current time if error occurs
+              const temporaryMessage: Message = {
+                id: streamingMessageId,
+                sessionId: conversationId,
+                timestamp: new Date().toISOString(),
+                role: 'assistant',
+                content: streamingText,
+                referencedDocuments: [],
+                referencedAnalyses: [],
+                citations: [],
+                content_blocks: null,
+                analysis_blocks: []
+              };
+              onMessageUpdate?.(temporaryMessage);
             }
           };
           

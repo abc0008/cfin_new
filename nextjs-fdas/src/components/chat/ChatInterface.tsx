@@ -6,6 +6,7 @@ import { conversationApi } from '@/lib/api/conversation';
 import { Loader2, Send, FileText } from 'lucide-react';
 import { MessageRenderer } from './MessageRenderer';
 import { FollowUpQuestions } from './FollowUpQuestions';
+import { formatTimestamp } from '@/utils/formatters';
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -119,6 +120,10 @@ export function ChatInterface({
               message={message} 
               onCitationClick={handleCitationClick}
             />
+            {/* Timestamp footnote */}
+            <div className="text-xs opacity-50 mt-2 text-right">
+              {formatTimestamp(message.timestamp)}
+            </div>
           </div>
         </div>
         {/* Show follow-up questions after the last assistant message */}

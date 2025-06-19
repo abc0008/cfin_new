@@ -11,6 +11,7 @@ import {
   ConnectionStatus, 
   VisualizationReadyIndicator 
 } from '@/components/ui/streaming-indicators';
+import { formatTimestamp } from '@/utils/formatters';
 
 interface StreamingChatInterfaceProps {
   messages: Message[];
@@ -184,6 +185,10 @@ export function StreamingChatInterface({
               message={message} 
               onCitationClick={handleCitationClick}
             />
+            {/* Timestamp footnote */}
+            <div className="text-xs opacity-50 mt-2 text-right">
+              {formatTimestamp(message.timestamp)}
+            </div>
           </div>
         </div>
         {/* Show follow-up questions after the last assistant message */}

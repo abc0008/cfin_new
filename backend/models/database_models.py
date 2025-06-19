@@ -68,6 +68,7 @@ class DocumentType(enum.Enum):
     INCOME_STATEMENT = "income_statement"
     CASH_FLOW = "cash_flow"
     NOTES = "notes"
+    INTEGRATED_FINANCIAL_REPORT = "integrated_financial_report"
     OTHER = "other"
 
 

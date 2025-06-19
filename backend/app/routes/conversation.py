@@ -742,10 +742,17 @@ async def send_message_streaming(
             )
             
             # Send final completion event
+            message_obj = result.get("message", {})
+            message_id = None
+            if message_obj and hasattr(message_obj, 'id'):
+                message_id = str(message_obj.id)
+            elif message_obj and isinstance(message_obj, dict):
+                message_id = str(message_obj.get("id")) if message_obj.get("id") else None
+            
             completion_event = {
                 "type": "message_complete",
                 "success": result.get("success", True),
-                "message_id": result.get("message", {}).get("id") if result.get("message") else None
+                "message_id": message_id
             }
             
             yield f"data: {json.dumps(completion_event)}\n\n"
