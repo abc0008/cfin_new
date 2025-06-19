@@ -684,3 +684,141 @@ With analytical keywords reverted to original minimal set, the query "How has lo
 ---
 
 *Phase 5 documents the identification and systematic reversion of changes that broke working PDF content access functionality, emphasizing the importance of controlled, incremental changes and maintaining working baselines.*
+
+---
+
+## Extended Timeline: Timestamp Chronological Ordering Fix (Phase 6)
+
+### Issue Identified: 5-Hour Timezone Delta in Message Display
+**User Report**: "Still getting a 5 hour delta between the user message and chat response timestamps. The chat response time is wrong by 5 hours (is using UTC, should use local time)."
+
+**Specific Example**:
+- User message: `01:10 AM` (Chicago time)  
+- Assistant message: `06:13 AM` (displaying UTC instead of Chicago time)
+- **Expected**: Both should show Chicago local time with only ~3 minute difference
+
+### Root Cause Analysis: Missing UTC Timezone Indicators
+
+**Technical Investigation**:
+1. **Backend timestamps** correctly generated in UTC using `datetime.utcnow()`
+2. **Frontend parsing issue**: JavaScript was interpreting timestamps differently due to missing timezone indicators
+3. **Critical Discovery**: Backend timestamps like `2025-06-19T06:13:25.152831` were missing the `Z` suffix
+4. **JavaScript behavior**: Without `Z` suffix, timestamps interpreted as local time instead of UTC
+
+**Debug Results**:
+```javascript
+// Backend timestamp (missing Z):
+"2025-06-19T06:13:25.152831" 
+// JavaScript interprets as: 2025-06-19T11:13:25.152Z (adds 5 hours for Chicago)
+
+// Fixed timestamp (with Z):
+"2025-06-19T06:13:25.152831Z"
+// JavaScript interprets as: 2025-06-19T06:13:25.152Z (correct UTC)
+```
+
+### Turn 30: Comprehensive Timestamp Format Fix
+
+**Actions Taken**:
+
+1. **Updated Pydantic Message Models** with UTC defaults and field serializers:
+   ```python
+   # Changed from datetime.now() to datetime.utcnow()
+   timestamp: datetime = Field(default_factory=datetime.utcnow)
+   
+   # Added field serializer to ensure Z suffix
+   @field_serializer('timestamp', when_used='always')
+   def serialize_timestamp(self, timestamp: datetime) -> str:
+       """Ensure timestamp is serialized as UTC with Z suffix"""
+       if timestamp.tzinfo is None:
+           timestamp = timestamp.replace(tzinfo=None)
+       return timestamp.isoformat() + 'Z' if not timestamp.isoformat().endswith('Z') else timestamp.isoformat()
+   ```
+
+2. **Fixed Multiple Backend Timestamp Sources**:
+   - **Message Model**: `datetime.now()` → `datetime.utcnow()` with serializer
+   - **ConversationState Model**: `datetime.now()` → `datetime.utcnow()` with serializer  
+   - **MessageResponse Model**: Added timestamp serializer
+   - **WebSocket Events**: `datetime.now().isoformat()` → `datetime.utcnow().isoformat() + 'Z'`
+   - **Message Converters**: Enhanced timestamp parsing and UTC defaults
+
+3. **Updated All WebSocket Event Timestamps**:
+   ```python
+   # Fixed all WebSocket events to use UTC with Z suffix
+   "timestamp": datetime.utcnow().isoformat() + 'Z'
+   ```
+
+4. **Enhanced Message Converter Timestamp Handling**:
+   ```python
+   # Handle timestamp - convert string to datetime if needed
+   timestamp_raw = frontend_message.get("timestamp")
+   if timestamp_raw:
+       if isinstance(timestamp_raw, str):
+           try:
+               timestamp = datetime.fromisoformat(timestamp_raw.replace('Z', '+00:00'))
+           except ValueError:
+               timestamp = datetime.utcnow()
+       else:
+           timestamp = timestamp_raw
+   else:
+       timestamp = datetime.utcnow()
+   ```
+
+**Files Modified**:
+- `/backend/models/message.py` (lines 27, 40-46, 55, 60-65, 109-114)
+- `/backend/services/conversation_service.py` (all WebSocket timestamp events)
+- `/backend/app/routes/websocket.py` (all WebSocket timestamp events)
+- `/backend/utils/message_converters.py` (lines 55, 94-105)
+
+### Testing Verification
+
+**Created Test Script** to verify timestamp serialization:
+```python
+# Test results showed correct UTC formatting:
+# User formatted: 01:10 AM
+# Assistant formatted: 01:13 AM  (previously showed 06:13 AM)
+# All timestamps now properly end with 'Z' suffix
+```
+
+### Issue Resolution Summary
+
+**Problem**: JavaScript was interpreting backend timestamps without timezone indicators as local time, causing a 5-hour offset in Chicago timezone.
+
+**Solution**: Ensured all backend timestamps are serialized with `Z` suffix to explicitly indicate UTC time, allowing JavaScript to properly convert to local timezone for display.
+
+**Result**: 
+- ✅ **User messages** display in Chicago local time
+- ✅ **Assistant messages** display in Chicago local time  
+- ✅ **Time differences** now show actual processing time (~3 minutes) instead of timezone offset
+- ✅ **Chronological ordering** maintained with proper timezone handling
+
+### Technical Implementation Details
+
+1. **Consistent UTC Generation**: All timestamp sources now use `datetime.utcnow()`
+2. **Explicit UTC Serialization**: All timestamps serialized with `Z` suffix via Pydantic field serializers
+3. **Robust Parsing**: Frontend timestamp parsing handles both string and datetime inputs
+4. **WebSocket Compatibility**: Real-time events use proper UTC formatting
+5. **Database Consistency**: All stored timestamps remain in UTC for proper sorting
+
+### Testing Checklist for Timestamp Issues
+
+When encountering timezone display problems:
+
+1. ✅ **Verify Z suffix** in all backend timestamp responses
+2. ✅ **Check UTC generation** using `datetime.utcnow()` not `datetime.now()`
+3. ✅ **Test field serializers** ensure proper ISO format with timezone
+4. ✅ **Validate WebSocket events** use UTC timestamps
+5. ✅ **Confirm frontend parsing** handles timezone conversion correctly
+6. ✅ **Check chronological order** preserves proper conversation flow
+7. ✅ **Test rapid message sending** doesn't introduce timing issues
+
+### Prevention Guidelines
+
+1. **Always Use UTC for Storage**: Use `datetime.utcnow()` for all backend timestamps
+2. **Explicit Timezone Indicators**: Always include `Z` suffix for UTC timestamps in API responses
+3. **Consistent Serialization**: Use Pydantic field serializers for datetime formatting
+4. **Test Timezone Display**: Verify local time display in different timezones
+5. **Document Timezone Handling**: Make timezone assumptions explicit in code comments
+
+---
+
+*Phase 6 documents the complete resolution of timestamp timezone display issues, ensuring proper chronological ordering with correct local time display for users across different timezones.*
