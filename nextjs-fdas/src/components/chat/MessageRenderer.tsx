@@ -66,27 +66,48 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
   // Detect and remove duplicate content in assistant messages
   let processedContent = message.content;
   
-  // Handle the case where the same text appears multiple times
-  // This can happen when analysis results contain duplicate text
+  // Handle the case where formatted content is followed by unformatted duplicate
+  // This happens when streaming content is duplicated without formatting
   const detectDuplicateText = (content: string): string => {
-    // Split content into sentences or meaningful chunks
+    // First, check if the content ends with an unformatted version of itself
+    // The pattern is: formatted content with newlines and numbering, followed by
+    // the same content as one long string without proper formatting
+    
+    // Extract the text content without formatting
+    const getPlainText = (text: string): string => {
+      // Remove markdown formatting, numbers, bullets, etc.
+      return text
+        .replace(/^\d+\.\s+/gm, '') // Remove numbered lists
+        .replace(/^[-*]\s+/gm, '') // Remove bullet points
+        .replace(/^#+\s+/gm, '') // Remove headers
+        .replace(/\*\*/g, '') // Remove bold
+        .replace(/\*/g, '') // Remove italic
+        .replace(/\n+/g, ' ') // Replace newlines with spaces
+        .replace(/\s+/g, ' ') // Normalize spaces
+        .trim();
+    };
+    
+    // Check if content has both formatted and unformatted versions
     const lines = content.split('\n');
-    
-    // Check for exact duplicates of entire content
-    if (content.includes(content.trim() + '\n' + content.trim())) {
-      return content.trim();
-    }
-    
-    // Check for duplicated first sentence/line (common case)
-    if (lines.length > 1) {
-      const firstLine = lines[0].trim();
-      const restOfContent = lines.slice(1).join('\n');
+    if (lines.length > 0) {
+      // Get the last line which might be the unformatted duplicate
+      const lastLine = lines[lines.length - 1].trim();
       
-      if (restOfContent.includes(firstLine) && firstLine.length > 10) {
-        // The first line is duplicated somewhere in the rest of the content
-        // Only return the content starting from the second instance
-        const startOfDuplicate = restOfContent.indexOf(firstLine);
-        return restOfContent.substring(startOfDuplicate);
+      // If the last line is very long and contains no formatting
+      if (lastLine.length > 200 && !lastLine.includes('\n')) {
+        // Get all content except the last line
+        const formattedContent = lines.slice(0, -1).join('\n').trim();
+        
+        // Compare plain text versions
+        const formattedPlain = getPlainText(formattedContent);
+        const lastLinePlain = getPlainText(lastLine);
+        
+        // If they're essentially the same content, keep only the formatted version
+        if (formattedPlain.length > 100 && 
+            (lastLinePlain.includes(formattedPlain.substring(0, 100)) || 
+             formattedPlain.includes(lastLinePlain.substring(0, 100)))) {
+          return formattedContent;
+        }
       }
     }
     
