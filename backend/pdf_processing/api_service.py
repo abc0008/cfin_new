@@ -411,13 +411,13 @@ class ClaudeService:
                                 })
                                 
                                 # Send content update with proper accumulated text
-                                # If tools have started, only send post-tool text in content_update
-                                content_to_send = post_tool_text if tools_started else accumulated_text
+                                # Always send the full accumulated text to maintain consistency
                                 await emit_callback({
                                     "type": "content_update",
-                                    "accumulated_text": content_to_send,
+                                    "accumulated_text": accumulated_text,
                                     "message_id": message_id,
-                                    "is_post_tools": tools_started
+                                    "is_post_tools": tools_started,
+                                    "post_tool_text": post_tool_text if tools_started else None
                                 })
                         elif chunk.delta.type == "input_json_delta":
                             # Buffer tool input (don't stream incomplete JSON)

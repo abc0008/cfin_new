@@ -23,6 +23,7 @@ export interface StreamingEvent {
   content_length?: number;
   content_preserved?: boolean;
   is_post_tools?: boolean;
+  post_tool_text?: string;
 }
 
 export interface UseStreamingChatOptions {
@@ -175,18 +176,25 @@ export function useStreamingChat({
         
         if (event.accumulated_text) {
           // Route content based on phase and backend signal
-          if (event.is_post_tools) {
-            // Backend is sending post-tool text only
-            setPostVisualizationText(event.accumulated_text);
-            console.log(`📊 Post-visualization content update: ${event.accumulated_text.length} chars`);
+          if (event.is_post_tools && event.post_tool_text !== undefined) {
+            // Backend is sending post-tool text separately
+            setPostVisualizationText(event.post_tool_text);
+            console.log(`📊 Post-visualization content update: ${event.post_tool_text.length} chars`);
           } else if (messagePhase === 'initial' || (!messagePhase && !toolsStarted)) {
             // Initial streaming phase - update normally
             setStreamingText(event.accumulated_text);
             console.log(`📝 Initial streaming update: ${event.accumulated_text.length} chars`);
           } else if (messagePhase === 'tools' || messagePhase === 'post-tools' || toolsStarted) {
-            // Shouldn't happen with the backend fix, but handle as post-viz
-            setPostVisualizationText(event.accumulated_text);
-            console.log(`📊 Post-visualization content update (fallback): ${event.accumulated_text.length} chars`);
+            // Extract post-tool portion if not provided separately
+            if (frozenInitialText && event.accumulated_text.startsWith(frozenInitialText)) {
+              const postToolOnly = event.accumulated_text.substring(frozenInitialText.length).trim();
+              setPostVisualizationText(postToolOnly);
+              console.log(`📊 Post-visualization content update (extracted): ${postToolOnly.length} chars`);
+            } else {
+              // Fallback
+              setPostVisualizationText(event.accumulated_text);
+              console.log(`📊 Post-visualization content update (fallback): ${event.accumulated_text.length} chars`);
+            }
           }
         }
         break;
