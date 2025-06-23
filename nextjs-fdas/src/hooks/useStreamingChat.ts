@@ -138,7 +138,15 @@ export function useStreamingChat({
         
         // Also handle accumulated_text for completeness
         if (event.accumulated_text) {
-          setStreamingText(event.accumulated_text);
+          if (messagePhase === 'initial') {
+            setStreamingText(event.accumulated_text);
+          } else if ((messagePhase === 'tools' || messagePhase === 'post-tools') && frozenInitialText) {
+            // Extract only post-viz content from accumulated text
+            if (event.accumulated_text.startsWith(frozenInitialText)) {
+              const postVizOnly = event.accumulated_text.substring(frozenInitialText.length).trim();
+              setPostVisualizationText(postVizOnly);
+            }
+          }
         }
         break;
 
@@ -171,9 +179,18 @@ export function useStreamingChat({
             setStreamingText(event.accumulated_text);
             console.log(`📝 Initial streaming update: ${event.accumulated_text.length} chars`);
           } else if (messagePhase === 'tools' || messagePhase === 'post-tools' || toolsStarted) {
-            // Tools have started - capture post-visualization content
-            setPostVisualizationText(event.accumulated_text);
-            console.log(`📊 Post-visualization content update: ${event.accumulated_text.length} chars`);
+            // Backend sends full accumulated text including initial message
+            // We need to extract only the post-visualization part
+            if (frozenInitialText && event.accumulated_text.startsWith(frozenInitialText)) {
+              // Remove the initial text portion to get only post-viz content
+              const postVizOnly = event.accumulated_text.substring(frozenInitialText.length).trim();
+              setPostVisualizationText(postVizOnly);
+              console.log(`📊 Post-visualization content update (extracted): ${postVizOnly.length} chars from total ${event.accumulated_text.length} chars`);
+            } else {
+              // Fallback: use the full text if we can't extract properly
+              setPostVisualizationText(event.accumulated_text);
+              console.log(`📊 Post-visualization content update: ${event.accumulated_text.length} chars`);
+            }
           }
         }
         break;

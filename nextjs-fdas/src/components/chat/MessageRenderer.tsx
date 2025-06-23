@@ -87,7 +87,19 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
         .trim();
     };
     
-    // Check if content has both formatted and unformatted versions
+    // First check: Look for exact duplicates where content appears twice
+    const halfLength = Math.floor(content.length / 2);
+    if (content.length > 100) {
+      const firstHalf = content.substring(0, halfLength);
+      const secondHalf = content.substring(halfLength);
+      
+      // Check if the content is literally duplicated
+      if (firstHalf.trim() === secondHalf.trim()) {
+        return firstHalf.trim();
+      }
+    }
+    
+    // Second check: Check if content has both formatted and unformatted versions
     const lines = content.split('\n');
     if (lines.length > 0) {
       // Get the last line which might be the unformatted duplicate
@@ -108,6 +120,23 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
              formattedPlain.includes(lastLinePlain.substring(0, 100)))) {
           return formattedContent;
         }
+      }
+    }
+    
+    // Third check: Look for content that starts repeating mid-way
+    // This handles cases where backend duplicates from a certain point
+    if (content.length > 200) {
+      // Look for repeated patterns in the content
+      const plainContent = getPlainText(content);
+      const searchLength = Math.min(100, Math.floor(plainContent.length / 4));
+      const searchPattern = plainContent.substring(0, searchLength);
+      
+      // Find if this pattern appears again later in the content
+      const secondOccurrence = plainContent.indexOf(searchPattern, searchLength);
+      if (secondOccurrence > searchLength) {
+        // Found a duplicate pattern, extract the non-duplicated part
+        const originalContent = content.substring(0, secondOccurrence);
+        return originalContent.trim();
       }
     }
     
