@@ -22,6 +22,7 @@ export interface StreamingEvent {
   is_initial_content?: boolean;
   content_length?: number;
   content_preserved?: boolean;
+  is_post_tools?: boolean;
 }
 
 export interface UseStreamingChatOptions {
@@ -173,24 +174,19 @@ export function useStreamingChat({
         }
         
         if (event.accumulated_text) {
-          // Route content based on phase (not just toolsStarted)
-          if (messagePhase === 'initial' || (!messagePhase && !toolsStarted)) {
+          // Route content based on phase and backend signal
+          if (event.is_post_tools) {
+            // Backend is sending post-tool text only
+            setPostVisualizationText(event.accumulated_text);
+            console.log(`📊 Post-visualization content update: ${event.accumulated_text.length} chars`);
+          } else if (messagePhase === 'initial' || (!messagePhase && !toolsStarted)) {
             // Initial streaming phase - update normally
             setStreamingText(event.accumulated_text);
             console.log(`📝 Initial streaming update: ${event.accumulated_text.length} chars`);
           } else if (messagePhase === 'tools' || messagePhase === 'post-tools' || toolsStarted) {
-            // Backend sends full accumulated text including initial message
-            // We need to extract only the post-visualization part
-            if (frozenInitialText && event.accumulated_text.startsWith(frozenInitialText)) {
-              // Remove the initial text portion to get only post-viz content
-              const postVizOnly = event.accumulated_text.substring(frozenInitialText.length).trim();
-              setPostVisualizationText(postVizOnly);
-              console.log(`📊 Post-visualization content update (extracted): ${postVizOnly.length} chars from total ${event.accumulated_text.length} chars`);
-            } else {
-              // Fallback: use the full text if we can't extract properly
-              setPostVisualizationText(event.accumulated_text);
-              console.log(`📊 Post-visualization content update: ${event.accumulated_text.length} chars`);
-            }
+            // Shouldn't happen with the backend fix, but handle as post-viz
+            setPostVisualizationText(event.accumulated_text);
+            console.log(`📊 Post-visualization content update (fallback): ${event.accumulated_text.length} chars`);
           }
         }
         break;

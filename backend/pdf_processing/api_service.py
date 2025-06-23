@@ -342,19 +342,24 @@ class ClaudeService:
             Processed response dict with accumulated text, tool_calls, and citations
         """
         accumulated_text = ""
+        initial_text = ""  # Track initial text before tools
+        post_tool_text = ""  # Track text after tools
+        tools_started = False  # Track if we've started processing tools
         tool_calls = []
         tool_buffer = {}  # Buffer incomplete tool calls by ID
         citations = []
+        message_id = None  # Track message ID for consistent event emission
         
         try:
             async with stream_manager as stream:
                 async for chunk in stream:
                     if chunk.type == "message_start":
-                        # Message started - emit initial event
+                        # Message started - capture message ID and emit initial event
+                        message_id = chunk.message.id
                         if emit_callback:
                             await emit_callback({
                                 "type": "message_start",
-                                "message_id": chunk.message.id
+                                "message_id": message_id
                             })
                     
                     elif chunk.type == "content_block_start":
@@ -363,7 +368,8 @@ class ClaudeService:
                             if emit_callback:
                                 await emit_callback({
                                     "type": "text_start",
-                                    "block_index": chunk.index
+                                    "block_index": chunk.index,
+                                    "message_id": message_id
                                 })
                         elif chunk.content_block.type == "tool_use":
                             # Tool use block started - buffer it
@@ -373,11 +379,17 @@ class ClaudeService:
                                 "name": chunk.content_block.name,
                                 "input": {}
                             }
+                            # Mark that tools have started
+                            if not tools_started:
+                                tools_started = True
+                                # Save the initial text before tools
+                                initial_text = accumulated_text
                             if emit_callback:
                                 await emit_callback({
                                     "type": "tool_start",
                                     "tool_id": tool_id,
-                                    "tool_name": chunk.content_block.name
+                                    "tool_name": chunk.content_block.name,
+                                    "message_id": message_id
                                 })
                     
                     elif chunk.type == "content_block_delta":
@@ -385,11 +397,27 @@ class ClaudeService:
                             # Stream text content immediately
                             text_delta = chunk.delta.text
                             accumulated_text += text_delta
+                            
+                            # Track post-tool text separately
+                            if tools_started:
+                                post_tool_text += text_delta
+                            
                             if emit_callback:
                                 await emit_callback({
                                     "type": "text_delta",
                                     "text": text_delta,
-                                    "accumulated_text": accumulated_text
+                                    "accumulated_text": accumulated_text,
+                                    "message_id": message_id
+                                })
+                                
+                                # Send content update with proper accumulated text
+                                # If tools have started, only send post-tool text in content_update
+                                content_to_send = post_tool_text if tools_started else accumulated_text
+                                await emit_callback({
+                                    "type": "content_update",
+                                    "accumulated_text": content_to_send,
+                                    "message_id": message_id,
+                                    "is_post_tools": tools_started
                                 })
                         elif chunk.delta.type == "input_json_delta":
                             # Buffer tool input (don't stream incomplete JSON)
@@ -402,7 +430,8 @@ class ClaudeService:
                             if emit_callback:
                                 await emit_callback({
                                     "type": "content_block_stop",
-                                    "block_index": chunk.index
+                                    "block_index": chunk.index,
+                                    "message_id": message_id
                                 })
                     
                     elif chunk.type == "message_delta":
@@ -411,14 +440,16 @@ class ClaudeService:
                             if emit_callback:
                                 await emit_callback({
                                     "type": "message_delta",
-                                    "stop_reason": chunk.delta.stop_reason
+                                    "stop_reason": chunk.delta.stop_reason,
+                                    "message_id": message_id
                                 })
                     
                     elif chunk.type == "message_stop":
                         # Message completed
                         if emit_callback:
                             await emit_callback({
-                                "type": "message_stop"
+                                "type": "message_stop",
+                                "message_id": message_id
                             })
                 
                 # After stream completes, get the final message with complete tool calls
@@ -457,7 +488,8 @@ class ClaudeService:
                                     "type": "tool_complete",
                                     "tool_id": content_block.id,
                                     "tool_name": content_block.name,
-                                    "tool_input": tool_input  # Use the converted dict, not the raw input
+                                    "tool_input": tool_input,  # Use the converted dict, not the raw input
+                                    "message_id": message_id
                                 })
                 
                 return {
@@ -475,6 +507,62 @@ class ClaudeService:
                 "citations": citations,
                 "error": str(e)
             }
+
+    def _is_substantially_new_content(self, new_text: str, existing_text: str, similarity_threshold: float = 0.15) -> bool:
+        """
+        Check if new_text contains substantially new content compared to existing_text.
+        Uses multiple methods to detect duplicates and near-duplicates.
+        
+        Args:
+            new_text: The new text content to evaluate
+            existing_text: The accumulated text content so far
+            similarity_threshold: Minimum proportion of new content required (0.15 = 15% new)
+            
+        Returns:
+            True if the new text is substantially different and should be added
+        """
+        if not new_text or not new_text.strip():
+            return False
+            
+        if not existing_text:
+            return True
+            
+        new_text_clean = new_text.strip().lower()
+        existing_text_clean = existing_text.strip().lower()
+        
+        # Method 1: Check if new text is completely contained in existing text
+        if new_text_clean in existing_text_clean:
+            return False
+            
+        # Method 2: Check if substantial portion (>85%) of new text already exists
+        new_words = set(new_text_clean.split())
+        existing_words = set(existing_text_clean.split())
+        
+        if new_words:
+            overlap_ratio = len(new_words.intersection(existing_words)) / len(new_words)
+            if overlap_ratio > (1 - similarity_threshold):  # More than 85% overlap
+                return False
+        
+        # Method 3: Check for repeated sentence patterns
+        new_sentences = [s.strip() for s in new_text_clean.split('.') if s.strip()]
+        existing_sentences = [s.strip() for s in existing_text_clean.split('.') if s.strip()]
+        
+        if new_sentences and existing_sentences:
+            # Count how many new sentences are similar to existing ones
+            similar_count = 0
+            for new_sent in new_sentences:
+                if len(new_sent) > 10:  # Only check substantial sentences
+                    for existing_sent in existing_sentences:
+                        if new_sent in existing_sent or existing_sent in new_sent:
+                            similar_count += 1
+                            break
+            
+            similarity_ratio = similar_count / len(new_sentences) if new_sentences else 0
+            if similarity_ratio > (1 - similarity_threshold):
+                return False
+        
+        # If we made it here, the content appears to be substantially new
+        return True
 
     async def execute_tool_interaction_turn(
         self,
@@ -1511,7 +1599,8 @@ Follow these guidelines:
         user_query: str,
         knowledge_base: Optional[str] = None,
         file_id: Optional[str] = None,
-        emit_callback=None
+        emit_callback=None,
+        message_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Streaming version of analyze_with_visualization_tools.
@@ -1598,13 +1687,20 @@ Follow these guidelines:
                     tool_calls = response.get("tool_calls", [])
                     
                     # The text has already been streamed in real-time by _process_streaming_response
-                    # Accumulate text from this turn
+                    # Accumulate text from this turn with improved duplicate detection
                     if response_text and turn == 0:
-                        # First turn - use the response text as is
+                        # First turn - preserve the initial streaming text completely
                         accumulated_text = response_text
-                    elif response_text:
-                        # Subsequent turns - append new text if any
-                        accumulated_text += "\n" + response_text
+                        logger.info(f"Turn {turn + 1}: Initial streaming text preserved ({len(response_text)} chars)")
+                    elif response_text and len(response_text.strip()) > 0:
+                        # Subsequent turns - use improved duplicate detection
+                        if self._is_substantially_new_content(response_text, accumulated_text):
+                            # Content is genuinely new - append it
+                            logger.info(f"Turn {turn + 1}: Adding new content ({len(response_text)} chars)")
+                            accumulated_text += "\n\n" + response_text
+                        else:
+                            # Content appears to be duplicated or very similar
+                            logger.info(f"Turn {turn + 1}: Skipping duplicate/similar content ({len(response_text)} chars)")
                     
                     # Log tool calls for debugging
                     if tool_calls:
@@ -1686,7 +1782,8 @@ Follow these guidelines:
                                     "tool_id": tool_use_id,
                                     "tool_name": tool_name,
                                     "tool_input": tool_input,
-                                    "result": processed_data
+                                    "result": processed_data,
+                                    "message_id": message_id
                                 })
                         else:
                             tool_results_for_next_turn.append({
