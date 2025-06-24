@@ -873,87 +873,86 @@ class ConversationService:
         # Track content state to prevent overwrites
         has_good_content = False
         last_good_content = ""
+        # A new flag to indicate tool_start has been processed by this callback
+        # This is specific to the current streaming interaction via this callback instance.
+        tool_start_processed_in_current_stream = False
         
-        # CLEAN BACKEND: Simple content updates, let frontend handle separation
         async def enhanced_emit_callback(event: Dict[str, Any]):
-            nonlocal has_good_content, last_good_content
+            nonlocal has_good_content, last_good_content, tool_start_processed_in_current_stream
             
-            # Handle tool_start event - freeze content when tools start
-            if event.get("type") == "tool_start":
+            event_type = event.get("type")
+
+            if event_type == "tool_start":
+                tool_start_processed_in_current_stream = True # Mark that tool_start passed through here
                 if assistant_message_placeholder.content and len(assistant_message_placeholder.content) > 100:
                     has_good_content = True
                     last_good_content = assistant_message_placeholder.content
                     logger.info(f"🔒 Freezing content at tool_start: {len(last_good_content)} chars")
             
-            # CRITICAL: Block ALL text_delta events - they cause duplication
-            if event.get("type") == "text_delta":
-                # Check current content length to see if we should block this
-                current_length = len(assistant_message_placeholder.content) if assistant_message_placeholder.content else 0
-                
-                # If we already have substantial content, block the text_delta
-                if current_length > 1000:
-                    logger.info(f"🚫 Blocking text_delta - already have {current_length} chars, preventing overwrite")
+            # If tool_start has been processed in this stream, block any subsequent text_delta or content_update
+            # that isn't explicitly marked as post-tool by the api_service.
+            if tool_start_processed_in_current_stream:
+                if event_type == "text_delta":
+                    logger.info(f"🚫 Blocking text_delta event after tool_start has been processed in this stream. Text: '{event.get('text', '')[:50]}...'")
                     return
-                
-                # Also check if this is the exact same content (duplicate)
-                if "accumulated_text" in event:
-                    new_text = event["accumulated_text"]
-                    if assistant_message_placeholder.content and len(new_text) == len(assistant_message_placeholder.content):
-                        logger.info(f"🚫 Blocking duplicate text_delta - same length as existing content")
+                if event_type == "content_update":
+                    if event.get("is_post_tools") and event.get("post_tool_text") is not None:
+                        pass # Allow it to proceed
+                    else:
+                        logger.info(f"🚫 Blocking content_update event after tool_start (not marked as post_tool_text). Accumulated: '{event.get('accumulated_text', '')[:50]}...'")
                         return
-            
-            # Simple content handling - only accept pre-tool formatted content
-            if event.get("type") == "content_update" and "accumulated_text" in event:
-                # If we already have good content and tools have started, ignore updates
+
+            # Original logic for content_update (now primarily for pre-tool_start content)
+            if event_type == "content_update" and "accumulated_text" in event:
+                if tool_start_processed_in_current_stream:
+                     logger.warning("Content_update reached main processing block despite tool_start_processed_in_current_stream being true. This is unexpected.")
+                     return
+
                 if has_good_content:
-                    logger.info(f"📝 Ignoring content update - already have good formatted content ({len(last_good_content)} chars)")
+                    logger.info(f"📝 Ignoring content update based on has_good_content flag. Content: '{event['accumulated_text'][:50]}...'")
                     return
                 
-                # Only process content updates that are NOT post-tools
-                # Post-tool content is often unformatted and duplicative
                 if event.get("is_post_tools", False):
-                    logger.info(f"📝 Ignoring post-tool content update to preserve formatting")
+                    logger.info(f"📝 Ignoring post-tool content update as it should be handled by api_service. Content: '{event['accumulated_text'][:50]}...'")
                     return
                 
                 new_content = event["accumulated_text"]
                 
-                # CRITICAL: Don't update if we already have substantial content
-                current_content = assistant_message_placeholder.content
-                if current_content and len(current_content) > 1000 and len(new_content) <= len(current_content) + 50:
-                    logger.info(f"📝 Blocking content update - already have {len(current_content)} chars, new content is {len(new_content)} chars")
+                current_db_content = assistant_message_placeholder.content
+                if current_db_content and len(current_db_content) > 1000 and len(new_content) <= len(current_db_content) + 50:
+                    logger.info(f"📝 Blocking content update to DB - already have {len(current_db_content)} chars, new content is {len(new_content)} chars")
+                    if emit_callback: # Still forward pre-tool_start valid events
+                        event_to_forward = {**event, "message_id": message_id or str(assistant_message_placeholder.id), "content_length": len(new_content)}
+                        await emit_callback(event_to_forward)
                     return
-                
-                # Update the database with formatted content
+
                 assistant_message_placeholder.content = new_content
                 await self.conversation_repository.update_message(assistant_message_placeholder)
-                logger.info(f"📝 Content updated: {len(new_content)} chars")
+                logger.info(f"📝 DB Content updated: {len(new_content)} chars")
                 
-                # Check if this looks like good content (has newlines)
                 if new_content.count('\n') > 2 and len(new_content) > 500:
-                    has_good_content = True
-                    last_good_content = new_content
-                    newline_count = new_content.count('\n')
-                    logger.info(f"📝 Detected good formatted content with {newline_count} newlines")
+                    if not tool_start_processed_in_current_stream:
+                        has_good_content = True
+                        last_good_content = new_content
+                        logger.info(f"📝 Detected good formatted content with {new_content.count('\n')} newlines (pre-tool_start)")
                 
-                # Forward the content_update event to frontend
                 if emit_callback:
-                    enhanced_event = {
-                        **event,
-                        "message_id": message_id or str(assistant_message_placeholder.id),
-                        "content_length": len(new_content)
-                    }
+                    enhanced_event = {**event, "message_id": message_id or str(assistant_message_placeholder.id), "content_length": len(new_content)}
                     await emit_callback(enhanced_event)
                 return
-            
-            # Forward ALL other events to the original callback, ensuring message_id is included
+
+            # Fallback for text_delta events (if not blocked by tool_start_processed_in_current_stream)
+            if event_type == "text_delta":
+                if tool_start_processed_in_current_stream:
+                    logger.warning("Text_delta reached main processing block despite tool_start_processed_in_current_stream. This is unexpected.")
+                    return
+                logger.info(f"Passing through text_delta event (pre-tool_start): '{event.get('text', '')[:50]}...'")
+
+
+            # Forward ALL other events (or non-returned text_delta/content_update)
             if emit_callback:
-                # Add message_id to all events if not present, using the original message_id parameter
-                # This preserves the message_id established by the WebSocket handler
                 if event.get("type") not in ["error"] and not event.get("message_id"):
-                    event = {
-                        **event,
-                        "message_id": message_id or str(assistant_message_placeholder.id)
-                    }
+                    event = {**event, "message_id": message_id or str(assistant_message_placeholder.id)}
                 await emit_callback(event)
         
         # Note: message_start event is already sent by WebSocket handler
