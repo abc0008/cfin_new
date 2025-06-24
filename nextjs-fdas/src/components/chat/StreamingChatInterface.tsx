@@ -204,15 +204,15 @@ export function StreamingChatInterface({
     );
   }, [handleCitationClick, messages.length, isLoading, isStreaming, conversationId, isSubmitting]);
 
-  // Render streaming message if actively streaming
+  // Render streaming message if we have streaming text (even if streaming has completed)
   const renderStreamingMessage = () => {
-    if (!isStreaming || !streamingText) return null;
+    if (!streamingText) return null;
 
     return (
       <StreamingMessage 
         text={streamingText} 
         toolsInProgress={toolsInProgress} 
-        showTypingIndicator={true}
+        showTypingIndicator={isStreaming} // Only show typing indicator if actively streaming
       />
     );
   };

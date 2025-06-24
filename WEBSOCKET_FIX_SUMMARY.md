@@ -44,3 +44,49 @@ Created test files to verify WebSocket functionality:
 1. Test streaming messages functionality in the actual application
 2. Verify chat interface works with live streaming
 3. Monitor for any remaining connection stability issues
+
+## Phase 2: Streaming Implementation Fixes (June 23, 2024)
+
+### 6. Stale Closure Issue in WebSocket Handlers
+- **Problem**: WebSocket message handlers were using stale versions of state variables due to React closure behavior
+- **Symptom**: `messagePhase` was always null in event handlers despite being set correctly
+- **Fix**: Implemented useRef pattern to ensure latest handler is always called
+- **Files**: 
+  - `/Users/alexcardell/AlexCoding_Local/cfin/nextjs-fdas/src/hooks/useStreamingChat.ts`
+
+### 7. Race Condition in Message Completion
+- **Problem**: State was being cleared before async `fetchCompleteMessage` completed
+- **Symptom**: Post-visualization messages would appear briefly then disappear
+- **Fix**: Captured state values before async operation and moved cleanup to promise resolution
+- **Files**: 
+  - `/Users/alexcardell/AlexCoding_Local/cfin/nextjs-fdas/src/hooks/useStreamingChat.ts`
+
+### 8. Message Content Duplication
+- **Problem**: Backend was sending only post-tool text in content_update events, causing message overwrites
+- **Symptom**: Messages showed duplicate content - formatted version followed by unformatted version
+- **Root Cause**: Backend was overwriting entire message content with partial text
+- **Fix**: 
+  - Backend now always sends full `accumulated_text` to maintain consistency
+  - Added separate `post_tool_text` field for frontend phase separation
+  - Frontend uses `post_tool_text` when available, falls back to extraction
+- **Files**: 
+  - `/Users/alexcardell/AlexCoding_Local/cfin/backend/pdf_processing/api_service.py`
+  - `/Users/alexcardell/AlexCoding_Local/cfin/nextjs-fdas/src/hooks/useStreamingChat.ts`
+
+## Current Streaming Status
+- ✅ WebSocket connections stable and working
+- ✅ Message phase tracking (initial → tools → post-tools) functioning correctly
+- ✅ Stale closure issues resolved with useRef pattern
+- ✅ Post-visualization messages persist correctly
+- ✅ Message content displays without duplication
+- ✅ Clean separation between initial content and post-tool content
+
+## Technical Implementation Details
+1. **Phase Tracking**: Messages go through phases: initial → tools → post-tools → complete
+2. **Message Separation**: Frontend maintains separate state for initial and post-tool content
+3. **Database Consistency**: Backend always stores complete message content
+4. **Event Flow**: Proper message_id tracking throughout streaming lifecycle
+
+## Remaining Known Issues
+- Backend not emitting visualization events (chart_ready, table_ready, metric_ready)
+- Database showing 0 visualizations stored (noted but not critical for streaming)

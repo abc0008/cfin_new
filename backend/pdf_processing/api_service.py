@@ -345,6 +345,8 @@ class ClaudeService:
         initial_text = ""  # Track initial text before tools
         post_tool_text = ""  # Track text after tools
         tools_started = False  # Track if we've started processing tools
+        received_streaming_text = False  # Track if we received any streaming text
+        last_content_update_length = 0  # Track last content update to avoid duplicates
         tool_calls = []
         tool_buffer = {}  # Buffer incomplete tool calls by ID
         citations = []
@@ -394,31 +396,39 @@ class ClaudeService:
                     
                     elif chunk.type == "content_block_delta":
                         if chunk.delta.type == "text_delta":
-                            # Stream text content immediately
                             text_delta = chunk.delta.text
-                            accumulated_text += text_delta
                             
-                            # Track post-tool text separately
-                            if tools_started:
-                                post_tool_text += text_delta
-                            
-                            if emit_callback:
-                                await emit_callback({
-                                    "type": "text_delta",
-                                    "text": text_delta,
-                                    "accumulated_text": accumulated_text,
-                                    "message_id": message_id
-                                })
+                            # IMPORTANT: Only accumulate and stream text BEFORE tools
+                            # Post-tool text is often unformatted duplicate content
+                            if not tools_started:
+                                # Stream text content immediately
+                                accumulated_text += text_delta
+                                received_streaming_text = True  # Mark that we received streaming text
                                 
-                                # Send content update with proper accumulated text
-                                # Always send the full accumulated text to maintain consistency
-                                await emit_callback({
-                                    "type": "content_update",
-                                    "accumulated_text": accumulated_text,
-                                    "message_id": message_id,
-                                    "is_post_tools": tools_started,
-                                    "post_tool_text": post_tool_text if tools_started else None
-                                })
+                                if emit_callback:
+                                    await emit_callback({
+                                        "type": "text_delta",
+                                        "text": text_delta,
+                                        "accumulated_text": accumulated_text,
+                                        "message_id": message_id
+                                    })
+                                    
+                                    # Only send content_update if we have significant new content
+                                    # This prevents duplicate updates for single character additions
+                                    content_length_diff = len(accumulated_text) - last_content_update_length
+                                    if content_length_diff >= 50 or (content_length_diff > 0 and text_delta.endswith('\n')):
+                                        await emit_callback({
+                                            "type": "content_update",
+                                            "accumulated_text": accumulated_text,
+                                            "message_id": message_id,
+                                            "is_post_tools": False,
+                                            "post_tool_text": None
+                                        })
+                                        last_content_update_length = len(accumulated_text)
+                            else:
+                                # Track post-tool text separately but DON'T accumulate or send it
+                                post_tool_text += text_delta
+                                logger.info(f"Ignoring post-tool text delta: {len(text_delta)} chars")
                         elif chunk.delta.type == "input_json_delta":
                             # Buffer tool input (don't stream incomplete JSON)
                             # This accumulates the tool parameters - we'll process when complete
@@ -426,7 +436,19 @@ class ClaudeService:
                     
                     elif chunk.type == "content_block_stop":
                         if chunk.index is not None:
-                            # Content block completed
+                            # Content block completed - send final content_update if needed
+                            if not tools_started and last_content_update_length < len(accumulated_text):
+                                # Send final content update for any remaining text
+                                if emit_callback:
+                                    await emit_callback({
+                                        "type": "content_update",
+                                        "accumulated_text": accumulated_text,
+                                        "message_id": message_id,
+                                        "is_post_tools": False,
+                                        "post_tool_text": None
+                                    })
+                                    last_content_update_length = len(accumulated_text)
+                            
                             if emit_callback:
                                 await emit_callback({
                                     "type": "content_block_stop",
@@ -453,9 +475,14 @@ class ClaudeService:
                             })
                 
                 # After stream completes, get the final message with complete tool calls
+                # IMPORTANT: We only use final_message for extracting tool calls, NOT text content
+                # This prevents duplicate unformatted text that Claude sends in final_message
+                # All text content should come from the streaming deltas above
+                if received_streaming_text:
+                    logger.info(f"Received {len(accumulated_text)} chars during streaming, will ignore text in final_message")
                 final_message = await stream.get_final_message()
                 
-                # Extract complete tool calls from final message
+                # Extract ONLY tool calls from final message (ignore text blocks to prevent duplication)
                 if final_message and final_message.content:
                     for content_block in final_message.content:
                         if hasattr(content_block, 'type') and content_block.type == 'tool_use':
@@ -1660,6 +1687,19 @@ Follow these guidelines:
                 max_retries = 2
                 while retries <= max_retries:
                     try:
+                        # Create a filtering callback for subsequent turns
+                        # Only allow tool events, block all text/content events to prevent duplicates
+                        async def filtered_emit_callback(event: Dict[str, Any]):
+                            if turn > 0:
+                                # After first turn, only allow tool-related events
+                                allowed_types = {'tool_start', 'tool_complete', 'chart_ready', 'table_ready', 'metric_ready'}
+                                if event.get('type') not in allowed_types:
+                                    logger.info(f"Turn {turn + 1}: Blocking {event.get('type')} event to prevent duplicate content")
+                                    return
+                            # Pass through allowed events
+                            if emit_callback:
+                                await emit_callback(event)
+                        
                         response = await self.execute_tool_interaction_turn(
                             system_prompt=LOADED_DEFAULT_FINANCIAL_PROMPT,
                             messages=conversation_messages,
@@ -1667,7 +1707,7 @@ Follow these guidelines:
                             max_tokens=4000,
                             temperature=0.7,
                             stream=True,  # Enable streaming to get real-time text updates
-                            emit_callback=emit_callback  # Pass the callback to emit streaming events
+                            emit_callback=filtered_emit_callback  # Use filtered callback
                         )
                         break  # Success, exit retry loop
                     except Exception as e:
@@ -1686,21 +1726,29 @@ Follow these guidelines:
                     response_text = response.get("text", "")
                     tool_calls = response.get("tool_calls", [])
                     
-                    # The text has already been streamed in real-time by _process_streaming_response
-                    # Accumulate text from this turn with improved duplicate detection
-                    if response_text and turn == 0:
-                        # First turn - preserve the initial streaming text completely
-                        accumulated_text = response_text
-                        logger.info(f"Turn {turn + 1}: Initial streaming text preserved ({len(response_text)} chars)")
-                    elif response_text and len(response_text.strip()) > 0:
-                        # Subsequent turns - use improved duplicate detection
-                        if self._is_substantially_new_content(response_text, accumulated_text):
-                            # Content is genuinely new - append it
-                            logger.info(f"Turn {turn + 1}: Adding new content ({len(response_text)} chars)")
-                            accumulated_text += "\n\n" + response_text
+                    # CRITICAL: For streaming, the text has ALREADY been sent to frontend
+                    # We should NOT re-accumulate it here as that causes duplication
+                    # The 'response' from execute_tool_interaction_turn contains the full text
+                    # but it's already been streamed piece by piece to the frontend
+                    if response_text:
+                        if turn == 0:
+                            # First turn - save for analysis result but DON'T re-stream
+                            accumulated_text = response_text
+                            logger.info(f"Turn {turn + 1}: Captured streamed text ({len(response_text)} chars) - already sent to frontend")
                         else:
-                            # Content appears to be duplicated or very similar
-                            logger.info(f"Turn {turn + 1}: Skipping duplicate/similar content ({len(response_text)} chars)")
+                            # Subsequent turns - check if this is new content
+                            logger.info(f"Turn {turn + 1}: Received {len(response_text)} chars")
+                            
+                            # Only accumulate if this is genuinely new content, not a duplicate
+                            response_plain = response_text.replace('\n', ' ').replace('  ', ' ').strip()
+                            accumulated_plain = accumulated_text.replace('\n', ' ').replace('  ', ' ').strip()
+                            
+                            if response_plain[:min(100, len(response_plain))] in accumulated_plain:
+                                logger.warning(f"Turn {turn + 1}: Detected duplicate content - ignoring to prevent duplication")
+                            else:
+                                # This appears to be new content, accumulate it
+                                accumulated_text = accumulated_text + "\n\n" + response_text
+                                logger.info(f"Turn {turn + 1}: Added new content to accumulated_text")
                     
                     # Log tool calls for debugging
                     if tool_calls:
@@ -1824,15 +1872,16 @@ Follow these guidelines:
                     logger.warning(f"Reached maximum turns ({max_turns}) for streaming visualization analysis")
                     break
             
-            # Prepare analysis text, ensuring it's not empty
-            current_analysis_text = accumulated_text.strip()
-            if not current_analysis_text:
-                logger.warning("accumulated_text was empty in streaming analyze_with_visualization_tools. Using default fallback text.")
-                current_analysis_text = "Here's the information based on your query and the provided documents."
+            # CRITICAL: For streaming, we should NOT return accumulated_text
+            # The frontend already has the properly formatted text from streaming
+            # Returning accumulated_text causes duplication
+            current_analysis_text = ""  # Empty for streaming mode
+            
+            logger.info(f"Streaming mode: NOT returning accumulated_text to prevent duplication")
 
-            # Return structured result
+            # Return structured result with empty analysis_text
             result = {
-                "analysis_text": current_analysis_text,
+                "analysis_text": current_analysis_text,  # Empty to prevent duplication
                 "visualizations": {
                     "charts": accumulated_charts,
                     "tables": accumulated_tables

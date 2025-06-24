@@ -284,7 +284,7 @@ class ConversationRepository:
         
     async def update_message(self, message: Message) -> Optional[Message]:
         """
-        Update a message with new data.
+        Update a message with new data while preserving existing analysis_blocks.
         
         Args:
             message: Message object with updated fields
@@ -293,16 +293,17 @@ class ConversationRepository:
             Updated message if successful, None otherwise
         """
         try:
-            # Just merge the message object with the database
-            self.db.add(message)
+            # Ensure we preserve the updated_at timestamp
+            message.updated_at = datetime.utcnow()
+            
+            # Use merge to handle potential detached instances
+            merged_message = await self.db.merge(message)
             await self.db.commit()
-            # await self.db.refresh(message) # We will re-fetch with eager loading
-
-            # Re-fetch the message with relationships eagerly loaded
-            # This assumes 'message.id' is accessible on the input 'message' object
+            
+            # Re-fetch the message with relationships eagerly loaded to ensure consistency
             stmt = (
                 select(Message)
-                .where(Message.id == message.id) 
+                .where(Message.id == merged_message.id) 
                 .options(
                     selectinload(Message.citations).selectinload(MessageCitation.citation),
                     selectinload(Message.analysis_blocks)
@@ -313,6 +314,14 @@ class ConversationRepository:
 
             if loaded_message:
                 logger.info(f"Updated and re-fetched message {loaded_message.id}")
+                logger.info(f"Message content length: {len(loaded_message.content) if loaded_message.content else 0}")
+                logger.info(f"Analysis blocks count: {len(loaded_message.analysis_blocks) if loaded_message.analysis_blocks else 0}")
+                
+                # Verify content consistency for debugging
+                if loaded_message.content != message.content:
+                    logger.error(f"CONTENT INCONSISTENCY: Expected {len(message.content)} chars, got {len(loaded_message.content)} chars")
+                else:
+                    logger.info(f"Content update verified: {len(loaded_message.content)} chars")
             else:
                 logger.warning(f"Failed to re-fetch message {message.id} after update")
             
@@ -372,7 +381,7 @@ class ConversationRepository:
         content: Dict[str, Any]
     ) -> Optional[AnalysisBlock]:
         """
-        Add an analysis block to a message.
+        Add an analysis block to a message without affecting message content.
         
         Args:
             message_id: ID of the message
@@ -383,27 +392,37 @@ class ConversationRepository:
         Returns:
             Created analysis block if message found, None otherwise
         """
-        # Check if message exists
-        message = await self.get_message(message_id)
-        if not message:
+        try:
+            # Check if message exists (but don't fetch it to avoid locking issues)
+            message_exists = await self.db.execute(
+                select(Message.id).where(Message.id == message_id)
+            )
+            if not message_exists.scalar():
+                logger.warning(f"Message {message_id} not found when adding analysis block")
+                return None
+            
+            # Create analysis block
+            analysis_block = AnalysisBlock(
+                id=str(uuid.uuid4()),
+                message_id=message_id,
+                block_type=block_type,
+                title=title,
+                content=content,
+                created_at=datetime.utcnow()
+            )
+            
+            # Add to database with proper isolation
+            self.db.add(analysis_block)
+            await self.db.commit()
+            await self.db.refresh(analysis_block)
+            
+            logger.info(f"Added analysis block '{title}' (type: {block_type}) to message {message_id}")
+            
+            return analysis_block
+        except Exception as e:
+            logger.error(f"Error adding analysis block to message {message_id}: {e}")
+            await self.db.rollback()
             return None
-        
-        # Create analysis block
-        analysis_block = AnalysisBlock(
-            id=str(uuid.uuid4()),
-            message_id=message_id,
-            block_type=block_type,
-            title=title,
-            content=content,
-            created_at=datetime.utcnow()
-        )
-        
-        # Add to database
-        self.db.add(analysis_block)
-        await self.db.commit()
-        await self.db.refresh(analysis_block)
-        
-        return analysis_block
     
     async def get_message_analysis_blocks(self, message_id: str) -> List[AnalysisBlock]:
         """

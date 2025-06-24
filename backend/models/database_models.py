@@ -217,6 +217,7 @@ class Message(Base):
     content = Column(Text, nullable=False)
     role = Column(String, nullable=False)  # "user" or "assistant"
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     content_blocks = Column(JSON)  # Store structured content blocks from Claude API
     referenced_documents = Column(JSON, default=lambda: [])  # Referenced document IDs
     referenced_analyses = Column(JSON, default=lambda: [])   # Referenced analysis IDs

@@ -69,6 +69,102 @@ from models.database_models import Message, Conversation
 
 logger = logging.getLogger(__name__)
 
+
+def _assess_content_quality(content: str) -> float:
+    """
+    Assess the quality of content based on multiple criteria.
+    Returns a score from 0.0 to 1.0 where 1.0 is highest quality.
+    """
+    if not content or not content.strip():
+        return 0.0
+    
+    content = content.strip()
+    score = 0.0
+    
+    # Length factor (substantial content gets higher score)
+    if len(content) > 500:
+        score += 0.3
+    elif len(content) > 200:
+        score += 0.2
+    elif len(content) > 50:
+        score += 0.1
+    
+    # Sentence completeness (complete sentences get higher score)
+    sentences = content.split('.')
+    complete_sentences = sum(1 for s in sentences if len(s.strip()) > 10)
+    if complete_sentences > 3:
+        score += 0.3
+    elif complete_sentences > 1:
+        score += 0.2
+    elif complete_sentences > 0:
+        score += 0.1
+    
+    # Content richness (varied vocabulary and structure)
+    words = content.split()
+    unique_words = set(word.lower() for word in words if len(word) > 3)
+    if len(unique_words) > 50:
+        score += 0.2
+    elif len(unique_words) > 20:
+        score += 0.1
+    
+    # Financial analysis indicators (specific to our use case)
+    financial_keywords = ['analysis', 'trend', 'ratio', 'performance', 'financial', 'revenue', 'profit', 'growth', 'quarter']
+    keyword_count = sum(1 for keyword in financial_keywords if keyword.lower() in content.lower())
+    if keyword_count > 3:
+        score += 0.2
+    elif keyword_count > 1:
+        score += 0.1
+    
+    return min(score, 1.0)
+
+
+def _is_content_truncated(content: str) -> bool:
+    """
+    Detect if content appears to be truncated or incomplete.
+    Returns True if content shows signs of truncation.
+    """
+    if not content or not content.strip():
+        return True
+    
+    content = content.strip()
+    
+    # Check for common truncation patterns
+    truncation_indicators = [
+        # Mid-sentence cuts
+        content.endswith(' The'),
+        content.endswith(' Let me'),
+        content.endswith(' Based on'),
+        content.endswith(' Looking at'),
+        content.endswith(' The analysis'),
+        content.endswith(' This shows'),
+        # Incomplete phrases
+        content.endswith(' Quarter-over-Quarter'),
+        content.endswith(' The line chart above'),
+        content.endswith(' provide'),
+        content.endswith(' shows'),
+        content.endswith(' indicates'),
+        # Very short content
+        len(content) < 50,
+        # Ends with incomplete conjunction
+        content.endswith(' and'),
+        content.endswith(' but'),
+        content.endswith(' or'),
+        content.endswith(' with'),
+        content.endswith(' from'),
+        content.endswith(' to'),
+        # Mid-word cuts (very basic check)
+        content.endswith(' ') and not content.endswith(('.', '!', '?', ':', ';'))
+    ]
+    
+    # Also check if it ends abruptly without proper punctuation
+    has_proper_ending = content.endswith(('.', '!', '?')) or content.endswith('.')
+    
+    # Check for minimum viable content length for financial analysis
+    # But allow single complete sentences if they're substantial
+    is_too_short = len(content) < 50 if has_proper_ending and '.' in content else len(content) < 100
+    
+    return any(truncation_indicators) or not has_proper_ending or is_too_short
+
 class ConversationService:
     """Service for managing conversations and messages."""
     
@@ -774,83 +870,77 @@ class ConversationService:
         if not assistant_message_placeholder:
             raise ValueError("Failed to create assistant message placeholder")
         
-        # Track whether we've established initial streaming content to prevent overwrites
-        initial_content_established = False
-        preserved_initial_content = ""
-        content_protection_lock = asyncio.Lock()  # Add lock for thread safety
+        # Track content state to prevent overwrites
+        has_good_content = False
+        last_good_content = ""
         
-        # Create a wrapper callback that handles content updates
+        # CLEAN BACKEND: Simple content updates, let frontend handle separation
         async def enhanced_emit_callback(event: Dict[str, Any]):
-            nonlocal initial_content_established, preserved_initial_content
+            nonlocal has_good_content, last_good_content
             
-            # Handle content updates to preserve streaming text in database
-            if event.get("type") == "content_update" and "accumulated_text" in event:
-                # Use lock to prevent race conditions in content protection logic
-                async with content_protection_lock:
-                    current_content = assistant_message_placeholder.content or ""
-                    new_content = event["accumulated_text"]
-                    
-                    # Determine if this is initial content or subsequent tool-generated content
-                    is_initial_content = (
-                        current_content == "Processing your request..." or
-                        len(current_content) == 0 or
-                        not initial_content_established
-                    )
-                    
-                    # Enhanced logic for identifying when initial content is substantial enough to preserve
-                    is_substantial_content = (
-                        len(new_content.strip()) > 100 and 
-                        not new_content.strip().endswith("...") and
-                        not new_content.startswith("I'll") and
-                        len(new_content.split('.')) > 3  # Multiple sentences
-                    )
-                    
-                    if is_initial_content and not initial_content_established and is_substantial_content:
-                        # This is the initial comprehensive streaming content - preserve it
-                        initial_content_established = True
-                        preserved_initial_content = new_content
-                        assistant_message_placeholder.content = new_content
-                        await self.conversation_repository.update_message(assistant_message_placeholder)
-                        logger.info(f"PRESERVED initial streaming content ({len(new_content)} chars)")
-                        logger.info(f"CONTENT_TRACKING: Initial content established - Length: {len(new_content)} chars")
-                        logger.info(f"Content preview: '{new_content[:200]}...'")
-                        
-                    elif is_initial_content and not initial_content_established:
-                        # Still building initial content
-                        assistant_message_placeholder.content = new_content
-                        await self.conversation_repository.update_message(assistant_message_placeholder)
-                        logger.info(f"Building initial content ({len(new_content)} chars)")
-                        
-                    elif initial_content_established:
-                        # We already have good initial content - check if new content is more comprehensive
-                        # This allows for proper content updates when analysis completes
-                        if len(new_content.strip()) > len(preserved_initial_content.strip()) * 1.5:
-                            # New content is significantly more comprehensive - likely the complete analysis
-                            logger.info(f"UPDATING: New content is more comprehensive ({len(new_content)} chars vs {len(preserved_initial_content)} chars)")
-                            assistant_message_placeholder.content = new_content
-                            await self.conversation_repository.update_message(assistant_message_placeholder)
-                            # Update preserved content to reflect the new, more complete content
-                            preserved_initial_content = new_content
-                        else:
-                            # Content is similar length - protect the initial content but forward event
-                            logger.info(f"PROTECTING initial content - similar length content update ({len(new_content)} chars)")
-                            logger.info(f"CONTENT_TRACKING: Protected - Preserved: {len(preserved_initial_content)} chars, Ignored: {len(new_content)} chars")
-                            # Don't update database, just forward event to frontend
-                        
-                    else:
-                        # Fallback: update if we don't have substantial content yet
-                        assistant_message_placeholder.content = new_content
-                        await self.conversation_repository.update_message(assistant_message_placeholder)
-                        logger.info(f"Updated message content ({len(new_content)} chars)")
+            # Handle tool_start event - freeze content when tools start
+            if event.get("type") == "tool_start":
+                if assistant_message_placeholder.content and len(assistant_message_placeholder.content) > 100:
+                    has_good_content = True
+                    last_good_content = assistant_message_placeholder.content
+                    logger.info(f"🔒 Freezing content at tool_start: {len(last_good_content)} chars")
+            
+            # CRITICAL: Block ALL text_delta events - they cause duplication
+            if event.get("type") == "text_delta":
+                # Check current content length to see if we should block this
+                current_length = len(assistant_message_placeholder.content) if assistant_message_placeholder.content else 0
                 
-                # Always forward content_update events to frontend with metadata
+                # If we already have substantial content, block the text_delta
+                if current_length > 1000:
+                    logger.info(f"🚫 Blocking text_delta - already have {current_length} chars, preventing overwrite")
+                    return
+                
+                # Also check if this is the exact same content (duplicate)
+                if "accumulated_text" in event:
+                    new_text = event["accumulated_text"]
+                    if assistant_message_placeholder.content and len(new_text) == len(assistant_message_placeholder.content):
+                        logger.info(f"🚫 Blocking duplicate text_delta - same length as existing content")
+                        return
+            
+            # Simple content handling - only accept pre-tool formatted content
+            if event.get("type") == "content_update" and "accumulated_text" in event:
+                # If we already have good content and tools have started, ignore updates
+                if has_good_content:
+                    logger.info(f"📝 Ignoring content update - already have good formatted content ({len(last_good_content)} chars)")
+                    return
+                
+                # Only process content updates that are NOT post-tools
+                # Post-tool content is often unformatted and duplicative
+                if event.get("is_post_tools", False):
+                    logger.info(f"📝 Ignoring post-tool content update to preserve formatting")
+                    return
+                
+                new_content = event["accumulated_text"]
+                
+                # CRITICAL: Don't update if we already have substantial content
+                current_content = assistant_message_placeholder.content
+                if current_content and len(current_content) > 1000 and len(new_content) <= len(current_content) + 50:
+                    logger.info(f"📝 Blocking content update - already have {len(current_content)} chars, new content is {len(new_content)} chars")
+                    return
+                
+                # Update the database with formatted content
+                assistant_message_placeholder.content = new_content
+                await self.conversation_repository.update_message(assistant_message_placeholder)
+                logger.info(f"📝 Content updated: {len(new_content)} chars")
+                
+                # Check if this looks like good content (has newlines)
+                if new_content.count('\n') > 2 and len(new_content) > 500:
+                    has_good_content = True
+                    last_good_content = new_content
+                    newline_count = new_content.count('\n')
+                    logger.info(f"📝 Detected good formatted content with {newline_count} newlines")
+                
+                # Forward the content_update event to frontend
                 if emit_callback:
                     enhanced_event = {
                         **event,
-                        "message_id": message_id or str(assistant_message_placeholder.id),  # Use original message_id
-                        "is_initial_content": is_initial_content,
-                        "content_length": len(new_content),
-                        "content_preserved": initial_content_established
+                        "message_id": message_id or str(assistant_message_placeholder.id),
+                        "content_length": len(new_content)
                     }
                     await emit_callback(enhanced_event)
                 return
@@ -973,68 +1063,61 @@ class ConversationService:
         visualizations = result.get("visualizations", {})
         accumulated_metrics = result.get("metrics", [])
         
-        # For streaming responses, combine preserved initial content with complete analysis
+        # CLEAN BACKEND: Simple final content handling  
         logger.info(f"Current assistant message content length: {len(assistant_message_placeholder.content) if assistant_message_placeholder.content else 0}")
         logger.info(f"Analysis text length: {len(analysis_text) if analysis_text else 0}")
-        logger.info(f"Initial content established: {initial_content_established}")
         
-        # Use the same lock to ensure consistency
-        async with content_protection_lock:
-            if initial_content_established and preserved_initial_content and analysis_text:
-                # FIXED: Combine initial streaming content with complete analysis instead of ignoring analysis
-                # This preserves the valuable streaming UX while ensuring complete content is displayed
-                
-                # Check if analysis_text is more comprehensive than preserved_initial_content
-                if len(analysis_text.strip()) > len(preserved_initial_content.strip()) and analysis_text.strip() != preserved_initial_content.strip():
-                    # Use the complete analysis text as it contains the full response
-                    final_content = analysis_text
-                    logger.info(f"COMBINING: Using complete analysis text ({len(final_content)} chars) over initial content ({len(preserved_initial_content)} chars)")
-                else:
-                    # Use preserved initial content if analysis text isn't more comprehensive
-                    final_content = preserved_initial_content
-                    logger.info(f"PRESERVING: Using initial streaming content ({len(final_content)} chars) as it's more comprehensive")
-                
-                assistant_message_placeholder.content = final_content
+        # IMPORTANT: Restore good content if it was overwritten
+        if has_good_content and last_good_content:
+            # We had good formatted content - make sure it's preserved
+            if assistant_message_placeholder.content != last_good_content:
+                logger.warning(f"📝 Content was overwritten! Restoring good formatted content ({len(last_good_content)} chars)")
+                assistant_message_placeholder.content = last_good_content
                 assistant_message = await self.conversation_repository.update_message(assistant_message_placeholder)
-                logger.info(f"Updated message with combined content (final length: {len(final_content)} chars)")
-                
-                # Verify the database write was successful
-                if assistant_message and assistant_message.content:
-                    logger.info(f"DATABASE WRITE VERIFIED: Final message content length: {len(assistant_message.content)} chars")
-                    logger.info(f"DATABASE CONTENT PREVIEW: {assistant_message.content[:200]}...")
-                else:
-                    logger.error(f"DATABASE WRITE FAILED: Assistant message content is empty or None")
-                
-            elif initial_content_established and preserved_initial_content:
-                # We have preserved initial content but no analysis text - use preserved content
-                logger.info(f"PRESERVING: Using initial streaming content ({len(preserved_initial_content)} chars) - no analysis text available")
-                assistant_message_placeholder.content = preserved_initial_content
-                assistant_message = await self.conversation_repository.update_message(assistant_message_placeholder)
-                
-            elif not assistant_message_placeholder.content or assistant_message_placeholder.content == "Processing your request...":
-                # Only update if we still have the placeholder or empty content (fallback case)
-                final_content = analysis_text if analysis_text else "Analysis completed. Please check the visualizations in the Analysis panel."
-                logger.info(f"Fallback: Updating message content (was placeholder): {final_content[:100]}...")
-                assistant_message_placeholder.content = final_content
-                assistant_message = await self.conversation_repository.update_message(assistant_message_placeholder)
+                final_content = last_good_content
             else:
-                # Fallback: We have some content but not protected - preserve it
-                logger.info(f"Preserving existing content without changes")
+                final_content = assistant_message_placeholder.content
                 assistant_message = assistant_message_placeholder
+                logger.info(f"✅ Good formatted content preserved ({len(final_content)} chars)")
+        elif assistant_message_placeholder.content and assistant_message_placeholder.content != "Processing your request...":
+            # Use whatever streaming content we have
+            final_content = assistant_message_placeholder.content
+            logger.info(f"📝 Using streaming content ({len(final_content)} chars)")
+            assistant_message = assistant_message_placeholder
+        elif analysis_text and not assistant_message_placeholder.content:
+            # Only use analysis text if we have NO streaming content
+            final_content = analysis_text
+            logger.info(f"📊 Using analysis text as fallback ({len(final_content)} chars)")
+            assistant_message_placeholder.content = final_content
+            assistant_message = await self.conversation_repository.update_message(assistant_message_placeholder)
+        else:
+            # Fallback
+            final_content = "Analysis completed. Please check the visualizations."
+            logger.info(f"🔄 Using fallback content")
+            assistant_message_placeholder.content = final_content
+            assistant_message = await self.conversation_repository.update_message(assistant_message_placeholder)
+        
+        logger.info(f"✅ Database updated with final content: {len(final_content)} chars")
         
         if not assistant_message:
             logger.error("Failed to update assistant message with streamed content")
             assistant_message = assistant_message_placeholder
         else:
-            # Emit a message update event so frontend knows to refresh the message content
-            if emit_callback:
-                await emit_callback({
-                    "type": "message_update",
-                    "message_id": str(assistant_message.id),
-                    "content": assistant_message.content,
-                    "timestamp": datetime.utcnow().isoformat() + 'Z'
-                })
-                logger.info(f"Sent message_update event for {assistant_message.id} after streaming complete")
+            # Only send message_update if content actually changed
+            # This prevents sending duplicate/unformatted content that would overwrite good formatting
+            if emit_callback and final_content and final_content != "Processing your request...":
+                # Check if this would be a meaningful update
+                if len(final_content) <= 1500 or "analysis_text" not in locals():
+                    # Only send if content is reasonable size or we don't have analysis_text to compare
+                    await emit_callback({
+                        "type": "message_update", 
+                        "message_id": str(assistant_message.id),
+                        "content": assistant_message.content,
+                        "timestamp": datetime.utcnow().isoformat() + 'Z'
+                    })
+                    logger.info(f"Sent message_update event for {assistant_message.id} after streaming complete")
+                else:
+                    logger.info(f"Skipping message_update event - content may be duplicated (length: {len(final_content)})")
         
         # Debug logging for metrics
         logger.info(f"DEBUG: result.get('metrics'): {result.get('metrics', []) if 'result' in locals() else 'result not available'}")
@@ -1819,34 +1902,52 @@ Generate exactly {limit} follow-up questions, each on a new line, without number
         """
         from sqlalchemy.orm import sessionmaker
         
-        # Use a single transaction for both content verification and analysis block storage
-        async with self.conversation_repository.db.begin() as transaction:
-            try:
-                # First, ensure the message content is properly persisted
-                await self.conversation_repository.db.refresh(message)
-                logger.info(f"ATOMIC: Refreshed message {message.id} content length: {len(message.content or '')} chars")
+        # FIXED: Check if transaction is already active to prevent "transaction already begun" error
+        db_session = self.conversation_repository.db
+        
+        # Check if there's already an active transaction
+        if db_session.in_transaction():
+            logger.info(f"ATOMIC: Using existing transaction for message {message.id}")
+            # Use existing transaction - just execute the operations directly
+            await self._store_blocks_in_current_transaction(message, visualizations)
+        else:
+            logger.info(f"ATOMIC: Creating new transaction for message {message.id}")
+            # Create new transaction
+            async with db_session.begin() as transaction:
+                await self._store_blocks_in_current_transaction(message, visualizations)
+    
+    async def _store_blocks_in_current_transaction(
+        self,
+        message: Any,
+        visualizations: List[Dict[str, Any]]
+    ):
+        """
+        Store analysis blocks in the current transaction (helper method)
+        """
+        try:
+            # First, ensure the message content is properly persisted
+            await self.conversation_repository.db.refresh(message)
+            logger.info(f"ATOMIC: Refreshed message {message.id} content length: {len(message.content or '')} chars")
+            
+            # Store all analysis blocks within the current transaction
+            for i, viz in enumerate(visualizations):
+                title = viz.get("title", f"Visualization {i+1}")
+                block_type = viz.get("visualization_type", "chart")
                 
-                # Store all analysis blocks within the same transaction
-                for i, viz in enumerate(visualizations):
-                    title = viz.get("title", f"Visualization {i+1}")
-                    block_type = viz.get("visualization_type", "chart")
-                    
-                    # Create analysis block within the transaction
-                    await self.conversation_repository.add_analysis_block(
-                        message_id=str(message.id),
-                        block_type=viz.get("visualization_type", "unknown"),
-                        title=title,
-                        content=viz.get("data")
-                    )
-                    logger.info(f"ATOMIC: Stored analysis block {i+1}/{len(visualizations)}: {title}")
-                
-                # Refresh message to load analysis blocks within the transaction
-                await self.conversation_repository.db.refresh(message, attribute_names=['analysis_blocks'])
-                logger.info(f"ATOMIC: Transaction complete - message {message.id} has {len(message.analysis_blocks or [])} analysis blocks")
-                
-                # Transaction will commit automatically when exiting the context
-                
-            except Exception as e:
-                logger.error(f"ATOMIC: Transaction failed for message {message.id}: {str(e)}")
-                # Transaction will rollback automatically on exception
-                raise
+                # Create analysis block within the transaction
+                await self.conversation_repository.add_analysis_block(
+                    message_id=str(message.id),
+                    block_type=viz.get("visualization_type", "unknown"),
+                    title=title,
+                    content=viz.get("data")
+                )
+                logger.info(f"ATOMIC: Stored analysis block {i+1}/{len(visualizations)}: {title}")
+            
+            # Refresh message to load analysis blocks within the transaction
+            await self.conversation_repository.db.refresh(message, attribute_names=['analysis_blocks'])
+            logger.info(f"ATOMIC: Transaction complete - message {message.id} has {len(message.analysis_blocks or [])} analysis blocks")
+            
+        except Exception as e:
+            logger.error(f"ATOMIC: Transaction failed for message {message.id}: {str(e)}")
+            # Transaction will rollback automatically on exception
+            raise
