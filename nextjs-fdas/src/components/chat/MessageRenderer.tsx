@@ -146,12 +146,11 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
   // Apply duplicate detection and removal
   processedContent = detectDuplicateText(processedContent);
 
+  // For assistant messages, use whitespace-pre-wrap to preserve formatting
   return (
-    <MarkdownRenderer 
-      content={processedContent} 
-      citations={message.citations}
-      onCitationClick={onCitationClick}
-    />
+    <div className="message-content whitespace-pre-wrap">
+      {processedContent}
+    </div>
   );
 }
 

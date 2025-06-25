@@ -53,12 +53,11 @@ export function StreamingChatInterface({
   } = useStreamingChat({
     conversationId: conversationId || '',
     onMessageUpdate: (message) => {
-      console.log('Streaming message update:', message);
       // Pass the streaming message to the parent component
       onMessageUpdate?.(message);
     },
     onVisualizationReady: (type, data, index) => {
-      console.log('Visualization ready:', type, data, index);
+      // Handle visualization ready event if needed
     },
     onError: (error) => {
       console.error('Streaming error:', error);
@@ -205,9 +204,11 @@ export function StreamingChatInterface({
   }, [handleCitationClick, messages.length, isLoading, isStreaming, conversationId, isSubmitting]);
 
   // Render streaming message if we have streaming text (even if streaming has completed)
-  const renderStreamingMessage = () => {
+  const renderStreamingMessage = useCallback(() => {
     if (!streamingText) return null;
 
+    // Always show streaming text if it exists - it represents the current message
+    
     return (
       <StreamingMessage 
         text={streamingText} 
@@ -215,7 +216,7 @@ export function StreamingChatInterface({
         showTypingIndicator={isStreaming} // Only show typing indicator if actively streaming
       />
     );
-  };
+  }, [streamingText, toolsInProgress, isStreaming]);
 
   return (
     <div className="flex flex-col h-full bg-background">

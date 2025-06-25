@@ -104,9 +104,9 @@ export function useStreamingChat({
         setMessagePhase('initial');
         setPhaseTransitions(['initial']);
         
-        // Normal initialization
+        // Initialize for new message
         setIsStreaming(true);
-        setStreamingText('');
+        setStreamingText(''); // Clear buffer for the new streaming message
         setStreamingMessageId(newMessageId);
         setToolsStarted(false);
         setFrozenInitialText('');
@@ -202,36 +202,20 @@ export function useStreamingChat({
       case 'tool_start':
         console.log(`🔧 Tool started: ${event.tool_name} in phase ${messagePhase}`);
         
-        if (messagePhase === 'initial' && streamingText && streamingMessageId) {
-          // Complete Message 1 (initial streaming response)
-          console.log(`✅ Completing initial streaming message: ${streamingText.length} chars`);
+        if (messagePhase === 'initial' && streamingText) {
+          console.log(`✅ Tool started, freezing initial streaming message: ${streamingText.length} chars`);
           
-          const initialMessage = {
-            id: streamingMessageId,
-            sessionId: conversationId,
-            timestamp: new Date().toISOString(),
-            role: 'assistant' as const,
-            content: streamingText,
-            referencedDocuments: [],
-            referencedAnalyses: [],
-            citations: [],
-            content_blocks: null,
-            analysis_blocks: []
-          };
-          
-          onMessageUpdate?.(initialMessage);
-          
-          // Transition to tools phase
+          // Transition to tools phase and freeze the text
           setMessagePhase('tools');
           setPhaseTransitions(prev => [...prev, 'tools']);
           setFrozenInitialText(streamingText);
           setToolsStarted(true);
           
-          // Clear streaming for next phase but keep message ID
-          setStreamingText('');
+          // DON'T clear streaming text - keep it visible!
+          // DON'T persist yet - wait for message_complete
           setIsStreaming(false);
         } else {
-          console.log(`⚠️ Tool started in phase ${messagePhase} - not completing initial message`);
+          console.log(`⚠️ Tool started in phase ${messagePhase} - not freezing text`);
         }
         
         // Track tool in progress
@@ -314,30 +298,57 @@ export function useStreamingChat({
         const currentPhase = messagePhase;
         const currentPostVizText = postVisualizationText;
         const currentStreamingText = streamingText;
+        const currentFrozenInitialText = frozenInitialText;
         const currentStreamingMessageId = streamingMessageId;
         const currentToolsStarted = toolsStarted;
         const currentCompletedVisualizations = { ...completedVisualizations };
         
-        // Always fetch the complete message from backend
+        // ALWAYS persist the initial streaming message if it exists
+        if ((currentStreamingText || currentFrozenInitialText) && currentStreamingMessageId) {
+          const textToPreserve = currentFrozenInitialText || currentStreamingText;
+          console.log(`📝 Persisting streaming message on completion: ${textToPreserve.length} chars`);
+          
+          const streamingMessage = {
+            id: currentStreamingMessageId,
+            sessionId: conversationId,
+            timestamp: new Date().toISOString(),
+            role: 'assistant' as const,
+            content: textToPreserve,
+            referencedDocuments: [],
+            referencedAnalyses: [],
+            citations: [],
+            content_blocks: null,
+            analysis_blocks: []
+          };
+          
+          console.log(`✅ Creating persistent message from streaming content (ID: ${currentStreamingMessageId})`);
+          onMessageUpdate?.(streamingMessage);
+        }
+        
+        // Fetch visualization data from backend if tools were used
         const fetchCompleteMessage = async () => {
           try {
-            const dbMessage = await conversationApi.getMessage(messageIdToFetch);
+            // Only fetch from backend if we used tools (for visualization data)
+            // The streaming text has already been persisted above
+            if (!currentToolsStarted) {
+              console.log(`📌 No tools used, skipping backend fetch (already have streaming content)`);
+              return;
+            }
             
-            if (dbMessage) {
-              // Check what we need to create based on phase and content
-              const hasVisualizations = dbMessage.analysis_blocks?.length > 0;
-              const hasPostVizText = currentPostVizText && currentPostVizText.length > 0;
-              const hasLocalVisualizations = currentCompletedVisualizations.charts.length > 0 || 
-                                           currentCompletedVisualizations.tables.length > 0 || 
-                                           currentCompletedVisualizations.metrics.length > 0;
+            // Check if we have any post-viz text that needs to be displayed
+            const hasPostVizText = currentPostVizText && currentPostVizText.length > 0;
+            
+            // Check if we received any visualization events during streaming
+            const hasStreamedVisualizations = currentCompletedVisualizations.charts.length > 0 || 
+                                             currentCompletedVisualizations.tables.length > 0 || 
+                                             currentCompletedVisualizations.metrics.length > 0;
+            
+            if (hasStreamedVisualizations || hasPostVizText) {
+              // We have data from streaming, create messages directly without fetching
+              console.log(`📊 Using streamed visualization data (${currentCompletedVisualizations.charts.length} charts, ${currentCompletedVisualizations.tables.length} tables, ${currentCompletedVisualizations.metrics.length} metrics)`);
               
-              console.log(`📊 DB Message: ${hasVisualizations ? dbMessage.analysis_blocks.length : 0} visualizations`);
-              console.log(`💬 Post-viz text: ${hasPostVizText ? currentPostVizText.length : 0} chars`);
-              console.log(`📊 Local visualizations: ${currentCompletedVisualizations.charts.length} charts, ${currentCompletedVisualizations.tables.length} tables, ${currentCompletedVisualizations.metrics.length} metrics`);
-              console.log(`📍 Current phase: ${currentPhase}, Tools started: ${currentToolsStarted}`);
-              
-              if (hasVisualizations) {
-                // Message 2: Create visualization message
+              if (hasStreamedVisualizations) {
+                // Create visualization message with streamed data
                 const toolMessageId = `tool_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
                 const toolMessage = {
                   id: toolMessageId,
@@ -345,62 +356,19 @@ export function useStreamingChat({
                   timestamp: new Date().toISOString(),
                   role: 'assistant' as const,
                   content: 'Analysis Visualizations',
-                  referencedDocuments: dbMessage.referencedDocuments || [],
-                  referencedAnalyses: dbMessage.referencedAnalyses || [],
-                  citations: dbMessage.citations || [],
-                  content_blocks: dbMessage.content_blocks,
-                  analysis_blocks: dbMessage.analysis_blocks
+                  referencedDocuments: [],
+                  referencedAnalyses: [],
+                  citations: [],
+                  content_blocks: null,
+                  analysis_blocks: [] // Frontend will use completedVisualizations
                 };
                 
-                console.log(`📊 Creating visualization message with ${dbMessage.analysis_blocks.length} items`);
+                console.log(`📊 Creating visualization message from streamed data`);
                 onMessageUpdate?.(toolMessage);
-                
-                // Message 3: Create post-visualization message if we have content
-                if (hasPostVizText) {
-                  const postVizMessageId = `post_viz_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-                  const postVizMessage = {
-                    id: postVizMessageId,
-                    sessionId: conversationId,
-                    timestamp: new Date().toISOString(),
-                    role: 'assistant' as const,
-                    content: currentPostVizText,
-                    referencedDocuments: [],
-                    referencedAnalyses: [],
-                    citations: [],
-                    content_blocks: null,
-                    analysis_blocks: []
-                  };
-                  
-                  console.log(`💬 Creating post-visualization message: ${postVisualizationText.length} chars`);
-                  onMessageUpdate?.(postVizMessage);
-                }
-              } else if (currentPhase === 'post-tools' && hasPostVizText && !hasVisualizations) {
-                // We have post-visualization text but no visualizations in DB
-                // This can happen if visualization storage failed or is delayed
-                console.log(`⚠️ Post-tools phase with text but no DB visualizations - creating messages anyway`);
-                
-                // First check if we should create a placeholder visualization message
-                if (currentToolsStarted && hasLocalVisualizations) {
-                  // Create a placeholder visualization message with local data
-                  const toolMessageId = `tool_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-                  const toolMessage = {
-                    id: toolMessageId,
-                    sessionId: conversationId,
-                    timestamp: new Date().toISOString(),
-                    role: 'assistant' as const,
-                    content: 'Analysis Visualizations',
-                    referencedDocuments: [],
-                    referencedAnalyses: [],
-                    citations: [],
-                    content_blocks: null,
-                    analysis_blocks: [] // Empty for now, frontend will use completedVisualizations
-                  };
-                  
-                  console.log(`📊 Creating placeholder visualization message (no DB data)`);
-                  onMessageUpdate?.(toolMessage);
-                }
-                
-                // Then create the post-visualization text message
+              }
+              
+              if (hasPostVizText) {
+                // Create post-viz message
                 const postVizMessageId = `post_viz_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
                 const postVizMessage = {
                   id: postVizMessageId,
@@ -415,27 +383,39 @@ export function useStreamingChat({
                   analysis_blocks: []
                 };
                 
-                console.log(`💬 Creating standalone post-visualization message: ${postVisualizationText.length} chars`);
+                console.log(`💬 Creating post-visualization message from streamed data: ${currentPostVizText.length} chars`);
                 onMessageUpdate?.(postVizMessage);
-              } else if (currentPhase === 'initial' && currentStreamingText) {
-                // No tools were used - complete as streaming-only message
-                const finalMessage = {
-                  id: currentStreamingMessageId || messageIdToFetch,
-                  sessionId: conversationId,
-                  timestamp: new Date().toISOString(),
-                  role: 'assistant' as const,
-                  content: currentStreamingText,
-                  referencedDocuments: [],
-                  referencedAnalyses: [],
-                  citations: [],
-                  content_blocks: null,
-                  analysis_blocks: []
-                };
-                
-                console.log(`📝 Completing streaming-only message: ${currentStreamingText.length} chars`);
-                onMessageUpdate?.(finalMessage);
               }
+              
+              return; // Skip backend fetch since we have the data
             }
+            
+            // No streamed visualizations or post-viz text
+            // Tools ran but apparently produced no output
+            console.log(`📌 Tools completed without producing streamed output`);
+            
+            // Create a completion message
+            const noResultMessageId = `no_result_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+            const noResultMessage = {
+              id: noResultMessageId,
+              sessionId: conversationId,
+              timestamp: new Date().toISOString(),
+              role: 'assistant' as const,
+              content: 'Analysis completed.',
+              referencedDocuments: [],
+              referencedAnalyses: [],
+              citations: [],
+              content_blocks: null,
+              analysis_blocks: []
+            };
+            
+            console.log(`📭 Creating completion message for tools`);
+            onMessageUpdate?.(noResultMessage);
+            return;
+            
+            // IMPORTANT: We're NOT fetching from backend anymore
+            // If visualizations are stored after message_complete, the backend
+            // should send proper streaming events (chart_ready, table_ready, etc.)
           } catch (error) {
             console.error('Error fetching complete message:', error);
           }
@@ -445,10 +425,14 @@ export function useStreamingChat({
         fetchCompleteMessage().then(() => {
           // Clean up for next message AFTER messages are created
           console.log(`🧹 Cleaning up after phase transitions: ${phaseTransitions.join(' → ')}`);
+          
+          // Clear streaming text now that message is persisted and any visualizations are created
+          console.log(`✅ Clearing streaming text after successful persistence`);
+          setStreamingText('');
+          
           setActiveMessageId(null);
           setMessagePhase(null);
           setPhaseTransitions([]);
-          setStreamingText('');
           setStreamingMessageId(null);
           setToolsStarted(false);
           setFrozenInitialText('');
@@ -457,11 +441,13 @@ export function useStreamingChat({
           setCompletedVisualizations({ charts: [], tables: [], metrics: [] });
         }).catch((error) => {
           console.error('Error in message completion flow:', error);
-          // Still clean up on error
+          // Clear streaming text on error too since we persisted it above
+          console.log(`❌ Error occurred, clearing streaming text after persistence`);
+          setStreamingText('');
+          
           setActiveMessageId(null);
           setMessagePhase(null);
           setPhaseTransitions([]);
-          setStreamingText('');
           setStreamingMessageId(null);
           setToolsStarted(false);
           setFrozenInitialText('');
