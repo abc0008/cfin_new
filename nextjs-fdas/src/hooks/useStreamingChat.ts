@@ -109,6 +109,11 @@ export function useStreamingChat({
         setMessagePhase('initial');
         setPhaseTransitions(['initial']);
         
+        // Reset visualization flags for the new message cycle
+        vizCreatedRef.current = false;
+        postVizCreatedRef.current = false;
+        lastCompletedMessageIdRef.current = null;
+        
         // Initialize for new message
         setIsStreaming(true);
         setStreamingText(''); // Clear buffer for the new streaming message

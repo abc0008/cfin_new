@@ -303,11 +303,14 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             )}
             
             {visualizationData.tables && visualizationData.tables.length > 0 && (
-              <div className="flex-1">
-                <TableRenderer
-                  data={visualizationData.tables[0]}
-                  onCellClick={onCitationClick ? handleCellClick : undefined}
-                />
+              <div className="flex-1 flex flex-col space-y-4">
+                {visualizationData.tables.map((table, idx) => (
+                  <TableRenderer
+                    key={idx}
+                    data={table}
+                    onCellClick={onCitationClick ? handleCellClick : undefined}
+                  />
+                ))}
               </div>
             )}
             
