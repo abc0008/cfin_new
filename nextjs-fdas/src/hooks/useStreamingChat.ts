@@ -76,6 +76,11 @@ export function useStreamingChat({
   const baseReconnectDelay = 1000; // 1 second
   const maxReconnectDelay = 30000; // 30 seconds
 
+  // Flags to ensure we don't create duplicate visualization / post-viz messages
+  const vizCreatedRef = useRef(false);
+  const postVizCreatedRef = useRef(false);
+  const lastCompletedMessageIdRef = useRef<string | null>(null);
+
   const handleStreamingEvent = useCallback((event: StreamingEvent) => {
     // Debug logging to track state values
     if (event.type === 'tool_start' || event.type === 'message_start') {
@@ -174,13 +179,15 @@ export function useStreamingChat({
           console.warn('Content update event has no message_id and streamingMessageId is null');
         }
         
+        // First, handle dedicated post-tool text regardless of accumulated_text presence
+        if (event.is_post_tools && event.post_tool_text !== undefined) {
+          setPostVisualizationText(event.post_tool_text);
+          console.log(`📊 Post-visualization content update: ${event.post_tool_text.length} chars`);
+        }
+
         if (event.accumulated_text) {
-          // Route content based on phase and backend signal
-          if (event.is_post_tools && event.post_tool_text !== undefined) {
-            // Backend is sending post-tool text separately
-            setPostVisualizationText(event.post_tool_text);
-            console.log(`📊 Post-visualization content update: ${event.post_tool_text.length} chars`);
-          } else if (messagePhase === 'initial' || (!messagePhase && !toolsStarted)) {
+          // Route other content based on phase
+          if (messagePhase === 'initial' || (!messagePhase && !toolsStarted)) {
             // Initial streaming phase - update normally
             setStreamingText(event.accumulated_text);
             console.log(`📝 Initial streaming update: ${event.accumulated_text.length} chars`);
@@ -283,6 +290,62 @@ export function useStreamingChat({
         break;
 
       case 'message_complete':
+        // If backend included analysis_blocks directly in the completion event, convert them into the streamed
+        // visualization structures expected by the rest of the hook so we can skip extra fetch logic.
+        const blocksFromEvent = (event as any).analysis_blocks || (event as any).analysisBlocks;
+        if (blocksFromEvent && Array.isArray(blocksFromEvent) && blocksFromEvent.length > 0) {
+          console.log(`📦 Received ${blocksFromEvent.length} analysis blocks in message_complete event`);
+
+          // Build an assistant message that contains these blocks so Canvas can pick them up
+          const vizMessageId = `viz_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+          const vizMessage = {
+            id: vizMessageId,
+            sessionId: conversationId,
+            timestamp: new Date().toISOString(),
+            role: 'assistant' as const,
+            // Leave content empty so the message is not rendered, but still carries analysis_blocks for visualization aggregation.
+            content: '',
+            referencedDocuments: [],
+            referencedAnalyses: [],
+            citations: [],
+            content_blocks: null,
+            analysis_blocks: blocksFromEvent
+          } as any;
+
+          onMessageUpdate?.(vizMessage);
+          vizCreatedRef.current = true;
+
+          // Still push them into completedVisualizations for real-time callbacks
+          const charts: any[] = [];
+          const tables: any[] = [];
+          const metrics: any[] = [];
+
+          blocksFromEvent.forEach((blk: any) => {
+            if (!blk || !blk.block_type) return;
+            switch (blk.block_type) {
+              case 'chart':
+                charts.push(blk.content);
+                break;
+              case 'table':
+                tables.push(blk.content);
+                break;
+              case 'metric':
+                metrics.push(blk.content);
+                break;
+              default:
+                break;
+            }
+          });
+
+          setCompletedVisualizations(prev => ({
+            charts: [...prev.charts, ...charts],
+            tables: [...prev.tables, ...tables],
+            metrics: [...prev.metrics, ...metrics]
+          }));
+
+          // Ensure toolsStarted is true so fetchCompleteMessage skip logic treats as streamed
+          setToolsStarted(true);
+        }
         console.log(`🏁 Message complete in phase: ${messagePhase}`);
         setIsStreaming(false);
         setToolsInProgress(new Set());
@@ -301,7 +364,11 @@ export function useStreamingChat({
         const currentFrozenInitialText = frozenInitialText;
         const currentStreamingMessageId = streamingMessageId;
         const currentToolsStarted = toolsStarted;
-        const currentCompletedVisualizations = { ...completedVisualizations };
+        const currentCompletedVisualizations = {
+          charts: [...completedVisualizations.charts, ...(blocksFromEvent ? blocksFromEvent.filter((b: any) => b?.block_type === 'chart').map((b: any) => b.content) : [])],
+          tables: [...completedVisualizations.tables, ...(blocksFromEvent ? blocksFromEvent.filter((b: any) => b?.block_type === 'table').map((b: any) => b.content) : [])],
+          metrics: [...completedVisualizations.metrics, ...(blocksFromEvent ? blocksFromEvent.filter((b: any) => b?.block_type === 'metric').map((b: any) => b.content) : [])]
+        };
         
         // ALWAYS persist the initial streaming message if it exists
         if ((currentStreamingText || currentFrozenInitialText) && currentStreamingMessageId) {
@@ -347,27 +414,11 @@ export function useStreamingChat({
               // We have data from streaming, create messages directly without fetching
               console.log(`📊 Using streamed visualization data (${currentCompletedVisualizations.charts.length} charts, ${currentCompletedVisualizations.tables.length} tables, ${currentCompletedVisualizations.metrics.length} metrics)`);
               
-              if (hasStreamedVisualizations) {
-                // Create visualization message with streamed data
-                const toolMessageId = `tool_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-                const toolMessage = {
-                  id: toolMessageId,
-                  sessionId: conversationId,
-                  timestamp: new Date().toISOString(),
-                  role: 'assistant' as const,
-                  content: 'Analysis Visualizations',
-                  referencedDocuments: [],
-                  referencedAnalyses: [],
-                  citations: [],
-                  content_blocks: null,
-                  analysis_blocks: [] // Frontend will use completedVisualizations
-                };
-                
-                console.log(`📊 Creating visualization message from streamed data`);
-                onMessageUpdate?.(toolMessage);
-              }
+              // Visualization blocks were already emitted as a synthetic message in the message_complete handler,
+              // so we purposely avoid creating the fallback placeholder here to prevent duplicate
+              // "Analysis Visualizations" messages.
               
-              if (hasPostVizText) {
+              if (hasPostVizText && !postVizCreatedRef.current) {
                 // Create post-viz message
                 const postVizMessageId = `post_viz_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
                 const postVizMessage = {
@@ -385,6 +436,7 @@ export function useStreamingChat({
                 
                 console.log(`💬 Creating post-visualization message from streamed data: ${currentPostVizText.length} chars`);
                 onMessageUpdate?.(postVizMessage);
+                postVizCreatedRef.current = true;
               }
               
               return; // Skip backend fetch since we have the data

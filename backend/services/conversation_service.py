@@ -59,7 +59,7 @@ import json
 import logging
 import asyncio
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Union, cast
 
 from repositories.conversation_repository import ConversationRepository
 from repositories.document_repository import DocumentRepository
@@ -165,6 +165,15 @@ def _is_content_truncated(content: str) -> bool:
     
     return any(truncation_indicators) or not has_proper_ending or is_too_short
 
+def _to_str(value: Any) -> str:
+    """Safely convert any value to a string for DB storage."""
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, default=str)
+    except Exception:
+        return str(value)
+
 class ConversationService:
     """Service for managing conversations and messages."""
     
@@ -200,6 +209,7 @@ class ConversationService:
             logger.info(f"Found ANTHROPIC_API_KEY in environment variables: {masked_key}")
         
         self.claude_service = ClaudeService(api_key=api_key)
+        self.citation_repository: Optional[Any] = None  # may be injected later
     
     async def create_conversation(
         self,
@@ -643,7 +653,7 @@ class ConversationService:
             # Add assistant message to conversation
             assistant_message = await self.add_message(
                 conversation_id=conversation_id,
-                content=response_content,
+                content=_to_str(response_content),
                 role="assistant"
             )
             
@@ -710,7 +720,7 @@ class ConversationService:
             # Add assistant message to conversation
             assistant_message = await self.add_message(
                 conversation_id=conversation_id,
-                content=analysis_text,
+                content=_to_str(analysis_text),
                 role="assistant"
             )
             
@@ -725,7 +735,7 @@ class ConversationService:
                 processed_chart_item = {
                     "title": chart_item.get("config", {}).get("title", "Chart"),
                     "visualization_type": "chart", # Frontend expects 'chart' as the block_type for all chart types
-                    "data": chart_item  # Store the entire chart item as data (includes chartType)
+                    "data": chart_item or {}  # Store the entire chart item as data (includes chartType)
                 }
                 items_for_analysis_blocks.append(processed_chart_item)
             
@@ -734,7 +744,7 @@ class ConversationService:
                 processed_table_item = {
                     "title": table_item.get("config", {}).get("title", "Table"),
                     "visualization_type": "table", # Matches frontend expectations
-                    "data": table_item  # Store the entire table item as data
+                    "data": table_item or {}  # Store the entire table item as data
                 }
                 items_for_analysis_blocks.append(processed_table_item)
 
@@ -743,7 +753,7 @@ class ConversationService:
                 processed_metric_item = {
                     "title": metric_item.get("name", metric_item.get("title", "Metric")), # Use 'name' or 'title'
                     "visualization_type": "metric", # Or "key_figure" - using "metric"
-                    "data": metric_item  # Store the entire metric item as data
+                    "data": metric_item or {}  # Store the entire metric item as data
                 }
                 items_for_analysis_blocks.append(processed_metric_item)
             
@@ -804,7 +814,7 @@ class ConversationService:
             # Add assistant message to conversation
             assistant_message = await self.add_message(
                 conversation_id=conversation_id,
-                content=response_content,
+                content=_to_str(response_content),
                 role="assistant"
             )
             
@@ -1121,7 +1131,7 @@ class ConversationService:
                 processed_chart_item = {
                     "title": chart_item.get("config", {}).get("title", "Chart"),
                     "visualization_type": "chart",
-                    "data": chart_item
+                    "data": chart_item or {}
                 }
                 items_for_analysis_blocks.append(processed_chart_item)
             
@@ -1131,7 +1141,7 @@ class ConversationService:
                 processed_table_item = {
                     "title": table_item.get("config", {}).get("title", "Table"),
                     "visualization_type": "table",
-                    "data": table_item
+                    "data": table_item or {}
                 }
                 items_for_analysis_blocks.append(processed_table_item)
             
@@ -1141,7 +1151,7 @@ class ConversationService:
                 processed_metric_item = {
                     "title": metric_item.get("name", metric_item.get("title", "Metric")),
                     "visualization_type": "metric",
-                    "data": metric_item
+                    "data": metric_item or {}
                 }
                 items_for_analysis_blocks.append(processed_metric_item)
             
@@ -1155,15 +1165,36 @@ class ConversationService:
                 
                 # NOW send message_complete event after analysis blocks are stored atomically
                 logger.info(f"Sending message_complete event for conversation {conversation_id} after analysis blocks stored")
+
+                # Serialize analysis blocks for immediate frontend rendering
+                serialized_blocks = []
+                try:
+                    for block in (assistant_message.analysis_blocks or []):
+                        serialized_blocks.append({
+                            "id": block.id,
+                            "block_type": block.block_type,
+                            "title": block.title,
+                            "content": block.content,
+                            # ISO format ensures JSON serializable datetime
+                            "created_at": block.created_at.isoformat() if block.created_at else None
+                        })
+                except Exception as ser_err:
+                    logger.warning(f"Failed to serialize analysis blocks for message_complete event: {ser_err}")
+
                 if emit_callback:
                     await emit_callback({
                         "type": "message_complete",
                         "message_id": str(assistant_message.id),
-                        "timestamp": datetime.utcnow().isoformat() + 'Z'
+                        "timestamp": datetime.utcnow().isoformat() + 'Z',
+                        "analysis_blocks": serialized_blocks  # provide blocks directly
                     })
-                    logger.info(f"message_complete event sent for conversation {conversation_id} after analysis blocks")
+                    logger.info(
+                        f"message_complete event sent for conversation {conversation_id} after analysis blocks – blocks: {len(serialized_blocks)}"
+                    )
                 else:
-                    logger.warning(f"No emit_callback available to send message_complete for conversation {conversation_id}")
+                    logger.warning(
+                        f"No emit_callback available to send message_complete for conversation {conversation_id}"
+                    )
         else:
             # For conversations without visualizations, still send message_complete
             logger.info(f"Sending message_complete event for conversation {conversation_id} (no visualizations)")
@@ -1240,8 +1271,15 @@ Here are some important guidelines:
                 
                 # Add a snippet of the document text if available
                 if doc_text:
-                    # Limit to 1000 characters to avoid making the prompt too large
-                    text_preview = doc_text[:1000] + "..." if len(doc_text) > 1000 else doc_text
+                    # Ensure preview_source is a string before slicing to satisfy type checker
+                    preview_source: str
+                    if isinstance(doc_text, str):
+                        preview_source = doc_text
+                    else:
+                        preview_source = _to_str(doc_text)
+
+                    preview_source_str: str = str(preview_source)
+                    text_preview = preview_source_str[:1000] + "..." if len(preview_source_str) > 1000 else preview_source_str
                     prompt += f"\nContent preview:\n{text_preview}\n"
                 else:
                     prompt += "\nNo text content available for this document.\n"
@@ -1344,11 +1382,14 @@ When analyzing financial documents, focus on:
             # and `content=viz.get("data")`
             
             # The content of the analysis block should be the 'data' part of the viz item
+            data_content: Dict[str, Any] = viz.get("data") or {}
+            if not isinstance(data_content, dict):
+                data_content = {"value": data_content}
             await self.conversation_repository.add_analysis_block(
                 message_id=message_id,
-                block_type=viz.get("visualization_type", "unknown"), # Use the type from the item directly
+                block_type=viz.get("visualization_type", "unknown"),
                 title=title,
-                content=viz.get("data") # Store the 'data' part of the item
+                content=data_content
             )
     
     async def add_document_to_conversation(
@@ -1502,13 +1543,14 @@ Generate exactly {limit} follow-up questions, each on a new line, without number
 
             # Use Haiku 3.5 for fast, cost-effective follow-up generation
             try:
-                follow_up_response = await self.claude_service.generate_response(
+                follow_up_response_raw = await self.claude_service.generate_response(
                     system_prompt="You are a financial analysis assistant that generates relevant follow-up questions for financial document discussions. Always provide exactly the requested number of questions, each on a separate line.",
                     messages=[{"role": "user", "content": follow_up_prompt}],
                     model="claude-3-5-haiku-20241022",  # Use Haiku 3.5 as specified
                     max_tokens=500,  # Limit tokens since we only need a few questions
                     temperature=0.7  # Slightly creative for varied questions
                 )
+                follow_up_response: str = cast(str, follow_up_response_raw)
                 
                 # Parse the response into individual questions
                 if follow_up_response and follow_up_response.strip():
@@ -1833,7 +1875,7 @@ Generate exactly {limit} follow-up questions, each on a new line, without number
             # Add assistant message with citation links
             assistant_message = await self.add_message(
                 conversation_id=conversation_id,
-                content=response_content,
+                content=_to_str(response_content),
                 role="assistant",
                 citation_ids=citation_ids if citation_ids else citation_links
             )
@@ -1921,11 +1963,14 @@ Generate exactly {limit} follow-up questions, each on a new line, without number
                 block_type = viz.get("visualization_type", "chart")
                 
                 # Create analysis block within the transaction
+                block_content: Dict[str, Any] = viz.get("data") or {}
+                if not isinstance(block_content, dict):
+                    block_content = {"value": block_content}
                 await self.conversation_repository.add_analysis_block(
                     message_id=str(message.id),
                     block_type=viz.get("visualization_type", "unknown"),
                     title=title,
-                    content=viz.get("data")
+                    content=block_content
                 )
                 logger.info(f"ATOMIC: Stored analysis block {i+1}/{len(visualizations)}: {title}")
             

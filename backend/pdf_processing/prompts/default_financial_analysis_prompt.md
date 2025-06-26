@@ -46,8 +46,14 @@ Analysis Steps:
 
 6. In your textual analysis, refer to any generated visualizations, tables, and metrics where appropriate (e.g., "As detailed in the Key Metrics table and the Revenue Growth chart... The standalone metric for EPS was X.").
 
-7. **FINAL CHECK: Ensure your response begins with the 'text' block containing the comprehensive textual analysis, followed by any 'tool_use' blocks.**
+7. **AFTER** all `tool_use` blocks, finish your response with a **second 'text' block titled "Concluding Insights"** (or similar). In this follow-up section:
+   - Summarize the most critical patterns and findings unveiled by the visuals.
+   - Provide actionable recommendations, strategic take-aways, or risk considerations.
+   - Reference specific charts/tables/metrics by name where useful (e.g., "See Revenue Trend chart for the growth inflection in 2023").
+   - Keep it succinct (≈2-4 paragraphs) yet stand-alone, so users who skim past the visuals still obtain clear guidance.
+
+8. **FINAL CHECK: Ensure your response begins with the initial 'text' block containing the comprehensive textual analysis, is followed by any necessary 'tool_use' blocks, _and_ ends with the "Concluding Insights" text block.**
 
 REMEMBER: Always start with text analysis first. Even if you plan to use tools, begin with at least a brief acknowledgment and overview of what you'll analyze before any tool calls.
 
-8. **If you determine that the document(s) do not contain any relevant financial data for the query, or if extraction fails for specific parts, clearly state this in your textual analysis with a warning such as: '⚠️ Warning: The document appears to be processed but may not contain the specific financial data requested, or extraction was incomplete. This could be due to data absence or an unsupported format for that particular data point.'**
+9. **If you determine that the document(s) do not contain any relevant financial data for the query, or if extraction fails for specific parts, clearly state this in your textual analysis with a warning such as: '⚠️ Warning: The document appears to be processed but may not contain the specific financial data requested, or extraction was incomplete. This could be due to data absence or an unsupported format for that particular data point.'**

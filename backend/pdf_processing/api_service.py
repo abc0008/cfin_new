@@ -469,6 +469,15 @@ class ClaudeService:
                     elif chunk.type == "message_stop":
                         # Message completed
                         if emit_callback:
+                            # Send any accumulated post-tool textual analysis before signaling completion
+                            if post_tool_text.strip():
+                                await emit_callback({
+                                    "type": "content_update",
+                                    "is_post_tools": True,
+                                    "post_tool_text": post_tool_text.strip(),
+                                    "message_id": message_id
+                                })
+
                             await emit_callback({
                                 "type": "message_stop",
                                 "message_id": message_id
@@ -482,42 +491,38 @@ class ClaudeService:
                     logger.info(f"Received {len(accumulated_text)} chars during streaming, will ignore text in final_message")
                 final_message = await stream.get_final_message()
                 
-                # Extract ONLY tool calls from final message (ignore text blocks to prevent duplication)
+                # Extract tool calls and *any* new text from final message (concluding insights often appear here)
+                concluding_text = ""
                 if final_message and final_message.content:
                     for content_block in final_message.content:
                         if hasattr(content_block, 'type') and content_block.type == 'tool_use':
-                            # Log the raw tool input from Claude
-                            logger.info(f"Raw tool input from Claude for {content_block.name}: type={type(content_block.input)}")
-                            if hasattr(content_block.input, '__dict__'):
-                                logger.info(f"Tool input attributes: {dir(content_block.input)}")
-                            
-                            # Convert input if it's a BaseModel to dict
+                            # Convert tool input (Pydantic model -> dict) for later processing
                             tool_input = content_block.input
                             if hasattr(tool_input, 'model_dump'):
-                                # It's a Pydantic model, convert to dict
                                 tool_input = tool_input.model_dump()
-                                logger.info(f"Converted Pydantic model to dict for {content_block.name}")
                             elif hasattr(tool_input, 'dict'):
-                                # Alternative method for older Pydantic
                                 tool_input = tool_input.dict()
-                                logger.info(f"Converted Pydantic model to dict using dict() for {content_block.name}")
-                            
+
                             tool_call = {
                                 "id": content_block.id,
                                 "name": content_block.name,
                                 "input": tool_input
                             }
                             tool_calls.append(tool_call)
-                            
-                            # Emit tool completion event
-                            if emit_callback:
-                                await emit_callback({
-                                    "type": "tool_complete",
-                                    "tool_id": content_block.id,
-                                    "tool_name": content_block.name,
-                                    "tool_input": tool_input,  # Use the converted dict, not the raw input
-                                    "message_id": message_id
-                                })
+                            # Debug
+                            logger.info(f"Queued tool_call from final_message: {tool_call['name']} (ID: {tool_call['id']})")
+                        elif hasattr(content_block, 'text'):
+                            concluding_text += content_block.text
+
+                # Emit concluding insights even if similar to accumulated_text – frontend will handle deduplication
+                if concluding_text:
+                    if emit_callback:
+                        await emit_callback({
+                            "type": "content_update",
+                            "is_post_tools": True,
+                            "post_tool_text": concluding_text,
+                            "message_id": message_id
+                        })
                 
                 return {
                     "text": accumulated_text,
@@ -1691,10 +1696,14 @@ Follow these guidelines:
                         # Only allow tool events, block all text/content events to prevent duplicates
                         async def filtered_emit_callback(event: Dict[str, Any]):
                             if turn > 0:
-                                # After first turn, only allow tool-related events
-                                allowed_types = {'tool_start', 'tool_complete', 'chart_ready', 'table_ready', 'metric_ready'}
-                                if event.get('type') not in allowed_types:
-                                    logger.info(f"Turn {turn + 1}: Blocking {event.get('type')} event to prevent duplicate content")
+                                # After first turn, allow tool-related events and the single concluding content_update
+                                if not (
+                                    (event.get('type') == 'content_update' and event.get('is_post_tools') and event.get('post_tool_text')) or
+                                    event.get('type') in {'tool_start', 'tool_complete', 'chart_ready', 'table_ready', 'metric_ready', 'message_stop'}
+                                ):
+                                    logger.info(
+                                        f"Turn {turn + 1}: Blocking {event.get('type')} event to prevent duplicate content"
+                                    )
                                     return
                             # Pass through allowed events
                             if emit_callback:

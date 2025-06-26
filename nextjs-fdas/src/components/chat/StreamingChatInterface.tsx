@@ -166,6 +166,11 @@ export function StreamingChatInterface({
       index === messages.length - 1 && 
       !isLoading && !isStreaming;
 
+    // If message has no textual content, skip rendering (e.g., synthetic visualization carriers)
+    if (!message.content || message.content.trim() === '') {
+      return null;
+    }
+
     return (
       <div key={`${message.id}-${message.role}`}>
         <div 
