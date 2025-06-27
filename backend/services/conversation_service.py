@@ -57,7 +57,9 @@ import os
 import uuid
 import json
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+import asyncio
+from datetime import datetime
+from typing import List, Dict, Any, Optional, Tuple, Union, cast
 
 from repositories.conversation_repository import ConversationRepository
 from repositories.document_repository import DocumentRepository
@@ -66,6 +68,111 @@ from pdf_processing.api_service import ClaudeService
 from models.database_models import Message, Conversation
 
 logger = logging.getLogger(__name__)
+
+
+def _assess_content_quality(content: str) -> float:
+    """
+    Assess the quality of content based on multiple criteria.
+    Returns a score from 0.0 to 1.0 where 1.0 is highest quality.
+    """
+    if not content or not content.strip():
+        return 0.0
+    
+    content = content.strip()
+    score = 0.0
+    
+    # Length factor (substantial content gets higher score)
+    if len(content) > 500:
+        score += 0.3
+    elif len(content) > 200:
+        score += 0.2
+    elif len(content) > 50:
+        score += 0.1
+    
+    # Sentence completeness (complete sentences get higher score)
+    sentences = content.split('.')
+    complete_sentences = sum(1 for s in sentences if len(s.strip()) > 10)
+    if complete_sentences > 3:
+        score += 0.3
+    elif complete_sentences > 1:
+        score += 0.2
+    elif complete_sentences > 0:
+        score += 0.1
+    
+    # Content richness (varied vocabulary and structure)
+    words = content.split()
+    unique_words = set(word.lower() for word in words if len(word) > 3)
+    if len(unique_words) > 50:
+        score += 0.2
+    elif len(unique_words) > 20:
+        score += 0.1
+    
+    # Financial analysis indicators (specific to our use case)
+    financial_keywords = ['analysis', 'trend', 'ratio', 'performance', 'financial', 'revenue', 'profit', 'growth', 'quarter']
+    keyword_count = sum(1 for keyword in financial_keywords if keyword.lower() in content.lower())
+    if keyword_count > 3:
+        score += 0.2
+    elif keyword_count > 1:
+        score += 0.1
+    
+    return min(score, 1.0)
+
+
+def _is_content_truncated(content: str) -> bool:
+    """
+    Detect if content appears to be truncated or incomplete.
+    Returns True if content shows signs of truncation.
+    """
+    if not content or not content.strip():
+        return True
+    
+    content = content.strip()
+    
+    # Check for common truncation patterns
+    truncation_indicators = [
+        # Mid-sentence cuts
+        content.endswith(' The'),
+        content.endswith(' Let me'),
+        content.endswith(' Based on'),
+        content.endswith(' Looking at'),
+        content.endswith(' The analysis'),
+        content.endswith(' This shows'),
+        # Incomplete phrases
+        content.endswith(' Quarter-over-Quarter'),
+        content.endswith(' The line chart above'),
+        content.endswith(' provide'),
+        content.endswith(' shows'),
+        content.endswith(' indicates'),
+        # Very short content
+        len(content) < 50,
+        # Ends with incomplete conjunction
+        content.endswith(' and'),
+        content.endswith(' but'),
+        content.endswith(' or'),
+        content.endswith(' with'),
+        content.endswith(' from'),
+        content.endswith(' to'),
+        # Mid-word cuts (very basic check)
+        content.endswith(' ') and not content.endswith(('.', '!', '?', ':', ';'))
+    ]
+    
+    # Also check if it ends abruptly without proper punctuation
+    has_proper_ending = content.endswith(('.', '!', '?')) or content.endswith('.')
+    
+    # Check for minimum viable content length for financial analysis
+    # But allow single complete sentences if they're substantial
+    is_too_short = len(content) < 50 if has_proper_ending and '.' in content else len(content) < 100
+    
+    return any(truncation_indicators) or not has_proper_ending or is_too_short
+
+def _to_str(value: Any) -> str:
+    """Safely convert any value to a string for DB storage."""
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, default=str)
+    except Exception:
+        return str(value)
 
 class ConversationService:
     """Service for managing conversations and messages."""
@@ -102,6 +209,7 @@ class ConversationService:
             logger.info(f"Found ANTHROPIC_API_KEY in environment variables: {masked_key}")
         
         self.claude_service = ClaudeService(api_key=api_key)
+        self.citation_repository: Optional[Any] = None  # may be injected later
     
     async def create_conversation(
         self,
@@ -206,7 +314,8 @@ class ConversationService:
         role: str,
         citation_ids: Optional[List[str]] = None,
         referenced_documents: Optional[List[str]] = None,
-        referenced_analyses: Optional[List[str]] = None
+        referenced_analyses: Optional[List[str]] = None,
+        message_id: Optional[str] = None
     ) -> Optional[Message]:
         """
         Add a message to a conversation.
@@ -239,7 +348,8 @@ class ConversationService:
             role=role,
             citation_ids=citation_ids,
             referenced_documents=referenced_documents or [],
-            referenced_analyses=referenced_analyses or []
+            referenced_analyses=referenced_analyses or [],
+            message_id=message_id
         )
     
     async def get_conversation_messages(
@@ -543,7 +653,7 @@ class ConversationService:
             # Add assistant message to conversation
             assistant_message = await self.add_message(
                 conversation_id=conversation_id,
-                content=response_content,
+                content=_to_str(response_content),
                 role="assistant"
             )
             
@@ -610,7 +720,7 @@ class ConversationService:
             # Add assistant message to conversation
             assistant_message = await self.add_message(
                 conversation_id=conversation_id,
-                content=analysis_text,
+                content=_to_str(analysis_text),
                 role="assistant"
             )
             
@@ -625,7 +735,7 @@ class ConversationService:
                 processed_chart_item = {
                     "title": chart_item.get("config", {}).get("title", "Chart"),
                     "visualization_type": "chart", # Frontend expects 'chart' as the block_type for all chart types
-                    "data": chart_item  # Store the entire chart item as data (includes chartType)
+                    "data": chart_item or {}  # Store the entire chart item as data (includes chartType)
                 }
                 items_for_analysis_blocks.append(processed_chart_item)
             
@@ -634,7 +744,7 @@ class ConversationService:
                 processed_table_item = {
                     "title": table_item.get("config", {}).get("title", "Table"),
                     "visualization_type": "table", # Matches frontend expectations
-                    "data": table_item  # Store the entire table item as data
+                    "data": table_item or {}  # Store the entire table item as data
                 }
                 items_for_analysis_blocks.append(processed_table_item)
 
@@ -643,7 +753,7 @@ class ConversationService:
                 processed_metric_item = {
                     "title": metric_item.get("name", metric_item.get("title", "Metric")), # Use 'name' or 'title'
                     "visualization_type": "metric", # Or "key_figure" - using "metric"
-                    "data": metric_item  # Store the entire metric item as data
+                    "data": metric_item or {}  # Store the entire metric item as data
                 }
                 items_for_analysis_blocks.append(processed_metric_item)
             
@@ -704,7 +814,7 @@ class ConversationService:
             # Add assistant message to conversation
             assistant_message = await self.add_message(
                 conversation_id=conversation_id,
-                content=response_content,
+                content=_to_str(response_content),
                 role="assistant"
             )
             
@@ -715,6 +825,391 @@ class ConversationService:
                 "success": True,
                 "message": assistant_message
             }
+
+    async def process_user_message_streaming(
+        self,
+        conversation_id: str,
+        content: str,
+        citation_ids: Optional[List[str]] = None,
+        referenced_documents: Optional[List[str]] = None,
+        referenced_analyses: Optional[List[str]] = None,
+        emit_callback=None,
+        message_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Process a user message with streaming support and real-time updates.
+        
+        Args:
+            conversation_id: ID of the conversation
+            content: Message content
+            citation_ids: Optional list of citation IDs to include as context
+            referenced_documents: Optional list of document IDs
+            referenced_analyses: Optional list of analysis IDs
+            emit_callback: Callback function for streaming events
+            
+        Returns:
+            Dict containing success status and the assistant message
+        """
+        # Get conversation and validate it exists
+        conversation = await self.conversation_repository.get_conversation(conversation_id)
+        if not conversation:
+            raise ValueError(f"Conversation with ID {conversation_id} not found")
+        
+        # Add user message to conversation
+        user_message = await self.add_message(
+            conversation_id=conversation_id,
+            content=content,
+            role="user",
+            citation_ids=citation_ids,
+            referenced_documents=referenced_documents,
+            referenced_analyses=referenced_analyses
+        )
+        
+        if not user_message:
+            raise ValueError("Failed to add user message to conversation")
+        
+        # Create assistant message immediately to establish correct chronological order
+        # This ensures the assistant response timestamp is close to the user message timestamp
+        assistant_message_placeholder = await self.add_message(
+            conversation_id=conversation_id,
+            content="Processing your request...",  # Placeholder content
+            role="assistant",
+            message_id=message_id
+        )
+        
+        if not assistant_message_placeholder:
+            raise ValueError("Failed to create assistant message placeholder")
+        
+        # Track content state to prevent overwrites
+        has_good_content = False
+        last_good_content = ""
+        # A new flag to indicate tool_start has been processed by this callback
+        # This is specific to the current streaming interaction via this callback instance.
+        tool_start_processed_in_current_stream = False
+        
+        async def enhanced_emit_callback(event: Dict[str, Any]):
+            nonlocal has_good_content, last_good_content, tool_start_processed_in_current_stream
+            
+            event_type = event.get("type")
+
+            if event_type == "tool_start":
+                tool_start_processed_in_current_stream = True # Mark that tool_start passed through here
+                if assistant_message_placeholder.content and len(assistant_message_placeholder.content) > 100:
+                    has_good_content = True
+                    last_good_content = assistant_message_placeholder.content
+                    logger.info(f"🔒 Freezing content at tool_start: {len(last_good_content)} chars")
+            
+            # If tool_start has been processed in this stream, block any subsequent text_delta or content_update
+            # that isn't explicitly marked as post-tool by the api_service.
+            if tool_start_processed_in_current_stream:
+                if event_type == "text_delta":
+                    logger.info(f"🚫 Blocking text_delta event after tool_start has been processed in this stream. Text: '{event.get('text', '')[:50]}...'")
+                    return
+                if event_type == "content_update":
+                    if event.get("is_post_tools") and event.get("post_tool_text") is not None:
+                        pass # Allow it to proceed
+                    else:
+                        logger.info(f"🚫 Blocking content_update event after tool_start (not marked as post_tool_text). Accumulated: '{event.get('accumulated_text', '')[:50]}...'")
+                        return
+
+            # Original logic for content_update (now primarily for pre-tool_start content)
+            if event_type == "content_update" and "accumulated_text" in event:
+                if tool_start_processed_in_current_stream: 
+                     logger.warning("Content_update reached main processing block despite tool_start_processed_in_current_stream being true. This is unexpected.")
+                     return
+
+                if has_good_content: 
+                    logger.info(f"📝 Ignoring content update based on has_good_content flag. Content: '{event['accumulated_text'][:50]}...'")
+                    return
+                
+                if event.get("is_post_tools", False):
+                    logger.info(f"📝 Ignoring post-tool content update as it should be handled by api_service. Content: '{event['accumulated_text'][:50]}...'")
+                    return
+                
+                new_content = event["accumulated_text"]
+                
+                current_db_content = assistant_message_placeholder.content
+                if current_db_content and len(current_db_content) > 1000 and len(new_content) <= len(current_db_content) + 50:
+                    logger.info(f"📝 Blocking content update to DB - already have {len(current_db_content)} chars, new content is {len(new_content)} chars")
+                    if emit_callback: # Still forward pre-tool_start valid events
+                        event_to_forward = {**event, "message_id": message_id or str(assistant_message_placeholder.id), "content_length": len(new_content)}
+                        await emit_callback(event_to_forward)
+                    return
+
+                assistant_message_placeholder.content = new_content
+                await self.conversation_repository.update_message(assistant_message_placeholder)
+                logger.info(f"📝 DB Content updated: {len(new_content)} chars")
+                
+                if new_content.count('\n') > 2 and len(new_content) > 500: 
+                    if not tool_start_processed_in_current_stream: 
+                        has_good_content = True
+                        last_good_content = new_content
+                        newline_count = new_content.count('\n')
+                        logger.info(f"📝 Detected good formatted content with {newline_count} newlines (pre-tool_start)")
+                
+                if emit_callback:
+                    enhanced_event = {**event, "message_id": message_id or str(assistant_message_placeholder.id), "content_length": len(new_content)}
+                    await emit_callback(enhanced_event)
+                return
+
+            # Fallback for text_delta events (if not blocked by tool_start_processed_in_current_stream)
+            if event_type == "text_delta":
+                if tool_start_processed_in_current_stream: 
+                    logger.warning("Text_delta reached main processing block despite tool_start_processed_in_current_stream. This is unexpected.")
+                    return
+                logger.info(f"Passing through text_delta event (pre-tool_start): '{event.get('text', '')[:50]}...'")
+
+
+            # Forward ALL other events (or non-returned text_delta/content_update)
+            if emit_callback:
+                if event.get("type") not in ["error"] and not event.get("message_id"):
+                    event = {**event, "message_id": message_id or str(assistant_message_placeholder.id)}
+                await emit_callback(event)
+        
+        # Note: message_start event is already sent by WebSocket handler
+        # Don't emit duplicate message_start event here to avoid frontend confusion
+        # The WebSocket handler already sent message_start with the correct message_id
+        
+        # Get conversation context
+        context = await self.get_conversation_context(conversation_id)
+        
+        # Extract document texts for system prompt
+        document_texts = []
+        if context.get("documents"):
+            # Process each document (same logic as non-streaming version)
+            for doc_info in context["documents"]:
+                try:
+                    content_obj = await self.document_repository.get_document_content(doc_info["id"])
+                    content_data = None
+                    raw_text = None
+                    extracted_data = None
+                    
+                    if content_obj and isinstance(content_obj, dict):
+                        content_data = content_obj.get("content")
+                        raw_text = content_obj.get("raw_text")
+                        extracted_data = content_obj.get("extracted_data")
+                        
+                        document = await self.document_repository.get_document(doc_info["id"])
+                        
+                        doc_dict = {
+                            "id": doc_info["id"],
+                            "title": doc_info.get("filename", "Document"),
+                            "type": "document"
+                        }
+                        
+                        if document and document.claude_file_id:
+                            doc_dict["claude_file_id"] = document.claude_file_id
+                            doc_dict["filename"] = document.filename
+                            document_texts.append(doc_dict)
+                            logger.info(f"Added document {doc_info['id']} with Files API file_id: {document.claude_file_id}")
+                        elif raw_text and not (document and document.mime_type == "application/pdf"):
+                            doc_dict["raw_text"] = raw_text
+                            document_texts.append(doc_dict)
+                            logger.info(f"Added non-PDF document {doc_info['id']} with raw_text ({len(raw_text)} chars)")
+                        elif content_data and isinstance(content_data, bytes) and not (document and document.mime_type == "application/pdf"):
+                            doc_dict["content"] = content_data
+                            document_texts.append(doc_dict)
+                            logger.info(f"Added non-PDF document {doc_info['id']} with binary content")
+                        elif document and document.mime_type == "application/pdf":
+                            logger.warning(f"PDF document {doc_info['id']} missing claude_file_id - cannot process with native PDF support")
+                        else:
+                            logger.warning(f"No usable content available for document {doc_info['id']}")
+                except Exception as e:
+                    logger.error(f"Error processing document content for streaming LLM: {str(e)}")
+                    logger.exception(e)
+                    continue
+        
+        # Get conversation messages
+        messages = await self.conversation_repository.get_conversation_messages(
+            conversation_id=conversation_id,
+            limit=10
+        )
+        
+        # Convert messages to the format expected by Claude API
+        message_history = []
+        for msg in messages:
+            if msg.id != user_message.id:
+                message_history.append({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+        
+        # UNIFIED APPROACH: Always use streaming with tools available
+        # Let Claude decide whether to use visualization tools based on the query
+        logger.info(f"Using unified streaming approach with tools available for conversation {conversation_id}")
+        
+        # Extract file_id from first document if available
+        file_id = None
+        combined_doc_text = ""
+        
+        for doc in document_texts:
+            if "claude_file_id" in doc and doc["claude_file_id"]:
+                file_id = doc["claude_file_id"]
+                logger.info(f"Using Files API claude_file_id {file_id} for unified streaming analysis")
+                break
+            elif "extracted_data" in doc and isinstance(doc["extracted_data"], dict):
+                if "claude_file_id" in doc["extracted_data"] and doc["extracted_data"]["claude_file_id"]:
+                    file_id = doc["extracted_data"]["claude_file_id"]
+                    logger.info(f"Using cached claude_file_id {file_id} from extracted_data for unified streaming analysis")
+                    break
+                elif "file_id" in doc["extracted_data"] and doc["extracted_data"]["file_id"]:
+                    file_id = doc["extracted_data"]["file_id"]
+                    logger.info(f"Using legacy file_id {file_id} from extracted_data for unified streaming analysis")
+                    break
+            if "raw_text" in doc:
+                combined_doc_text += f"\n\n{doc['raw_text']}"
+        
+        # Use Claude's streaming with tools - let Claude decide whether to use visualization tools
+        result = await self.claude_service.analyze_with_visualization_tools_streaming(
+            document_text=combined_doc_text,
+            user_query=content,
+            file_id=file_id,
+            emit_callback=enhanced_emit_callback,
+            message_id=message_id
+        )
+        
+        # Extract results
+        analysis_text = result.get("analysis_text", "")
+        visualizations = result.get("visualizations", {})
+        accumulated_metrics = result.get("metrics", [])
+        
+        # CRITICAL: For streaming, we should NEVER use analysis_text from the API result
+        # The frontend already has the properly formatted text from streaming
+        # analysis_text is often unformatted and would overwrite the good content
+        logger.info(f"Current assistant message content length: {len(assistant_message_placeholder.content) if assistant_message_placeholder.content else 0}")
+        if analysis_text:
+            logger.warning(f"⚠️ Ignoring analysis_text ({len(analysis_text)} chars) - using streaming content only")
+        
+        # IMPORTANT: Preserve the streaming content we already have
+        if has_good_content and last_good_content:
+            # We had good formatted content - make sure it's preserved
+            if assistant_message_placeholder.content != last_good_content:
+                logger.warning(f"📝 Content was overwritten! Restoring good formatted content ({len(last_good_content)} chars)")
+                assistant_message_placeholder.content = last_good_content
+                assistant_message = await self.conversation_repository.update_message(assistant_message_placeholder)
+                final_content = last_good_content
+            else:
+                final_content = assistant_message_placeholder.content
+                assistant_message = assistant_message_placeholder
+                logger.info(f"✅ Good formatted content preserved ({len(final_content)} chars)")
+        elif assistant_message_placeholder.content and assistant_message_placeholder.content != "Processing your request...":
+            # Use whatever streaming content we have
+            final_content = assistant_message_placeholder.content
+            logger.info(f"📝 Using streaming content ({len(final_content)} chars)")
+            assistant_message = assistant_message_placeholder
+        else:
+            # Only use this fallback if we truly have no content (should be rare)
+            final_content = "Analysis completed. Please check the visualizations."
+            logger.warning(f"⚠️ No streaming content received - using fallback message")
+            assistant_message_placeholder.content = final_content
+            assistant_message = await self.conversation_repository.update_message(assistant_message_placeholder)
+        
+        logger.info(f"✅ Database updated with final content: {len(final_content)} chars")
+        
+        if not assistant_message:
+            logger.error("Failed to update assistant message with streamed content")
+            assistant_message = assistant_message_placeholder
+        else:
+            # CRITICAL: Never send message_update events during streaming
+            # The frontend will fetch the complete message from the database when needed
+            # Sending updates here can cause formatting issues and duplicate content
+            logger.info(f"✅ NOT sending message_update - frontend will fetch from DB when needed")
+        
+        # Debug logging for metrics
+        logger.info(f"DEBUG: result.get('metrics'): {result.get('metrics', []) if 'result' in locals() else 'result not available'}")
+        logger.info(f"DEBUG: accumulated_metrics: {accumulated_metrics}")
+        
+        # Process and store visualizations (same logic as non-streaming)
+        logger.info(f"Processing visualizations for conversation {conversation_id}: charts={len(visualizations.get('charts', []))}, tables={len(visualizations.get('tables', []))}, metrics={len(accumulated_metrics)}")
+        
+        if visualizations.get("charts") or visualizations.get("tables") or accumulated_metrics:
+            items_for_analysis_blocks = []
+            
+            # Process charts
+            for chart_item in visualizations.get("charts", []):
+                logger.info(f"Processing chart: {chart_item.get('config', {}).get('title', 'Unnamed Chart')}")
+                processed_chart_item = {
+                    "title": chart_item.get("config", {}).get("title", "Chart"),
+                    "visualization_type": "chart",
+                    "data": chart_item or {}
+                }
+                items_for_analysis_blocks.append(processed_chart_item)
+            
+            # Process tables
+            for table_item in visualizations.get("tables", []):
+                logger.info(f"Processing table: {table_item.get('config', {}).get('title', 'Unnamed Table')}")
+                processed_table_item = {
+                    "title": table_item.get("config", {}).get("title", "Table"),
+                    "visualization_type": "table",
+                    "data": table_item or {}
+                }
+                items_for_analysis_blocks.append(processed_table_item)
+            
+            # Process metrics
+            for metric_item in accumulated_metrics:
+                logger.info(f"Processing metric: {metric_item.get('name', metric_item.get('title', 'Unnamed Metric'))}")
+                processed_metric_item = {
+                    "title": metric_item.get("name", metric_item.get("title", "Metric")),
+                    "visualization_type": "metric",
+                    "data": metric_item or {}
+                }
+                items_for_analysis_blocks.append(processed_metric_item)
+            
+            # Store analysis blocks atomically with final content verification
+            if items_for_analysis_blocks:
+                logger.info(f"Storing {len(items_for_analysis_blocks)} analysis blocks for streaming message {assistant_message.id}")
+                await self._store_analysis_blocks_atomically(
+                    message=assistant_message,
+                    visualizations=items_for_analysis_blocks
+                )
+                
+                # NOW send message_complete event after analysis blocks are stored atomically
+                logger.info(f"Sending message_complete event for conversation {conversation_id} after analysis blocks stored")
+
+                # Serialize analysis blocks for immediate frontend rendering
+                serialized_blocks = []
+                try:
+                    for block in (assistant_message.analysis_blocks or []):
+                        serialized_blocks.append({
+                            "id": block.id,
+                            "block_type": block.block_type,
+                            "title": block.title,
+                            "content": block.content,
+                            # ISO format ensures JSON serializable datetime
+                            "created_at": block.created_at.isoformat() if block.created_at else None
+                        })
+                except Exception as ser_err:
+                    logger.warning(f"Failed to serialize analysis blocks for message_complete event: {ser_err}")
+
+                if emit_callback:
+                    await emit_callback({
+                        "type": "message_complete",
+                        "message_id": str(assistant_message.id),
+                        "timestamp": datetime.utcnow().isoformat() + 'Z',
+                        "analysis_blocks": serialized_blocks  # provide blocks directly
+                    })
+                    logger.info(
+                        f"message_complete event sent for conversation {conversation_id} after analysis blocks – blocks: {len(serialized_blocks)}"
+                    )
+                else:
+                    logger.warning(
+                        f"No emit_callback available to send message_complete for conversation {conversation_id}"
+                    )
+        else:
+            # For conversations without visualizations, still send message_complete
+            logger.info(f"Sending message_complete event for conversation {conversation_id} (no visualizations)")
+            if emit_callback:
+                await emit_callback({
+                    "type": "message_complete",
+                    "message_id": str(assistant_message.id),
+                    "timestamp": datetime.utcnow().isoformat() + 'Z'
+                })
+                logger.info(f"message_complete event sent for conversation {conversation_id} (no visualizations)")
+        
+        return {
+            "success": True,
+            "message": assistant_message
+        }
     
     def _build_system_prompt(self, document_texts: List[Dict[str, Any]], citations: List[Dict[str, Any]]) -> str:
         """
@@ -776,8 +1271,15 @@ Here are some important guidelines:
                 
                 # Add a snippet of the document text if available
                 if doc_text:
-                    # Limit to 1000 characters to avoid making the prompt too large
-                    text_preview = doc_text[:1000] + "..." if len(doc_text) > 1000 else doc_text
+                    # Ensure preview_source is a string before slicing to satisfy type checker
+                    preview_source: str
+                    if isinstance(doc_text, str):
+                        preview_source = doc_text
+                    else:
+                        preview_source = _to_str(doc_text)
+
+                    preview_source_str: str = str(preview_source)
+                    text_preview = preview_source_str[:1000] + "..." if len(preview_source_str) > 1000 else preview_source_str
                     prompt += f"\nContent preview:\n{text_preview}\n"
                 else:
                     prompt += "\nNo text content available for this document.\n"
@@ -880,11 +1382,14 @@ When analyzing financial documents, focus on:
             # and `content=viz.get("data")`
             
             # The content of the analysis block should be the 'data' part of the viz item
+            data_content: Dict[str, Any] = viz.get("data") or {}
+            if not isinstance(data_content, dict):
+                data_content = {"value": data_content}
             await self.conversation_repository.add_analysis_block(
                 message_id=message_id,
-                block_type=viz.get("visualization_type", "unknown"), # Use the type from the item directly
+                block_type=viz.get("visualization_type", "unknown"),
                 title=title,
-                content=viz.get("data") # Store the 'data' part of the item
+                content=data_content
             )
     
     async def add_document_to_conversation(
@@ -1038,13 +1543,14 @@ Generate exactly {limit} follow-up questions, each on a new line, without number
 
             # Use Haiku 3.5 for fast, cost-effective follow-up generation
             try:
-                follow_up_response = await self.claude_service.generate_response(
+                follow_up_response_raw = await self.claude_service.generate_response(
                     system_prompt="You are a financial analysis assistant that generates relevant follow-up questions for financial document discussions. Always provide exactly the requested number of questions, each on a separate line.",
                     messages=[{"role": "user", "content": follow_up_prompt}],
                     model="claude-3-5-haiku-20241022",  # Use Haiku 3.5 as specified
                     max_tokens=500,  # Limit tokens since we only need a few questions
                     temperature=0.7  # Slightly creative for varied questions
                 )
+                follow_up_response: str = cast(str, follow_up_response_raw)
                 
                 # Parse the response into individual questions
                 if follow_up_response and follow_up_response.strip():
@@ -1369,7 +1875,7 @@ Generate exactly {limit} follow-up questions, each on a new line, without number
             # Add assistant message with citation links
             assistant_message = await self.add_message(
                 conversation_id=conversation_id,
-                content=response_content,
+                content=_to_str(response_content),
                 role="assistant",
                 citation_ids=citation_ids if citation_ids else citation_links
             )
@@ -1408,3 +1914,71 @@ Generate exactly {limit} follow-up questions, each on a new line, without number
                     "success": False,
                     "error": f"Multiple errors: {str(e)} and {str(add_error)}"
                 }
+
+    async def _store_analysis_blocks_atomically(
+        self,
+        message: Any,
+        visualizations: List[Dict[str, Any]]
+    ):
+        """
+        Store analysis blocks atomically with content verification to prevent frontend from
+        retrieving incomplete message states during the streaming process.
+        
+        Args:
+            message: The message object to attach analysis blocks to
+            visualizations: List of visualization data to store as analysis blocks
+        """
+        from sqlalchemy.orm import sessionmaker
+        
+        # FIXED: Check if transaction is already active to prevent "transaction already begun" error
+        db_session = self.conversation_repository.db
+        
+        # Check if there's already an active transaction
+        if db_session.in_transaction():
+            logger.info(f"ATOMIC: Using existing transaction for message {message.id}")
+            # Use existing transaction - just execute the operations directly
+            await self._store_blocks_in_current_transaction(message, visualizations)
+        else:
+            logger.info(f"ATOMIC: Creating new transaction for message {message.id}")
+            # Create new transaction
+            async with db_session.begin() as transaction:
+                await self._store_blocks_in_current_transaction(message, visualizations)
+    
+    async def _store_blocks_in_current_transaction(
+        self,
+        message: Any,
+        visualizations: List[Dict[str, Any]]
+    ):
+        """
+        Store analysis blocks in the current transaction (helper method)
+        """
+        try:
+            # First, ensure the message content is properly persisted
+            await self.conversation_repository.db.refresh(message)
+            logger.info(f"ATOMIC: Refreshed message {message.id} content length: {len(message.content or '')} chars")
+            
+            # Store all analysis blocks within the current transaction
+            for i, viz in enumerate(visualizations):
+                title = viz.get("title", f"Visualization {i+1}")
+                block_type = viz.get("visualization_type", "chart")
+                
+                # Create analysis block within the transaction
+                block_content: Dict[str, Any] = viz.get("data") or {}
+                if not isinstance(block_content, dict):
+                    block_content = {"value": block_content}
+                await self.conversation_repository.add_analysis_block(
+                    message_id=str(message.id),
+                    block_type=viz.get("visualization_type", "unknown"),
+                    title=title,
+                    content=block_content
+                )
+                logger.info(f"ATOMIC: Stored analysis block {i+1}/{len(visualizations)}: {title}")
+            
+            # Refresh message to load analysis blocks within the transaction
+            await self.conversation_repository.db.refresh(message, attribute_names=['analysis_blocks'])
+            logger.info(f"ATOMIC: Transaction complete - message {message.id} has {len(message.analysis_blocks or [])} analysis blocks")
+            
+        except Exception as e:
+            logger.error(f"ATOMIC: Transaction failed for message {message.id}: {str(e)}")
+            # Transaction will rollback automatically on exception
+            raise

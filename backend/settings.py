@@ -4,6 +4,7 @@
 ANTHROPIC_BETA = ",".join([
     "token-efficient-tools-2025-02-19",   # 14% token reduction on tool calls
     "files-api-2025-04-14",               # enables /files endpoint
+    "fine-grained-tool-streaming-2025-05-14",  # fine-grained tool parameter streaming
 ])
 
 # Claude model IDs  

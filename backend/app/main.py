@@ -9,7 +9,7 @@ from pathlib import Path
 import uvicorn
 from fastapi.responses import JSONResponse
 
-from .routes import document, conversation, analysis
+from .routes import document, conversation, analysis, websocket
 from utils.init_db import init_db
 from utils.error_handling import http_exception_handler, validation_exception_handler
 from utils.response import add_cors_headers as add_response_cors_headers
@@ -100,6 +100,10 @@ async def custom_http_exception_handler(request: Request, exc: HTTPException):
 @app.middleware("http")
 async def add_cors_headers_to_errors(request: Request, call_next):
     """Add CORS headers to all responses including errors."""
+    # Skip WebSocket requests
+    if request.url.path.startswith("/ws/"):
+        return await call_next(request)
+    
     try:
         # Get the origin from the request
         origin = request.headers.get("origin", "*")
@@ -180,6 +184,7 @@ async def handle_options(request: Request, call_next):
 app.include_router(document.router)
 app.include_router(conversation.router)
 app.include_router(analysis.router)
+app.include_router(websocket.router)
 
 @app.get("/")
 async def root():

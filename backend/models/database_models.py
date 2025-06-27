@@ -54,11 +54,13 @@ Interactions with other files:
 
 These models are the backbone of the backend application, ensuring consistent data structure and relationships across all services and repositories.
 """
+from __future__ import annotations
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, JSON, Boolean, Enum as SQLAlchemyEnum
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 import uuid
 from datetime import datetime
 import enum
+from typing import Optional
 
 from utils.database import Base
 
@@ -68,6 +70,7 @@ class DocumentType(enum.Enum):
     INCOME_STATEMENT = "income_statement"
     CASH_FLOW = "cash_flow"
     NOTES = "notes"
+    INTEGRATED_FINANCIAL_REPORT = "integrated_financial_report"
     OTHER = "other"
 
 
@@ -87,12 +90,12 @@ class User(Base):
     """User model for authentication."""
     __tablename__ = "users"
     
-    id = Column(String, primary_key=True, default=generate_uuid)
-    username = Column(String, unique=True, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    username: Mapped[str] = mapped_column(String, unique=True, index=True)
+    email: Mapped[str] = mapped_column(String, unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
     documents = relationship("Document", back_populates="user")
     conversations = relationship("Conversation", back_populates="user")
@@ -102,13 +105,13 @@ class Document(Base):
     """Document model for storing uploaded financial documents."""
     __tablename__ = "documents"
     
-    id = Column(String, primary_key=True, default=generate_uuid)
-    filename = Column(String, nullable=False)
-    file_path = Column(String, nullable=False)  # Path or URL to the stored file
-    file_size = Column(Integer, nullable=False)
-    mime_type = Column(String, nullable=False)
-    upload_timestamp = Column(DateTime, default=datetime.utcnow)
-    user_id = Column(String, ForeignKey("users.id"))
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    filename: Mapped[str] = mapped_column(String, nullable=False)
+    file_path: Mapped[str] = mapped_column(String, nullable=False)
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    mime_type: Mapped[str] = mapped_column(String, nullable=False)
+    upload_timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"))
     
     # Document processing fields
     document_type = Column(SQLAlchemyEnum(DocumentType), default=DocumentType.OTHER)
@@ -126,7 +129,7 @@ class Document(Base):
     # Claude API optimization fields
     full_text = Column(Text)  # Cached full text from Claude extraction
     text_sha256 = Column(String(64))  # SHA256 hash of full_text for deduplication
-    claude_file_id = Column(String(40))  # Claude Files API file ID
+    claude_file_id: Mapped[Optional[str]] = mapped_column(String(40))  # Claude Files API file ID
     
     # Relationships
     user = relationship("User", back_populates="documents")
@@ -181,11 +184,11 @@ class Conversation(Base):
     """Conversation model for storing chat interactions."""
     __tablename__ = "conversations"
     
-    id = Column(String, primary_key=True, default=generate_uuid)
-    title = Column(String, nullable=False)
-    user_id = Column(String, ForeignKey("users.id"))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     user = relationship("User", back_populates="conversations")
@@ -211,11 +214,12 @@ class Message(Base):
     """Message model for storing conversation messages."""
     __tablename__ = "messages"
     
-    id = Column(String, primary_key=True, default=generate_uuid)
-    conversation_id = Column(String, ForeignKey("conversations.id"), nullable=False)
-    content = Column(Text, nullable=False)
-    role = Column(String, nullable=False)  # "user" or "assistant"
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    conversation_id: Mapped[str] = mapped_column(String, ForeignKey("conversations.id"), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    role: Mapped[str] = mapped_column(String, nullable=False)  # "user" or "assistant"
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     content_blocks = Column(JSON)  # Store structured content blocks from Claude API
     referenced_documents = Column(JSON, default=lambda: [])  # Referenced document IDs
     referenced_analyses = Column(JSON, default=lambda: [])   # Referenced analysis IDs

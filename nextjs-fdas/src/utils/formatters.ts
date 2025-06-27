@@ -137,4 +137,68 @@ export function getTrend(
   } else {
     return isPositive ? 'down' : 'up';
   }
+}
+
+/**
+ * Format a timestamp for consistent display across the application
+ * Ensures all timestamps are displayed in local time regardless of source
+ * @param timestamp The timestamp to format (string or Date)
+ * @param options Optional Intl.DateTimeFormatOptions
+ * @returns Formatted time string
+ */
+export function formatTimestamp(
+  timestamp: string | Date,
+  options: Intl.DateTimeFormatOptions = {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  }
+): string {
+  try {
+    // Ensure we have a Date object
+    const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid timestamp provided:', timestamp);
+      return 'Invalid time';
+    }
+    
+    // Use toLocaleTimeString to format in user's local timezone
+    return date.toLocaleTimeString([], options);
+  } catch (error) {
+    console.error('Error formatting timestamp:', error, timestamp);
+    return 'Invalid time';
+  }
+}
+
+/**
+ * Format a timestamp with date and time
+ * @param timestamp The timestamp to format (string or Date)
+ * @param options Optional Intl.DateTimeFormatOptions
+ * @returns Formatted date and time string
+ */
+export function formatDatetime(
+  timestamp: string | Date,
+  options: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  }
+): string {
+  try {
+    const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid timestamp provided:', timestamp);
+      return 'Invalid date';
+    }
+    
+    return date.toLocaleString([], options);
+  } catch (error) {
+    console.error('Error formatting datetime:', error, timestamp);
+    return 'Invalid date';
+  }
 } 

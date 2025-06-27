@@ -24,7 +24,7 @@ class MessageRole(str, Enum):
 class Message(BaseModel):
     id: UUID4 = Field(default_factory=uuid.uuid4)
     session_id: str = Field(alias="sessionId")
-    timestamp: datetime = Field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
     role: MessageRole
     content: str
     referenced_documents: List[str] = Field(default_factory=list, alias="referencedDocuments")
@@ -37,6 +37,14 @@ class Message(BaseModel):
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
+    @field_serializer('timestamp', when_used='always')
+    def serialize_timestamp(self, timestamp: datetime) -> str:
+        """Ensure timestamp is serialized as UTC with Z suffix"""
+        if timestamp.tzinfo is None:
+            # Assume it's UTC if no timezone info
+            timestamp = timestamp.replace(tzinfo=None)
+        return timestamp.isoformat() + 'Z' if not timestamp.isoformat().endswith('Z') else timestamp.isoformat()
+
 
 class ConversationState(BaseModel):
     session_id: str = Field(alias="sessionId")
@@ -44,10 +52,17 @@ class ConversationState(BaseModel):
     active_analyses: List[str] = Field(default_factory=list, alias="activeAnalyses")
     current_focus: Optional[str] = Field(default=None, alias="currentFocus")
     user_preferences: Dict[str, Any] = Field(default_factory=dict, alias="userPreferences")
-    last_updated: datetime = Field(default_factory=datetime.now, alias="lastUpdated")
+    last_updated: datetime = Field(default_factory=datetime.utcnow, alias="lastUpdated")
     message_history: List[Dict[str, Any]] = Field(default_factory=list, alias="messageHistory")
     
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    @field_serializer('last_updated', when_used='always')
+    def serialize_last_updated(self, timestamp: datetime) -> str:
+        """Ensure timestamp is serialized as UTC with Z suffix"""
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=None)
+        return timestamp.isoformat() + 'Z' if not timestamp.isoformat().endswith('Z') else timestamp.isoformat()
 
 
 class MessageRequest(BaseModel):
@@ -90,6 +105,13 @@ class MessageResponse(BaseModel):
         populate_by_name=True,
         from_attributes=True
     )
+
+    @field_serializer('timestamp', when_used='always')
+    def serialize_timestamp(self, timestamp: datetime) -> str:
+        """Ensure timestamp is serialized as UTC with Z suffix"""
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=None)
+        return timestamp.isoformat() + 'Z' if not timestamp.isoformat().endswith('Z') else timestamp.isoformat()
 
     @field_serializer('citations_data', when_used='always')
     def serialize_citations_data(self, v: Optional[List[Any]]) -> List[Citation]:

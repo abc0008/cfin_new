@@ -52,7 +52,7 @@ def claude_message_to_internal(claude_message: Dict[str, Any]) -> Message:
     message = Message(
         id=message_id,
         session_id=claude_message.get("session_id", ""),
-        timestamp=datetime.now().isoformat(),
+        timestamp=datetime.utcnow(),
         role=MessageRole(role),
         content=content,
         content_blocks=content_blocks,
@@ -91,7 +91,18 @@ def frontend_message_to_internal(frontend_message: Dict[str, Any]) -> Message:
     """Convert a frontend message format to our internal Message model."""
     message_id = frontend_message.get("id", str(uuid.uuid4()))
     session_id = frontend_message.get("sessionId", "")
-    timestamp = frontend_message.get("timestamp", datetime.now().isoformat())
+    # Handle timestamp - convert string to datetime if needed
+    timestamp_raw = frontend_message.get("timestamp")
+    if timestamp_raw:
+        if isinstance(timestamp_raw, str):
+            try:
+                timestamp = datetime.fromisoformat(timestamp_raw.replace('Z', '+00:00'))
+            except ValueError:
+                timestamp = datetime.utcnow()
+        else:
+            timestamp = timestamp_raw
+    else:
+        timestamp = datetime.utcnow()
     role = frontend_message.get("role", "user").lower()
     content = frontend_message.get("content", "")
 

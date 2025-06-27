@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Debug Test</title>
+</head>
+<body>
+    <h1>WebSocket Connection Debug</h1>
+    <div id="status">Not connected</div>
+    <div id="messages"></div>
+    
+    <script>
+        const conversationId = 'test-conversation-123';
+        const wsUrl = `ws://localhost:8000/ws/conversation/${conversationId}`;
+        
+        console.log('Attempting to connect to:', wsUrl);
+        const messagesDiv = document.getElementById('messages');
+        const statusDiv = document.getElementById('status');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toISOString();
+            const div = document.createElement('div');
+            div.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            div.textContent = `[${timestamp}] ${message}`;
+            messagesDiv.appendChild(div);
+            console.log(`[${type}]`, message);
+        }
+        
+        try {
+            const ws = new WebSocket(wsUrl);
+            
+            ws.onopen = (event) => {
+                statusDiv.textContent = 'Connected!';
+                statusDiv.style.color = 'green';
+                log('WebSocket connected successfully', 'success');
+                
+                // Send a ping message
+                setTimeout(() => {
+                    log('Sending ping message...');
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                }, 1000);
+            };
+            
+            ws.onmessage = (event) => {
+                log(`Received: ${event.data}`, 'success');
+                
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'pong') {
+                        log('Received pong response!', 'success');
+                    }
+                } catch (e) {
+                    log(`Failed to parse message: ${e.message}`, 'error');
+                }
+            };
+            
+            ws.onerror = (event) => {
+                statusDiv.textContent = 'Connection error';
+                statusDiv.style.color = 'red';
+                log(`WebSocket error: ${event.type}`, 'error');
+                
+                // Check if server is reachable
+                fetch('http://localhost:8000/')
+                    .then(response => {
+                        log(`Server health check: ${response.ok ? 'OK' : 'Failed'}`, response.ok ? 'info' : 'error');
+                        return response.json();
+                    })
+                    .then(data => {
+                        log(`Server response: ${JSON.stringify(data)}`);
+                    })
+                    .catch(error => {
+                        log(`Server not reachable: ${error.message}`, 'error');
+                    });
+            };
+            
+            ws.onclose = (event) => {
+                statusDiv.textContent = 'Disconnected';
+                statusDiv.style.color = 'orange';
+                log(`WebSocket closed - Code: ${event.code}, Reason: ${event.reason}`, 'error');
+                
+                // Common close codes
+                const closeCodes = {
+                    1000: 'Normal closure',
+                    1001: 'Going away',
+                    1002: 'Protocol error',
+                    1003: 'Unsupported data',
+                    1006: 'Abnormal closure (no close frame)',
+                    1007: 'Invalid frame payload data',
+                    1008: 'Policy violation',
+                    1009: 'Message too big',
+                    1011: 'Internal server error',
+                    1015: 'TLS handshake failure'
+                };
+                
+                if (closeCodes[event.code]) {
+                    log(`Close reason: ${closeCodes[event.code]}`);
+                }
+            };
+            
+        } catch (error) {
+            log(`Failed to create WebSocket: ${error.message}`, 'error');
+        }
+    </script>
+</body>
+</html>

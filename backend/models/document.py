@@ -62,6 +62,7 @@ class DocumentContentType(str, Enum):
     BALANCE_SHEET = "balance_sheet"
     INCOME_STATEMENT = "income_statement"
     CASH_FLOW = "cash_flow"
+    INTEGRATED_FINANCIAL_REPORT = "integrated_financial_report"
     NOTES = "notes"
     OTHER = "other"
 

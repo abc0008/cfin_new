@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, BarChart2, Upload, FileUp, Zap, ChevronRight, FileSearch } from 'lucide-react'
-import { ChatInterface } from '../../components/chat/ChatInterface'
+import { StreamingChatInterface } from '../../components/chat/StreamingChatInterface'
 import { UploadForm } from '../../components/document/UploadForm'
 import dynamic from 'next/dynamic'
 import { ProcessedDocument, AnalysisResult, Message } from '@/types'
@@ -580,6 +580,40 @@ export default function Workspace() {
     }
   };
 
+  // Memoize the message update callback to prevent re-renders
+  const handleMessageUpdate = useCallback((message: Message) => {
+    // Add streaming message to the messages map
+    setMessagesMap(prev => {
+      const existingMessage = prev[message.id];
+      
+      // For post-viz messages, tool messages, and no-result messages, check if already exists
+      if (message.id.startsWith('post_viz_') || message.id.startsWith('tool_') || message.id.startsWith('no_result_')) {
+        // If message already exists with same ID, skip it
+        if (existingMessage) {
+          console.log(`Skipping duplicate ${message.id.split('_')[0]} message (already exists)`);
+          return prev;
+        }
+        
+        const messageType = message.id.startsWith('post_viz_') ? 'post-visualization' : 
+                           message.id.startsWith('tool_') ? 'tool' : 'no-result';
+        console.log(`Adding ${messageType} message: ${message.content.substring(0, 50)}...`);
+        return {
+          ...prev,
+          [message.id]: message
+        };
+      }
+      
+      // For regular streaming messages, only update if content changed
+      if (!existingMessage || existingMessage.content !== message.content) {
+        return {
+          ...prev,
+          [message.id]: message
+        };
+      }
+      return prev; // No change needed
+    });
+  }, []);
+
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-background to-muted/20">
       <div className="container mx-auto px-4 pt-2">
@@ -601,12 +635,13 @@ export default function Workspace() {
             <p className="text-xs text-muted-foreground font-avenir-pro">Ask questions about your financial documents</p>
           </div>
           <div className="flex-1 overflow-hidden">
-            <ChatInterface 
+            <StreamingChatInterface 
               messages={messages} 
               onSendMessage={handleSendMessage} 
               activeDocuments={selectedDocument ? [selectedDocument.metadata.id] : []}
               isLoading={isLoading}
               conversationId={sessionId || undefined}
+              onMessageUpdate={handleMessageUpdate}
             />
           </div>
         </div>
