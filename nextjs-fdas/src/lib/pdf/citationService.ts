@@ -113,5 +113,6 @@ export const filterCitationsBySource = (
 declare module 'react-pdf-highlighter' {
   interface IHighlight {
     isAICitation?: boolean;
+    rawClaudeCitation?: import('@/types').ClaudeCitation; // Store original API citation for reference
   }
 }

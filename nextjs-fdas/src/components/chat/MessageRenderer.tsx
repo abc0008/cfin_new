@@ -146,10 +146,90 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
   // Apply duplicate detection and removal
   processedContent = detectDuplicateText(processedContent);
 
+  // Helper function to parse content and embed clickable citations
+  const renderContentWithCitations = (
+    contentToRender: string,
+    citations: Citation[] | undefined,
+    handleCitationClick: ((citation: Citation) => void) | undefined
+  ) => {
+    if (!citations || citations.length === 0 || !handleCitationClick || !contentToRender) {
+      // If no citations or no handler, or no content, render plain content (potentially markdown)
+      // Using MarkdownRenderer for assistant messages if they might contain markdown.
+      // If they are plain text, then simple div per line or direct text is fine.
+      return <MarkdownRenderer content={contentToRender} />;
+    }
+
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    // Regex to find placeholders like [1], [2], etc.
+    // Using string.replace with a callback function to build the parts array
+    contentToRender.replace(/\[(\d+)\]/g, (match, p1, offset) => {
+      const citationNumber = parseInt(p1, 10);
+      const citationIndex = citationNumber - 1; // Citations are 1-indexed in text
+
+      // Add text part before the current match
+      if (offset > lastIndex) {
+        parts.push(
+          <MarkdownRenderer
+            key={`text-${lastIndex}`}
+            content={contentToRender.substring(lastIndex, offset)}
+          />
+        );
+      }
+
+      if (citations[citationIndex]) {
+        const citation = citations[citationIndex];
+        parts.push(
+          <span
+            key={`citation-${citation.id || citationIndex}`}
+            className="text-primary hover:text-primary/80 underline cursor-pointer font-semibold mx-0.5 px-0.5 rounded-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent any parent onClick if MessageRenderer is part of a larger clickable area
+              handleCitationClick(citation);
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                handleCitationClick(citation);
+              }
+            }}
+            aria-label={`Citation ${citationNumber}, Text: ${citation.text.substring(0, 30)}...`}
+          >
+            {`[${citationNumber}]`}
+          </span>
+        );
+      } else {
+        // If citation not found (e.g., malformed content), render the marker as text
+        parts.push(match);
+      }
+      lastIndex = offset + match.length;
+      return match; // Required by .replace(), not used for output array
+    });
+
+    // Add any remaining text after the last citation marker
+    if (lastIndex < contentToRender.length) {
+      parts.push(
+        <MarkdownRenderer
+          key={`text-${lastIndex}-end`}
+          content={contentToRender.substring(lastIndex)}
+        />
+      );
+    }
+
+    // If no markers were found, parts will be empty, return original content via MarkdownRenderer
+    if (parts.length === 0 && contentToRender) {
+        return <MarkdownRenderer content={contentToRender} />;
+    }
+
+    return <>{parts}</>;
+  };
+
   // For assistant messages, use whitespace-pre-wrap to preserve formatting
   return (
     <div className="message-content whitespace-pre-wrap">
-      {processedContent}
+      {renderContentWithCitations(processedContent, message.citations, onCitationClick)}
     </div>
   );
 }
