@@ -297,12 +297,17 @@ async def handle_streaming_message(
                 )
                 streaming_sessions[session_lookup_key] = current_session
             
-            # Always use the session's message_id to ensure consistency
-            if event.get("message_id") != current_session.message_id:
-                logger.warning(f"Correcting message_id from {event.get('message_id')} to {current_session.message_id} for {event.get('type')} event")
-                event["message_id"] = current_session.message_id
-            
             event_type = event.get("type", "unknown")
+            
+            # For new_message_start events, allow the new message_id
+            if event_type == "new_message_start" and event.get("is_post_visualization"):
+                # This is a new post-visualization message, don't override its ID
+                logger.info(f"Allowing new message_id {event.get('message_id')} for post-visualization message")
+            else:
+                # For other events, use the session's message_id to ensure consistency
+                if event.get("message_id") != current_session.message_id:
+                    logger.warning(f"Correcting message_id from {event.get('message_id')} to {current_session.message_id} for {event.get('type')} event")
+                    event["message_id"] = current_session.message_id
             
             # Filter out duplicate message_start events from Claude's internal processing
             if event_type == "message_start":
@@ -320,8 +325,11 @@ async def handle_streaming_message(
                 logger.info(f"WEBSOCKET_FLOW: Emitting {event_type} event with message_id: {message_id}")
                 
                 # Track content length for content events
-                if event_type in ["content_update", "text_delta"] and event.get("accumulated_text"):
+                if event_type == "content_update" and event.get("accumulated_text"):
                     content_length = len(event.get("accumulated_text", ""))
+                    logger.info(f"WEBSOCKET_FLOW: {event_type} content length: {content_length} chars")
+                elif event_type == "text_delta" and event.get("text"):
+                    content_length = len(event.get("text", ""))
                     logger.info(f"WEBSOCKET_FLOW: {event_type} content length: {content_length} chars")
                     
                 # Track tool progress

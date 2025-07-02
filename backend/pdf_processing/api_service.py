@@ -310,10 +310,41 @@ class ClaudeService:
         if not response.content:
             return result
             
+        citation_counter = 0
+        
         for content_block in response.content:
             if hasattr(content_block, 'text'):
                 # Text content
-                result["text"] += content_block.text
+                block_text = content_block.text
+                
+                # Check if this text block has citations
+                if hasattr(content_block, 'citations') and content_block.citations:
+                    citation_markers = []
+                    for citation in content_block.citations:
+                        citation_counter += 1
+                        citation_data = {
+                            "type": getattr(citation, 'type', 'page_location'),
+                            "cited_text": getattr(citation, 'cited_text', ''),
+                            "document_index": getattr(citation, 'document_index', 0),
+                            "document_title": getattr(citation, 'document_title', ''),
+                            "start_page_number": getattr(citation, 'start_page_number', None),
+                            "end_page_number": getattr(citation, 'end_page_number', None),
+                            "start_char_index": getattr(citation, 'start_char_index', None),
+                            "end_char_index": getattr(citation, 'end_char_index', None),
+                            "start_block_index": getattr(citation, 'start_block_index', None),
+                            "end_block_index": getattr(citation, 'end_block_index', None),
+                            "citation_index": citation_counter
+                        }
+                        result["citations"].append(citation_data)
+                        citation_markers.append(f"[{citation_counter}]")
+                        logger.info(f"📚 Citation {citation_counter} in non-streaming response: {citation_data['type']} - '{citation_data['cited_text'][:50]}...'")
+                    
+                    # Inject citation markers into text
+                    if citation_markers:
+                        block_text += " " + " ".join(citation_markers)
+                        logger.info(f"💉 Injected {len(citation_markers)} citation markers into non-streaming text")
+                
+                result["text"] += block_text
             elif hasattr(content_block, 'type') and content_block.type == 'tool_use':
                 # Tool use content
                 tool_call = {
@@ -323,9 +354,21 @@ class ClaudeService:
                 }
                 result["tool_calls"].append(tool_call)
         
-        # Extract citations if available (Claude's citation format may vary)
-        if hasattr(response, 'citations') and response.citations:
-            result["citations"] = response.citations
+        # Extract citations if available on response level (fallback)
+        if hasattr(response, 'citations') and response.citations and len(result["citations"]) == 0:
+            logger.info("Processing citations from response level (non-standard location)")
+            for citation in response.citations:
+                citation_counter += 1
+                citation_data = {
+                    "type": getattr(citation, 'type', 'page_location'),
+                    "cited_text": getattr(citation, 'cited_text', ''),
+                    "document_index": getattr(citation, 'document_index', 0),
+                    "document_title": getattr(citation, 'document_title', ''),
+                    "citation_index": citation_counter
+                }
+                result["citations"].append(citation_data)
+                # Note: Can't inject markers here as we don't know where in the text they belong
+                logger.warning(f"Found citation at response level - marker injection not possible")
             
         return result
 
@@ -351,6 +394,11 @@ class ClaudeService:
         tool_buffer = {}  # Buffer incomplete tool calls by ID
         citations = []
         message_id = None  # Track message ID for consistent event emission
+        
+        # Citation tracking for real-time marker injection
+        citation_counter = 0
+        citation_positions = {}  # Map citation index to text position
+        pending_citation_markers = []  # Queue for markers to inject
         
         try:
             async with stream_manager as stream:
@@ -398,6 +446,17 @@ class ClaudeService:
                         if chunk.delta.type == "text_delta":
                             text_delta = chunk.delta.text
                             
+                            # Check if we have pending citation markers to inject
+                            # Always inject citations regardless of tool state
+                            if pending_citation_markers:
+                                # Inject all pending markers at the end of this text chunk
+                                for marker_info in pending_citation_markers:
+                                    text_delta += f" {marker_info['marker']}"
+                                    logger.info(f"💉 Injected citation marker {marker_info['marker']} into stream")
+                                
+                                # Clear pending markers
+                                pending_citation_markers.clear()
+                            
                             # IMPORTANT: Only accumulate and stream text BEFORE tools
                             # Post-tool text is often unformatted duplicate content
                             if not tools_started:
@@ -426,16 +485,101 @@ class ClaudeService:
                                         })
                                         last_content_update_length = len(accumulated_text)
                             else:
-                                # Track post-tool text separately but DON'T accumulate or send it
+                                # Track post-tool text separately
+                                # Also check for pending markers in post-tool text
+                                if pending_citation_markers:
+                                    for marker_info in pending_citation_markers:
+                                        text_delta += f" {marker_info['marker']}"
+                                        logger.info(f"💉 Injected citation marker {marker_info['marker']} into post-tool stream")
+                                    pending_citation_markers.clear()
+                                
                                 post_tool_text += text_delta
-                                logger.info(f"Ignoring post-tool text delta: {len(text_delta)} chars")
+                                # We'll send this as a special post-tool update at the end
+                                logger.info(f"Accumulating post-tool text delta: {len(text_delta)} chars")
                         elif chunk.delta.type == "input_json_delta":
                             # Buffer tool input (don't stream incomplete JSON)
                             # This accumulates the tool parameters - we'll process when complete
                             pass
+                        elif hasattr(chunk.delta, 'type') and chunk.delta.type == "citation_delta":
+                            # Handle citation delta during streaming
+                            if hasattr(chunk.delta, 'citation'):
+                                citation = chunk.delta.citation
+                                
+                                # Increment citation counter
+                                citation_counter += 1
+                                citation_index = citation_counter
+                                
+                                citation_data = {
+                                    "type": getattr(citation, 'type', 'page_location'),
+                                    "cited_text": getattr(citation, 'cited_text', ''),
+                                    "document_index": getattr(citation, 'document_index', 0),
+                                    "document_title": getattr(citation, 'document_title', ''),
+                                    "start_page_number": getattr(citation, 'start_page_number', None),
+                                    "end_page_number": getattr(citation, 'end_page_number', None),
+                                    "start_char_index": getattr(citation, 'start_char_index', None),
+                                    "end_char_index": getattr(citation, 'end_char_index', None),
+                                    "start_block_index": getattr(citation, 'start_block_index', None),
+                                    "end_block_index": getattr(citation, 'end_block_index', None),
+                                    "citation_index": citation_index
+                                }
+                                citations.append(citation_data)
+                                logger.info(f"📚 Citation {citation_index} received during streaming: {citation_data['type']} - '{citation_data['cited_text'][:50]}...'")
+                                
+                                # Create citation marker
+                                citation_marker = f"[{citation_index}]"
+                                
+                                # Queue the marker for injection
+                                pending_citation_markers.append({
+                                    'marker': citation_marker,
+                                    'citation': citation_data,
+                                    'index': citation_index
+                                })
+                                logger.info(f"📌 Queued citation marker {citation_marker} for injection")
+                                
+                                # Emit citation marker event
+                                if emit_callback:
+                                    await emit_callback({
+                                        "type": "citation_marker",
+                                        "marker": citation_marker,
+                                        "citation_index": citation_index,
+                                        "citation": citation_data,
+                                        "message_id": message_id
+                                    })
+                                
+                                # Still emit the original citation delta for compatibility
+                                if emit_callback:
+                                    await emit_callback({
+                                        "type": "citations_delta",
+                                        "citation": citation_data,
+                                        "block_index": chunk.index if hasattr(chunk, 'index') else 0,
+                                        "message_id": message_id
+                                    })
                     
                     elif chunk.type == "content_block_stop":
                         if chunk.index is not None:
+                            # Flush any pending citations before ending the content block
+                            if pending_citation_markers:
+                                # Inject pending markers into accumulated text
+                                citation_text = ""
+                                for marker_info in pending_citation_markers:
+                                    citation_text += f" {marker_info['marker']}"
+                                    logger.info(f"💉 Flushing citation marker {marker_info['marker']} at content block end")
+                                
+                                # Add to accumulated text
+                                accumulated_text += citation_text
+                                
+                                # Send text delta with the citations
+                                if emit_callback:
+                                    await emit_callback({
+                                        "type": "text_delta",
+                                        "text": citation_text,
+                                        "accumulated_text": accumulated_text,
+                                        "message_id": message_id
+                                    })
+                                
+                                # Clear pending markers
+                                pending_citation_markers.clear()
+                            
                             # Content block completed - send final content_update if needed
                             if not tools_started and last_content_update_length < len(accumulated_text):
                                 # Send final content update for any remaining text
@@ -470,7 +614,7 @@ class ClaudeService:
                         # Message completed
                         if emit_callback:
                             # Send any accumulated post-tool textual analysis before signaling completion
-                            if post_tool_text.strip():
+                            if post_tool_text and post_tool_text.strip():
                                 await emit_callback({
                                     "type": "content_update",
                                     "is_post_tools": True,
@@ -512,20 +656,120 @@ class ClaudeService:
                             # Debug
                             logger.info(f"Queued tool_call from final_message: {tool_call['name']} (ID: {tool_call['id']})")
                         elif hasattr(content_block, 'text'):
-                            concluding_text += content_block.text
+                            # Only add text that's not already in accumulated_text to avoid duplication
+                            # This helps capture any post-tool concluding insights
+                            block_text = content_block.text
+                            if block_text and not block_text.strip() in accumulated_text:
+                                # Check if this is genuinely new content (post-tool)
+                                if self._is_substantially_new_content(block_text, accumulated_text):
+                                    concluding_text += block_text
+                                    logger.info(f"📝 Found new post-tool text in final_message: {len(block_text)} chars")
+                                else:
+                                    logger.info(f"⏩ Skipping duplicate text from final_message: {len(block_text)} chars")
+                            # Check if this text block has citations
+                            # Only process citations from final_message if we didn't already collect them during streaming
+                            if hasattr(content_block, 'citations') and content_block.citations:
+                                if len(citations) == 0:
+                                    logger.info(f"📚 Processing {len(content_block.citations)} citations from final_message (no citations found during streaming)")
+                                else:
+                                    logger.info(f"📚 Found {len(content_block.citations)} MORE citations in final_message (already have {len(citations)} from streaming)")
+                                
+                                # Process citations and inject markers into the text
+                                citation_markers_to_add = []
+                                for idx, citation in enumerate(content_block.citations):
+                                    # Increment citation counter
+                                    citation_counter += 1
+                                    citation_index = citation_counter
+                                    
+                                    citation_data = {
+                                        "type": citation.type,
+                                        "cited_text": citation.cited_text,
+                                        "document_index": citation.document_index,
+                                        "document_title": getattr(citation, 'document_title', ''),
+                                        "start_page_number": getattr(citation, 'start_page_number', None),
+                                        "end_page_number": getattr(citation, 'end_page_number', None),
+                                        "start_char_index": getattr(citation, 'start_char_index', None),
+                                        "end_char_index": getattr(citation, 'end_char_index', None),
+                                        "start_block_index": getattr(citation, 'start_block_index', None),
+                                        "end_block_index": getattr(citation, 'end_block_index', None),
+                                        "citation_index": citation_index
+                                    }
+                                    citations.append(citation_data)
+                                    logger.info(f"📚 Citation {citation_index} from final_message: {citation.type} - '{citation.cited_text[:50]}...'")
+                                    
+                                    # Create citation marker
+                                    citation_marker = f"[{citation_index}]"
+                                    citation_markers_to_add.append(citation_marker)
+                                    logger.info(f"📌 Created citation marker {citation_marker} for final_message citation")
+                                    
+                                    # Emit citation marker event
+                                    if emit_callback:
+                                        await emit_callback({
+                                            "type": "citation_marker",
+                                            "marker": citation_marker,
+                                            "citation_index": citation_index,
+                                            "citation": citation_data,
+                                            "message_id": message_id
+                                        })
+                                    
+                                    # Emit citation event for frontend
+                                    if emit_callback:
+                                        await emit_callback({
+                                            "type": "citations_delta",
+                                            "citation": citation_data,
+                                            "block_index": 0,  # Citations from final message, use block 0
+                                            "message_id": message_id
+                                        })
+                                
+                                # Send citation markers as a text_delta to append to the streamed text
+                                if citation_markers_to_add and emit_callback:
+                                    markers_text = " " + " ".join(citation_markers_to_add)
+                                    
+                                    # Send as text_delta to append to the initial streamed text
+                                    # IMPORTANT: Don't include accumulated_text to prevent content duplication
+                                    await emit_callback({
+                                        "type": "text_delta",
+                                        "text": markers_text,
+                                        "message_id": message_id
+                                    })
+                                    logger.info(f"💉 Sent {len(citation_markers_to_add)} citation markers as text_delta: {markers_text}")
+                                    
+                                    # Don't add citation markers to concluding_text - they belong to the pre-tool message
+                                    # concluding_text should only contain post-tool insights
+                                    
+                                    # Update accumulated_text to include the markers
+                                    accumulated_text += markers_text
+                            elif hasattr(content_block, 'citations') and content_block.citations and len(citations) > 0:
+                                logger.info(f"Skipping {len(content_block.citations)} citations from final_message (already collected {len(citations)} during streaming)")
 
                 # Emit concluding insights even if similar to accumulated_text – frontend will handle deduplication
-                if concluding_text:
-                    if emit_callback:
-                        await emit_callback({
-                            "type": "content_update",
-                            "is_post_tools": True,
-                            "post_tool_text": concluding_text,
-                            "message_id": message_id
-                        })
+                if concluding_text and emit_callback:
+                    await emit_callback({
+                        "type": "content_update",
+                        "is_post_tools": True,
+                        "post_tool_text": concluding_text,
+                        "message_id": message_id
+                    })
                 
+                # IMPORTANT: Only return the initial text with citations
+                # Post-tool content is sent via separate events and should NOT be included here
+                # to prevent duplication when conversation_service compares content
+                final_text = accumulated_text
+                
+                # Log what we're NOT including to prevent confusion
+                if post_tool_text and post_tool_text.strip():
+                    logger.info(f"NOT including {len(post_tool_text.strip())} chars of post-tool text in return value (sent via events)")
+                
+                if concluding_text and concluding_text.strip():
+                    logger.info(f"NOT including {len(concluding_text.strip())} chars of concluding text in return value (sent via events)")
+                
+                logger.info(f"🔍 _process_streaming_response returning: {len(citations)} citations, {len(tool_calls)} tool_calls, text length: {len(final_text)}")
+                # Log citation details for debugging
+                if citations:
+                    for i, cit in enumerate(citations):
+                        logger.info(f"🔍 Citation {i+1}: pages {cit.get('start_page_number')}-{cit.get('end_page_number')}")
                 return {
-                    "text": accumulated_text,
+                    "text": final_text,  # Only initial text with citations
                     "tool_calls": tool_calls,
                     "citations": citations
                 }
@@ -672,11 +916,13 @@ class ClaudeService:
         max_tokens: int = 4000,
         model: Optional[str] = None,
         stream: bool = False,
-        emit_callback=None
+        emit_callback=None,
+        documents: Optional[List[Dict[str, Any]]] = None,
+        enable_citations: bool = False
     ):
         """
         Generate a response from Claude based on a conversation with a system prompt.
-        Supports both streaming and non-streaming modes.
+        Supports both streaming and non-streaming modes, with optional citation support.
         
         Args:
             system_prompt: System prompt that guides Claude's behavior
@@ -686,9 +932,12 @@ class ClaudeService:
             model: Optional model override (e.g., "claude-3-5-haiku-20241022")
             stream: Whether to stream the response
             emit_callback: Optional callback for streaming events
+            documents: Optional list of documents with claude_file_id for citation support
+            enable_citations: Whether to enable citations for document references
             
         Returns:
             Generated response text (str if stream=False, dict if stream=True)
+            If enable_citations=True and stream=False, returns dict with 'text' and 'citations'
         """
         if not self.client:
             # Mock response for testing or when API key is not available
@@ -699,13 +948,60 @@ class ClaudeService:
             return error_msg
         
         try:
+            # Import citation service at runtime to avoid circular imports
+            from services.citation_service import parse_citations
+            from pdf_processing.claude_file_client import prepare_document_blocks
+            
             # Convert message format to Anthropic's format
             formatted_messages = []
-            for msg in messages:
-                role = "user" if msg["role"] == "user" else "assistant"
-                formatted_messages.append({"role": role, "content": msg["content"]})
+            document_map = {}  # Map document index to document ID
             
-            logger.info(f"Sending request to Claude API with {len(formatted_messages)} messages, streaming: {stream}")
+            # If documents are provided and citations are enabled, prepare document blocks
+            if documents and enable_citations:
+                doc_blocks = prepare_document_blocks(documents, enable_citations=True)
+                
+                # Build document map for citation resolution
+                for idx, doc in enumerate(documents):
+                    document_map[idx] = doc.get("id", str(idx))
+                
+                # Add document blocks to the first user message
+                first_user_msg_idx = None
+                for i, msg in enumerate(messages):
+                    if msg["role"] == "user":
+                        first_user_msg_idx = i
+                        break
+                
+                if first_user_msg_idx is not None:
+                    # Modify the first user message to include document blocks
+                    user_content = messages[first_user_msg_idx]["content"]
+                    if isinstance(user_content, str):
+                        user_content = [{"type": "text", "text": user_content}]
+                    
+                    # Prepend document blocks
+                    full_content = doc_blocks + user_content
+                    
+                    # Format messages with document blocks
+                    for i, msg in enumerate(messages):
+                        if i == first_user_msg_idx:
+                            formatted_messages.append({
+                                "role": "user",
+                                "content": full_content
+                            })
+                        else:
+                            role = "user" if msg["role"] == "user" else "assistant"
+                            formatted_messages.append({"role": role, "content": msg["content"]})
+                else:
+                    # No user message found, format normally
+                    for msg in messages:
+                        role = "user" if msg["role"] == "user" else "assistant"
+                        formatted_messages.append({"role": role, "content": msg["content"]})
+            else:
+                # No documents or citations not enabled, format normally
+                for msg in messages:
+                    role = "user" if msg["role"] == "user" else "assistant"
+                    formatted_messages.append({"role": role, "content": msg["content"]})
+            
+            logger.info(f"Sending request to Claude API with {len(formatted_messages)} messages, streaming: {stream}, citations: {enable_citations}")
 
             # Use provided model or default to instance model
             used_model = model or self.model
@@ -739,10 +1035,45 @@ class ClaudeService:
             
             if stream:
                 # Process streaming response
+                # TODO: Add citation support for streaming
                 return await self._process_streaming_response(response, emit_callback)
             else:
-                # Return non-streaming response as before
-                return response.content[0].text
+                # Process non-streaming response
+                if enable_citations and documents:
+                    # Parse citations from response
+                    content_blocks = []
+                    for content in response.content:
+                        if hasattr(content, 'type') and content.type == 'text':
+                            block = {"type": "text", "text": content.text}
+                            # Check if content has citations attribute
+                            if hasattr(content, 'citations'):
+                                block["citations"] = [
+                                    {
+                                        "type": citation.type,
+                                        "cited_text": citation.cited_text,
+                                        "document_index": citation.document_index,
+                                        "document_title": citation.document_title,
+                                        "start_page_number": getattr(citation, 'start_page_number', None),
+                                        "end_page_number": getattr(citation, 'end_page_number', None),
+                                        "start_char_index": getattr(citation, 'start_char_index', None),
+                                        "end_char_index": getattr(citation, 'end_char_index', None),
+                                        "start_block_index": getattr(citation, 'start_block_index', None),
+                                        "end_block_index": getattr(citation, 'end_block_index', None)
+                                    }
+                                    for citation in content.citations
+                                ]
+                            content_blocks.append(block)
+                    
+                    # Parse citations and get rendered text
+                    rendered_text, citations = parse_citations(content_blocks, document_map)
+                    
+                    return {
+                        "text": rendered_text,
+                        "citations": [citation.model_dump(by_alias=True) for citation in citations]
+                    }
+                else:
+                    # Return simple text response
+                    return response.content[0].text
                 
         except Exception as e:
             logger.error(f"Error calling Claude API: {str(e)}")
@@ -1471,7 +1802,8 @@ Follow these guidelines:
                     "content": [
                         {
                             "type": "document",
-                            "source": {"type": "file", "file_id": file_id}
+                            "source": {"type": "file", "file_id": file_id},
+                            "citations": {"enabled": True}
                         },
                         {
                             "type": "text", 
@@ -1660,7 +1992,8 @@ Follow these guidelines:
                     "content": [
                         {
                             "type": "document",
-                            "source": {"type": "file", "file_id": file_id}
+                            "source": {"type": "file", "file_id": file_id},
+                            "citations": {"enabled": True}
                         },
                         {
                             "type": "text", 
@@ -1678,9 +2011,12 @@ Follow these guidelines:
             # Initialize conversation tracking
             conversation_messages = initial_messages.copy()
             accumulated_text = ""
+            initial_text_only = ""  # Track initial text before tools
             accumulated_charts = []
             accumulated_tables = []
             accumulated_metrics = []
+            accumulated_citations = []
+            streaming_citations = []  # Collect citations from streaming events
             
             max_turns = 5  # Limit iterations
             
@@ -1693,19 +2029,42 @@ Follow these guidelines:
                 while retries <= max_retries:
                     try:
                         # Create a filtering callback for subsequent turns
-                        # Only allow tool events, block all text/content events to prevent duplicates
                         async def filtered_emit_callback(event: Dict[str, Any]):
+                            nonlocal streaming_citations
+                            
+                            # Capture citations from streaming events (for ALL turns, not just subsequent ones)
+                            if event.get('type') == 'citations_delta' and event.get('citation'):
+                                citation = event.get('citation')
+                                streaming_citations.append(citation)
+                                logger.info(f"📚 Captured citation from streaming (turn {turn + 1}): pages {citation.get('start_page_number')}-{citation.get('end_page_number')}")
+                            
+                            # For turns after the first, we need to be more selective
                             if turn > 0:
-                                # After first turn, allow tool-related events and the single concluding content_update
-                                if not (
-                                    (event.get('type') == 'content_update' and event.get('is_post_tools') and event.get('post_tool_text')) or
-                                    event.get('type') in {'tool_start', 'tool_complete', 'chart_ready', 'table_ready', 'metric_ready', 'message_stop'}
-                                ):
-                                    logger.info(
-                                        f"Turn {turn + 1}: Blocking {event.get('type')} event to prevent duplicate content"
-                                    )
+                                event_type = event.get('type')
+                                
+                                # Always allow tool-related events, citation events, and final events
+                                allowed_types = {'tool_start', 'tool_complete', 'chart_ready', 'table_ready', 'metric_ready', 'message_stop', 'citation_marker', 'citations_delta'}
+                                
+                                # Allow post-tool content updates (these contain new insights)
+                                if event_type == 'content_update' and event.get('is_post_tools') and event.get('post_tool_text'):
+                                    logger.info(f"Turn {turn + 1}: Allowing post-tool content_update")
+                                    if emit_callback:
+                                        await emit_callback(event)
                                     return
-                            # Pass through allowed events
+                                
+                                # Allow specific event types
+                                if event_type in allowed_types:
+                                    if emit_callback:
+                                        await emit_callback(event)
+                                    return
+                                
+                                # Block other events to prevent duplicates
+                                logger.info(
+                                    f"Turn {turn + 1}: Blocking {event_type} event to prevent duplicate content"
+                                )
+                                return
+                            
+                            # First turn - pass through all events
                             if emit_callback:
                                 await emit_callback(event)
                         
@@ -1734,6 +2093,16 @@ Follow these guidelines:
                     # Extract text and tool calls from streaming response
                     response_text = response.get("text", "")
                     tool_calls = response.get("tool_calls", [])
+                    citations = response.get("citations", [])
+                    
+                    logger.info(f"🔍 Turn {turn + 1} response contains: {len(citations)} citations, {len(tool_calls)} tool_calls")
+                    
+                    # Accumulate citations
+                    if citations:
+                        logger.info(f"🔍 Accumulating {len(citations)} citations from turn {turn + 1}")
+                        accumulated_citations.extend(citations)
+                        logger.info(f"🔍 Total accumulated citations: {len(accumulated_citations)}")
+                        logger.info(f"Turn {turn + 1}: Found {len(citations)} citations in streaming response")
                     
                     # CRITICAL: For streaming, the text has ALREADY been sent to frontend
                     # We should NOT re-accumulate it here as that causes duplication
@@ -1743,21 +2112,53 @@ Follow these guidelines:
                         if turn == 0:
                             # First turn - save for analysis result but DON'T re-stream
                             accumulated_text = response_text
+                            initial_text_only = response_text  # Save initial text before tools
                             logger.info(f"Turn {turn + 1}: Captured streamed text ({len(response_text)} chars) - already sent to frontend")
                         else:
                             # Subsequent turns - check if this is new content
                             logger.info(f"Turn {turn + 1}: Received {len(response_text)} chars")
                             
-                            # Only accumulate if this is genuinely new content, not a duplicate
-                            response_plain = response_text.replace('\n', ' ').replace('  ', ' ').strip()
-                            accumulated_plain = accumulated_text.replace('\n', ' ').replace('  ', ' ').strip()
-                            
-                            if response_plain[:min(100, len(response_plain))] in accumulated_plain:
-                                logger.warning(f"Turn {turn + 1}: Detected duplicate content - ignoring to prevent duplication")
-                            else:
-                                # This appears to be new content, accumulate it
-                                accumulated_text = accumulated_text + "\n\n" + response_text
-                                logger.info(f"Turn {turn + 1}: Added new content to accumulated_text")
+                            # For subsequent turns, always accumulate the text
+                            # The filtering callback prevents duplicate streaming, but we need the full text for the final result
+                            if response_text and response_text.strip():
+                                # Check if this is genuinely new content
+                                response_plain = response_text.replace('\n', ' ').replace('  ', ' ').strip()
+                                accumulated_plain = accumulated_text.replace('\n', ' ').replace('  ', ' ').strip()
+                                
+                                # More robust duplicate detection and extraction of new content
+                                is_duplicate = False
+                                new_content = response_text
+                                
+                                if len(response_plain) > 50 and len(accumulated_plain) > 50:
+                                    # Check if the accumulated text is contained within the response
+                                    # This happens when the response includes both initial and post-tool content
+                                    if accumulated_plain in response_plain:
+                                        # Extract only the new content after the duplicated part
+                                        # Find where the accumulated text ends in the response
+                                        accumulated_normalized = accumulated_text.strip()
+                                        response_normalized = response_text.strip()
+                                        
+                                        if accumulated_normalized in response_normalized:
+                                            # Find the position where accumulated text ends
+                                            split_pos = response_normalized.find(accumulated_normalized) + len(accumulated_normalized)
+                                            new_content = response_normalized[split_pos:].strip()
+                                            
+                                            if new_content:
+                                                logger.info(f"Turn {turn + 1}: Extracted {len(new_content)} chars of new post-tool content from {len(response_text)} total chars")
+                                            else:
+                                                is_duplicate = True
+                                                logger.warning(f"Turn {turn + 1}: Response contained only duplicate content")
+                                    # Also check if beginning of response is in accumulated text (original check)
+                                    elif response_plain[:min(100, len(response_plain) // 2)] in accumulated_plain:
+                                        is_duplicate = True
+                                        logger.warning(f"Turn {turn + 1}: Detected duplicate content - ignoring")
+                                
+                                if not is_duplicate and new_content and new_content.strip():
+                                    # This is new content, accumulate it
+                                    accumulated_text = accumulated_text + "\n\n" + new_content.strip()
+                                    logger.info(f"Turn {turn + 1}: Added {len(new_content.strip())} chars to accumulated_text. Total: {len(accumulated_text)}")
+                                else:
+                                    logger.info(f"Turn {turn + 1}: Skipped duplicate content")
                     
                     # Log tool calls for debugging
                     if tool_calls:
@@ -1881,24 +2282,32 @@ Follow these guidelines:
                     logger.warning(f"Reached maximum turns ({max_turns}) for streaming visualization analysis")
                     break
             
-            # CRITICAL: For streaming, we should NOT return accumulated_text
-            # The frontend already has the properly formatted text from streaming
-            # Returning accumulated_text causes duplication
-            current_analysis_text = ""  # Empty for streaming mode
+            # IMPORTANT: Only return the initial text (before tools)
+            # Post-tool content is sent as a separate message via events
+            # Including accumulated_text would cause duplication when conversation_service compares content
+            final_text = initial_text_only if initial_text_only else accumulated_text
             
-            logger.info(f"Streaming mode: NOT returning accumulated_text to prevent duplication")
+            logger.info(f"Streaming mode: Returning initial text only ({len(final_text)} chars) for backend processing")
+            logger.info(f"Note: Post-tool content already sent via separate message events")
+            
+            # Add streaming citations to accumulated citations
+            if streaming_citations:
+                logger.info(f"📚 Adding {len(streaming_citations)} streaming citations to accumulated citations")
+                accumulated_citations.extend(streaming_citations)
 
-            # Return structured result with empty analysis_text
+            # Return structured result with initial text only
             result = {
-                "analysis_text": current_analysis_text,  # Empty to prevent duplication
+                "analysis_text": final_text,  # Only initial text, not post-tool content
                 "visualizations": {
                     "charts": accumulated_charts,
                     "tables": accumulated_tables
                 },
-                "metrics": accumulated_metrics
+                "metrics": accumulated_metrics,
+                "citations": accumulated_citations
             }
             
-            logger.info(f"Streaming visualization analysis completed: {len(accumulated_charts)} charts, {len(accumulated_tables)} tables, {len(accumulated_metrics)} metrics. Analysis text length: {len(current_analysis_text)}")
+            logger.info(f"Streaming visualization analysis completed: {len(accumulated_charts)} charts, {len(accumulated_tables)} tables, {len(accumulated_metrics)} metrics, {len(accumulated_citations)} citations. Initial text length: {len(final_text)}")
+            logger.info(f"🔍 analyze_with_visualization_tools_streaming returning {len(accumulated_citations)} citations")
             return result
             
         except Exception as e:

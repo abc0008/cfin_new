@@ -7,6 +7,18 @@ def to_camel(string: str) -> str:
     parts = string.split('_')
     return parts[0] + ''.join(word.capitalize() for word in parts[1:]) if len(parts) > 1 else string
 
+class CitationRect(BaseModel):
+    """Bounding rectangle for citation highlights in PDF coordinates."""
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+    width: float
+    height: float
+    page_number: int = Field(..., alias="pageNumber")
+    
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
 class CitationType(str, Enum):
     CHAR_LOCATION = "char_location"
     PAGE_LOCATION = "page_location"
@@ -18,6 +30,8 @@ class CitationBase(BaseModel):
     cited_text: str = Field(..., alias="citedText")
     document_index: int = Field(..., alias="documentIndex")
     document_title: str = Field(..., alias="documentTitle")
+    highlight_id: Optional[str] = Field(None, alias="highlightId")
+    rects: List[CitationRect] = Field(default_factory=list)
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
@@ -47,6 +61,33 @@ class ContentBlockLocationCitation(CitationBase):
 
 # Generic Citation type that could be any of the specific citation types
 Citation = Union[CharLocationCitation, PageLocationCitation, ContentBlockLocationCitation]
+
+class CitationPayload(BaseModel):
+    """Comprehensive citation model for API responses and database storage."""
+    id: str
+    document_id: str = Field(..., alias="documentId")
+    type: CitationType
+    text: str  # Primary text field expected by frontend
+    cited_text: str = Field(..., alias="citedText")  # Keep for backward compatibility
+    document_title: str = Field(..., alias="documentTitle")
+    highlight_id: str = Field(..., alias="highlightId")
+    rects: List[CitationRect] = Field(default_factory=list)
+    
+    # Location fields (all optional, used based on type)
+    start_page_number: Optional[int] = Field(None, alias="startPageNumber")
+    end_page_number: Optional[int] = Field(None, alias="endPageNumber")
+    start_char_index: Optional[int] = Field(None, alias="startCharIndex")
+    end_char_index: Optional[int] = Field(None, alias="endCharIndex")
+    start_block_index: Optional[int] = Field(None, alias="startBlockIndex")
+    end_block_index: Optional[int] = Field(None, alias="endBlockIndex")
+    
+    # Optional metadata
+    page: Optional[int] = None  # Legacy field for backward compatibility
+    section: Optional[str] = None
+    message_id: Optional[str] = Field(None, alias="messageId")
+    analysis_id: Optional[str] = Field(None, alias="analysisId")
+    
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class ContentBlock(BaseModel):
     """Model for a content block in Claude's response."""

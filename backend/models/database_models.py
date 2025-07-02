@@ -153,15 +153,26 @@ class Document(Base):
 
 
 class Citation(Base):
-    """Citation model for storing document citations."""
+    """Citation model for storing document citations with Anthropic integration."""
     __tablename__ = "citations"
     
     id = Column(String, primary_key=True, default=generate_uuid)
     document_id = Column(String, ForeignKey("documents.id"), nullable=False)
-    page = Column(Integer, nullable=False)
+    type = Column(String(50))  # page_location, char_location, content_block_location
+    page = Column(Integer)  # Legacy field, nullable for new citations
     text = Column(Text, nullable=False)
     section = Column(String)
-    bounding_box = Column(JSON)  # JSON object with coordinates
+    cited_text = Column(Text)
+    document_title = Column(String(255))
+    start_page_number = Column(Integer)
+    end_page_number = Column(Integer)
+    start_char_index = Column(Integer)
+    end_char_index = Column(Integer)
+    start_block_index = Column(Integer)
+    end_block_index = Column(Integer)
+    rects = Column(Text, default='[]')  # JSON array of rectangles
+    highlight_id = Column(String(36))
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
     document = relationship("Document", back_populates="citations")

@@ -1,92 +1,76 @@
 # WebSocket Connection Fix Summary
 
-## Issues Fixed
+## Problem
+After implementing citation support, WebSocket showed "disconnected" and streaming wasn't working.
 
-### 1. WebSocket URL Configuration
-- **Problem**: Frontend was connecting to wrong server (localhost:3000 instead of localhost:8000)
-- **Fix**: Updated `useStreamingChat.ts` to use `NEXT_PUBLIC_API_URL` environment variable
-- **File**: `/Users/alexcardell/AlexCoding_Local/cfin/nextjs-fdas/src/hooks/useStreamingChat.ts`
+## Root Cause
+The `useStreamingChatWithCitations` hook was incomplete. It only had citation handling logic but was missing all the WebSocket connection implementation.
 
-### 2. Environment Configuration
-- **Problem**: Missing backend URL configuration
-- **Fix**: Created `.env.local` with `NEXT_PUBLIC_API_URL=http://localhost:8000`
-- **File**: `/Users/alexcardell/AlexCoding_Local/cfin/nextjs-fdas/.env.local`
+### What Was Missing:
+1. WebSocket connection logic (`connectWebSocket` function)
+2. WebSocket state management (`wsRef`)
+3. Reconnection logic
+4. Actual implementation of `sendStreamingMessage` and `sendStreamingMessageHTTP`
+5. Connection lifecycle management
+6. Auto-connect on mount
 
-### 3. Database Import Issue
-- **Problem**: `AsyncSessionLocal` import error in WebSocket handler
-- **Fix**: Added alias in `database.py` and fixed import in `websocket.py`
-- **Files**: 
-  - `/Users/alexcardell/AlexCoding_Local/cfin/backend/utils/database.py`
-  - `/Users/alexcardell/AlexCoding_Local/cfin/backend/app/routes/websocket.py`
+### What Was There:
+- Citation event handling
+- Citation state management
+- Placeholder functions that just logged to console
 
-### 4. Middleware Interference
-- **Problem**: HTTP middleware potentially interfering with WebSocket upgrade
-- **Fix**: Added check to skip middleware processing for WebSocket paths
-- **File**: `/Users/alexcardell/AlexCoding_Local/cfin/backend/app/main.py`
+## Solution Applied
 
-### 5. Connection Without Conversation ID
-- **Problem**: Frontend attempting WebSocket connection without valid conversation ID
-- **Fix**: Added validation in `useStreamingChat` hook to prevent connection without ID
-- **File**: `/Users/alexcardell/AlexCoding_Local/cfin/nextjs-fdas/src/hooks/useStreamingChat.ts`
+### 1. Added WebSocket Implementation
+Copied the complete WebSocket implementation from `useStreamingChat` into `useStreamingChatWithCitations`:
+- WebSocket connection establishment
+- Reconnection with exponential backoff
+- Connection state management
+- Error handling
 
-## Current Status
-- ✅ WebSocket connections now working properly
-- ✅ Ping/pong messages functioning
-- ✅ Connection status indicators working
-- ✅ Proper error handling in place
+### 2. Implemented Message Sending
+- `sendStreamingMessage`: Sends messages via WebSocket
+- `sendStreamingMessageHTTP`: HTTP fallback for streaming
 
-## Testing
-Created test files to verify WebSocket functionality:
-- `test_ws_detailed.py` - Python WebSocket client for testing
-- `test_browser_ws.html` - Browser-based WebSocket test
+### 3. Added Auto-Connect
+- WebSocket automatically connects when component mounts
+- Proper cleanup on unmount
 
-## Next Steps
-1. Test streaming messages functionality in the actual application
-2. Verify chat interface works with live streaming
-3. Monitor for any remaining connection stability issues
+### 4. Fixed Document Map Type
+- Changed from object to Map to match hook expectations
 
-## Phase 2: Streaming Implementation Fixes (June 23, 2024)
+## Testing the Fix
 
-### 6. Stale Closure Issue in WebSocket Handlers
-- **Problem**: WebSocket message handlers were using stale versions of state variables due to React closure behavior
-- **Symptom**: `messagePhase` was always null in event handlers despite being set correctly
-- **Fix**: Implemented useRef pattern to ensure latest handler is always called
-- **Files**: 
-  - `/Users/alexcardell/AlexCoding_Local/cfin/nextjs-fdas/src/hooks/useStreamingChat.ts`
+1. **Start the application**
+   - Backend should be running on port 8000
+   - Frontend should be running on port 3000
 
-### 7. Race Condition in Message Completion
-- **Problem**: State was being cleared before async `fetchCompleteMessage` completed
-- **Symptom**: Post-visualization messages would appear briefly then disappear
-- **Fix**: Captured state values before async operation and moved cleanup to promise resolution
-- **Files**: 
-  - `/Users/alexcardell/AlexCoding_Local/cfin/nextjs-fdas/src/hooks/useStreamingChat.ts`
+2. **Check WebSocket Connection**
+   - Open browser console
+   - Should see: "Starting WebSocket connection to: ws://localhost:8000/ws/conversation/{id}"
+   - Should see: "WebSocket connected and isConnected set to true"
 
-### 8. Message Content Duplication
-- **Problem**: Backend was sending only post-tool text in content_update events, causing message overwrites
-- **Symptom**: Messages showed duplicate content - formatted version followed by unformatted version
-- **Root Cause**: Backend was overwriting entire message content with partial text
-- **Fix**: 
-  - Backend now always sends full `accumulated_text` to maintain consistency
-  - Added separate `post_tool_text` field for frontend phase separation
-  - Frontend uses `post_tool_text` when available, falls back to extraction
-- **Files**: 
-  - `/Users/alexcardell/AlexCoding_Local/cfin/backend/pdf_processing/api_service.py`
-  - `/Users/alexcardell/AlexCoding_Local/cfin/nextjs-fdas/src/hooks/useStreamingChat.ts`
+3. **Test Streaming**
+   - Upload a document
+   - Ask a question
+   - Should see streaming response with real-time text updates
+   - Should see citation events if document has citations
 
-## Current Streaming Status
-- ✅ WebSocket connections stable and working
-- ✅ Message phase tracking (initial → tools → post-tools) functioning correctly
-- ✅ Stale closure issues resolved with useRef pattern
-- ✅ Post-visualization messages persist correctly
-- ✅ Message content displays without duplication
-- ✅ Clean separation between initial content and post-tool content
+4. **Monitor Console**
+   - Look for "WebSocket onopen event fired"
+   - Check for streaming events being received
+   - Verify no "disconnected" status
 
-## Technical Implementation Details
-1. **Phase Tracking**: Messages go through phases: initial → tools → post-tools → complete
-2. **Message Separation**: Frontend maintains separate state for initial and post-tool content
-3. **Database Consistency**: Backend always stores complete message content
-4. **Event Flow**: Proper message_id tracking throughout streaming lifecycle
+## Success Indicators
+- ✅ WebSocket shows "connected" status
+- ✅ Messages stream in real-time
+- ✅ Citations are collected during streaming
+- ✅ No fallback to HTTP mode
+- ✅ Reconnection works if connection drops
 
-## Remaining Known Issues
-- Backend not emitting visualization events (chart_ready, table_ready, metric_ready)
-- Database showing 0 visualizations stored (noted but not critical for streaming)
+## Common Issues
+- If still disconnected, check backend is running
+- Ensure CORS is configured for WebSocket
+- Check browser console for connection errors
+- Verify conversation ID is valid
+EOF < /dev/null

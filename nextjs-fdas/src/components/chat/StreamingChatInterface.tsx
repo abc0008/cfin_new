@@ -5,7 +5,7 @@ import { Message, Citation } from '@/types';
 import { Loader2, Send, FileText, Zap } from 'lucide-react';
 import { MessageRenderer } from './MessageRenderer';
 import { FollowUpQuestions } from './FollowUpQuestions';
-import { useStreamingChat } from '@/hooks/useStreamingChat';
+import { useStreamingChatWithCitations } from '@/hooks/useStreamingChatWithCitations';
 import { 
   StreamingMessage, 
   ConnectionStatus, 
@@ -40,7 +40,16 @@ export function StreamingChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Streaming chat hook
+  // Build document map from active documents
+  const documentMap = useCallback(() => {
+    const map = new Map<number, string>();
+    activeDocuments.forEach((docId, index) => {
+      map.set(index, docId);
+    });
+    return map;
+  }, [activeDocuments]);
+
+  // Streaming chat hook with citations
   const {
     isConnected,
     isStreaming,
@@ -48,10 +57,12 @@ export function StreamingChatInterface({
     streamingMessageId,
     toolsInProgress,
     completedVisualizations,
+    streamingCitations,
     sendStreamingMessage,
     sendStreamingMessageHTTP,
-  } = useStreamingChat({
+  } = useStreamingChatWithCitations({
     conversationId: conversationId || '',
+    documentMap: documentMap(),
     onMessageUpdate: (message) => {
       // Pass the streaming message to the parent component
       onMessageUpdate?.(message);
@@ -61,6 +72,20 @@ export function StreamingChatInterface({
     },
     onError: (error) => {
       console.error('Streaming error:', error);
+      // Display error as a system message in the chat
+      const errorMessage = {
+        id: `error_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+        sessionId: conversationId || '',
+        timestamp: new Date().toISOString(),
+        role: 'system' as const,
+        content: `Error: ${error}. Please try again or contact support if the issue persists.`,
+        referencedDocuments: [],
+        referencedAnalyses: [],
+        citations: [],
+        content_blocks: null,
+        analysis_blocks: []
+      };
+      onMessageUpdate?.(errorMessage);
     }
   });
 
@@ -219,9 +244,11 @@ export function StreamingChatInterface({
         text={streamingText} 
         toolsInProgress={toolsInProgress} 
         showTypingIndicator={isStreaming} // Only show typing indicator if actively streaming
+        citations={streamingCitations}
+        onCitationClick={handleCitationClick}
       />
     );
-  }, [streamingText, toolsInProgress, isStreaming]);
+  }, [streamingText, toolsInProgress, isStreaming, streamingCitations, handleCitationClick]);
 
   return (
     <div className="flex flex-col h-full bg-background">

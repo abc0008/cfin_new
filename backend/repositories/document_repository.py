@@ -492,6 +492,70 @@ class DocumentRepository:
         
         return citation
     
+    async def create_citation_with_message(
+        self, document_id: str, citation_data: Dict[str, Any]
+    ) -> Optional[Citation]:
+        """
+        Create a citation with full data including message relationship.
+        
+        Args:
+            document_id: ID of the document
+            citation_data: Dictionary containing all citation fields
+            
+        Returns:
+            Created citation if successful, None otherwise
+        """
+        from models.database_models import MessageCitation
+        
+        # Check if document exists
+        document = await self.get_document(document_id)
+        if not document:
+            return None
+        
+        # Extract message_id before creating citation
+        message_id = citation_data.pop("message_id", None)
+        
+        # Create citation with provided ID or generate new one
+        citation_id = citation_data.get("id") or citation_data.get("highlight_id") or str(uuid.uuid4())
+        
+        # Create citation object - filter out fields that don't exist in Citation model
+        citation = Citation(
+            id=citation_id,
+            document_id=document_id,
+            text=citation_data.get("text", ""),
+            cited_text=citation_data.get("cited_text", citation_data.get("text", "")),
+            document_title=citation_data.get("document_title", ""),
+            type=citation_data.get("type", "page_location"),
+            highlight_id=citation_data.get("highlight_id", citation_id),
+            rects=citation_data.get("rects", "[]"),
+            page=citation_data.get("start_page_number"),
+            start_page_number=citation_data.get("start_page_number"),
+            end_page_number=citation_data.get("end_page_number"),
+            start_char_index=citation_data.get("start_char_index"),
+            end_char_index=citation_data.get("end_char_index"),
+            start_block_index=citation_data.get("start_block_index"),
+            end_block_index=citation_data.get("end_block_index"),
+            section=citation_data.get("section")
+            # Removed bounding_box field - not in Citation model
+        )
+        
+        # Save citation to database
+        self.db.add(citation)
+        
+        # Create message-citation relationship if message_id provided
+        if message_id:
+            message_citation = MessageCitation(
+                message_id=message_id,
+                citation_id=citation.id
+            )
+            self.db.add(message_citation)
+        
+        # Commit all changes
+        await self.db.commit()
+        await self.db.refresh(citation)
+        
+        return citation
+    
     async def get_citation(self, citation_id: str) -> Optional[Citation]:
         """
         Get a citation by ID.
@@ -605,18 +669,48 @@ class DocumentRepository:
             file_size=document.file_size
         )
     
-    def citation_to_api_schema(self, citation: Citation) -> CitationSchema:
-        """Convert a database Citation to an API CitationSchema."""
-        return CitationSchema(
+    def citation_to_api_schema(self, citation: Citation) -> Dict[str, Any]:
+        """Convert a database Citation to an API schema."""
+        # Import here to avoid circular imports
+        from models.citation import CitationPayload, CitationType, CitationRect
+        import json
+        
+        # Parse rects from JSON if stored as string
+        rects = []
+        if citation.rects:
+            try:
+                rects_data = json.loads(citation.rects) if isinstance(citation.rects, str) else citation.rects
+                rects = [CitationRect(**rect) for rect in rects_data]
+            except:
+                logger.warning(f"Failed to parse rects for citation {citation.id}")
+        
+        # Build the CitationPayload
+        # Use cited_text if available, otherwise fall back to text field
+        citation_text = citation.cited_text or citation.text
+        
+        payload = CitationPayload(
             id=str(citation.id),
-            text=citation.text,
-            documentId=str(citation.document_id),
-            page=citation.page,
-            highlightId=citation.highlight_id,
-            rects=citation.bounding_box if citation.bounding_box else [],
-            messageId=str(citation.message_id) if citation.message_id else None,
-            analysisId=str(citation.analysis_id) if citation.analysis_id else None,
+            document_id=str(citation.document_id),
+            type=CitationType(citation.type) if citation.type else CitationType.PAGE_LOCATION,
+            text=citation_text,  # Frontend expects 'text' field
+            cited_text=citation_text,  # Keep for backward compatibility
+            document_title=citation.document_title or "",
+            highlight_id=citation.highlight_id or str(citation.id),
+            rects=rects,
+            start_page_number=citation.start_page_number,
+            end_page_number=citation.end_page_number,
+            start_char_index=citation.start_char_index,
+            end_char_index=citation.end_char_index,
+            start_block_index=citation.start_block_index,
+            end_block_index=citation.end_block_index,
+            page=citation.page,  # Legacy field
+            section=citation.section,
+            message_id=str(citation.message_id) if hasattr(citation, 'message_id') and citation.message_id else None,
+            analysis_id=str(citation.analysis_id) if hasattr(citation, 'analysis_id') and citation.analysis_id else None
         )
+        
+        # Return as dict with camelCase keys
+        return payload.model_dump(by_alias=True)
         
     def get_document_file_path(self, document_id: str) -> str:
         """

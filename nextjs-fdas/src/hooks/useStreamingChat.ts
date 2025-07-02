@@ -6,7 +6,7 @@ import { conversationApi } from '@/lib/api/conversation';
 
 export interface StreamingEvent {
   type: 'message_start' | 'text_delta' | 'tool_start' | 'tool_complete' | 
-        'chart_ready' | 'table_ready' | 'metric_ready' | 'message_complete' | 'content_update' | 'error';
+        'chart_ready' | 'table_ready' | 'metric_ready' | 'message_complete' | 'content_update' | 'error' | 'citation_marker' | 'citations_delta';
   text?: string;
   accumulated_text?: string;
   message_id?: string;
@@ -24,6 +24,12 @@ export interface StreamingEvent {
   content_preserved?: boolean;
   is_post_tools?: boolean;
   post_tool_text?: string;
+  // Citation marker fields
+  marker?: string;
+  citation_index?: number;
+  citation?: any;
+  // Citations delta fields
+  block_index?: number;
 }
 
 export interface UseStreamingChatOptions {
@@ -62,6 +68,9 @@ export function useStreamingChat({
     tables: any[];
     metrics: any[];
   }>({ charts: [], tables: [], metrics: [] });
+  
+  // Track citations during streaming
+  const [streamingCitations, setStreamingCitations] = useState<any[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -124,6 +133,7 @@ export function useStreamingChat({
         setPostVisualizationText('');
         setToolsInProgress(new Set());
         setCompletedVisualizations({ charts: [], tables: [], metrics: [] });
+        setStreamingCitations([]); // Clear citations for new message
         
         if (!newMessageId) {
           console.error('CRITICAL: message_start event missing message_id');
@@ -380,6 +390,9 @@ export function useStreamingChat({
           const textToPreserve = currentFrozenInitialText || currentStreamingText;
           console.log(`📝 Persisting streaming message on completion: ${textToPreserve.length} chars`);
           
+          // Get current streaming citations
+          const currentStreamingCitations = streamingCitations;
+          
           const streamingMessage = {
             id: currentStreamingMessageId,
             sessionId: conversationId,
@@ -388,7 +401,7 @@ export function useStreamingChat({
             content: textToPreserve,
             referencedDocuments: [],
             referencedAnalyses: [],
-            citations: [],
+            citations: currentStreamingCitations, // Include accumulated citations
             content_blocks: null,
             analysis_blocks: []
           };
@@ -511,7 +524,47 @@ export function useStreamingChat({
           setPostToolMessageId(null);
           setPostVisualizationText('');
           setCompletedVisualizations({ charts: [], tables: [], metrics: [] });
+          // Note: Don't clear streamingCitations here - they should persist for the message
         });
+        break;
+
+      case 'citation_marker':
+        console.log(`📍 Citation marker received: ${event.marker} at index ${event.citation_index}`);
+        
+        // The marker is already in the text stream, but we can use this event
+        // to prepare the citation for display or tracking
+        if (event.citation) {
+          console.log(`📚 Citation details:`, {
+            index: event.citation_index,
+            marker: event.marker,
+            documentTitle: event.citation.document_title || event.citation.documentTitle,
+            citedText: (event.citation.cited_text || event.citation.citedText)?.substring(0, 50) + '...',
+            pageNumber: event.citation.start_page_number || event.citation.startPageNumber
+          });
+          
+          // Add citation to streaming citations
+          setStreamingCitations(prev => [...prev, {
+            ...event.citation,
+            marker: event.marker,
+            index: event.citation_index
+          }]);
+        }
+        break;
+        
+      case 'citations_delta':
+        console.log(`📄 Citations delta received for block ${event.block_index}`);
+        
+        if (event.citation) {
+          console.log(`📚 Citation from delta:`, {
+            blockIndex: event.block_index,
+            documentTitle: event.citation.document_title || event.citation.documentTitle,
+            citedText: (event.citation.cited_text || event.citation.citedText)?.substring(0, 50) + '...',
+            pageNumber: event.citation.start_page_number || event.citation.startPageNumber
+          });
+          
+          // Add citation from delta event
+          setStreamingCitations(prev => [...prev, event.citation]);
+        }
         break;
 
       case 'error':
@@ -520,7 +573,7 @@ export function useStreamingChat({
         onError?.(event.message || event.error || 'Unknown streaming error');
         break;
     }
-  }, [conversationId, streamingMessageId, streamingText, toolsStarted, frozenInitialText, postToolMessageId, postVisualizationText, messagePhase, activeMessageId, phaseTransitions, onMessageUpdate, onVisualizationReady, onError]);
+  }, [conversationId, streamingMessageId, streamingText, toolsStarted, frozenInitialText, postToolMessageId, postVisualizationText, messagePhase, activeMessageId, phaseTransitions, streamingCitations, onMessageUpdate, onVisualizationReady, onError]);
   
   // Update the ref whenever the handler changes
   useEffect(() => {
@@ -826,6 +879,7 @@ export function useStreamingChat({
     streamingMessageId,
     toolsInProgress: Array.from(toolsInProgress),
     completedVisualizations,
+    streamingCitations, // Citations collected during streaming
     
     // Clean streaming state (for debugging)
     toolsStarted,

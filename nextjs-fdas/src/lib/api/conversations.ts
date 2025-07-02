@@ -114,6 +114,11 @@ export const conversationsApi = {
       const response = await apiService.get<any[]>(
         `/conversation/${sessionId}/history?limit=${limit}`
       );
+      
+      
+      // Import citation transform
+      const { transformCitations } = await import('@/lib/pdf/citationTransform');
+      
       // Convert backend format to frontend format if necessary
       return response.map(msg => ({
         id: msg.id,
@@ -123,9 +128,9 @@ export const conversationsApi = {
         content: msg.content,
         referencedDocuments: msg.referencedDocuments || msg.referenced_documents || [],
         referencedAnalyses: msg.referencedAnalyses || msg.referenced_analyses || [],
-        citations: msg.citations || [],
-        content_blocks: msg.content_blocks || [],
-        analysis_blocks: msg.analysis_blocks || []
+        citations: transformCitations(msg.citations || []),
+        content_blocks: msg.content_blocks || msg.contentBlocks || [],
+        analysis_blocks: msg.analysis_blocks || msg.analysisBlocks || []
       }));
     } catch (error) {
       console.error('Error getting conversation history:', error);

@@ -13,9 +13,9 @@ import Canvas from '@/components/visualization/Canvas'
 import { AnalysisControls } from '@/components/analysis/AnalysisControls'
 import { AnalysisResultSchema } from '@/validation/schemas'
 
-// Import PDFViewer component with dynamic import to avoid SSR issues
+// Import CitationEnabledPDFViewer component with dynamic import to avoid SSR issues
 const PDFViewer = dynamic(
-  () => import('../../components/document/PDFViewer').then(mod => mod.PDFViewer),
+  () => import('../../components/document/CitationEnabledPDFViewer').then(mod => mod.CitationEnabledPDFViewer),
   { ssr: false }
 )
 

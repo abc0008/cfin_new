@@ -65,7 +65,7 @@ from repositories.conversation_repository import ConversationRepository
 from repositories.document_repository import DocumentRepository
 from repositories.analysis_repository import AnalysisRepository
 from pdf_processing.api_service import ClaudeService
-from models.database_models import Message, Conversation
+from models.database_models import Message, Conversation, Citation
 
 logger = logging.getLogger(__name__)
 
@@ -899,18 +899,64 @@ class ConversationService:
                     last_good_content = assistant_message_placeholder.content
                     logger.info(f"🔒 Freezing content at tool_start: {len(last_good_content)} chars")
             
-            # If tool_start has been processed in this stream, block any subsequent text_delta or content_update
-            # that isn't explicitly marked as post-tool by the api_service.
-            if tool_start_processed_in_current_stream:
-                if event_type == "text_delta":
-                    logger.info(f"🚫 Blocking text_delta event after tool_start has been processed in this stream. Text: '{event.get('text', '')[:50]}...'")
+            # NEW: Handle post-tool content_update events properly
+            if event_type == "content_update" and event.get("is_post_tools") and event.get("post_tool_text", "").strip():
+                # This is legitimate post-visualization content from api_service
+                post_tool_text = event.get("post_tool_text", "")
+                logger.info(f"✅ Received post-tool content: '{post_tool_text[:100]}...' ({len(post_tool_text)} chars)")
+                
+                # Create a NEW message for post-visualization content instead of appending
+                if post_tool_text.strip():
+                    # Create a new assistant message for post-visualization content
+                    post_viz_message = await self.conversation_repository.add_message(
+                        conversation_id=conversation_id,
+                        role="assistant",
+                        content=post_tool_text,
+                        referenced_documents=[],
+                        referenced_analyses=[]
+                    )
+                    logger.info(f"✅ Created new message for post-tool content: {post_viz_message.id}")
+                    
+                    # Emit a new_message_start event for the frontend to create a separate message
+                    if emit_callback:
+                        await emit_callback({
+                            "type": "new_message_start",
+                            "message_id": str(post_viz_message.id),
+                            "role": "assistant",
+                            "is_post_visualization": True
+                        })
+                        
+                        # Then emit the content
+                        await emit_callback({
+                            "type": "text_delta",
+                            "text": post_tool_text,
+                            "message_id": str(post_viz_message.id)
+                        })
+                        
+                        # Finally, mark it as complete
+                        await emit_callback({
+                            "type": "message_complete",
+                            "message_id": str(post_viz_message.id),
+                            "is_post_visualization": True
+                        })
+                
+                return
+            
+            # Block regular text_delta after tool_start, but not post-tool content or citations
+            if tool_start_processed_in_current_stream and event_type == "text_delta":
+                text_content = event.get('text', '')
+                # Check if this is a citation marker text_delta (format: " [1] [2] [3]")
+                import re
+                if re.search(r'\[\d+\]', text_content):
+                    logger.info(f"✅ Allowing citation marker text_delta after tool_start: '{text_content}'")
+                    # Don't block citation markers - let them pass through
+                    # Also update our frozen content to include the citation markers
+                    if has_good_content and last_good_content:
+                        last_good_content += text_content
+                        logger.info(f"📝 Updated frozen content with citation markers. New length: {len(last_good_content)}")
+                else:
+                    logger.info(f"🚫 Blocking regular text_delta after tool_start. Text: '{text_content[:50]}...'")
                     return
-                if event_type == "content_update":
-                    if event.get("is_post_tools") and event.get("post_tool_text") is not None:
-                        pass # Allow it to proceed
-                    else:
-                        logger.info(f"🚫 Blocking content_update event after tool_start (not marked as post_tool_text). Accumulated: '{event.get('accumulated_text', '')[:50]}...'")
-                        return
 
             # Original logic for content_update (now primarily for pre-tool_start content)
             if event_type == "content_update" and "accumulated_text" in event:
@@ -918,9 +964,8 @@ class ConversationService:
                      logger.warning("Content_update reached main processing block despite tool_start_processed_in_current_stream being true. This is unexpected.")
                      return
 
-                if has_good_content: 
-                    logger.info(f"📝 Ignoring content update based on has_good_content flag. Content: '{event['accumulated_text'][:50]}...'")
-                    return
+                # REMOVED: The has_good_content check that was blocking legitimate updates
+                # We now handle content updates more intelligently
                 
                 if event.get("is_post_tools", False):
                     logger.info(f"📝 Ignoring post-tool content update as it should be handled by api_service. Content: '{event['accumulated_text'][:50]}...'")
@@ -929,8 +974,12 @@ class ConversationService:
                 new_content = event["accumulated_text"]
                 
                 current_db_content = assistant_message_placeholder.content
-                if current_db_content and len(current_db_content) > 1000 and len(new_content) <= len(current_db_content) + 50:
-                    logger.info(f"📝 Blocking content update to DB - already have {len(current_db_content)} chars, new content is {len(new_content)} chars")
+                # Normalize whitespace for more robust comparison
+                current_normalized = current_db_content.strip() if current_db_content else ""
+                new_normalized = new_content.strip()
+                
+                if current_normalized and len(current_normalized) > 1000 and len(new_normalized) <= len(current_normalized) + 50:
+                    logger.info(f"📝 Blocking content update to DB - already have {len(current_normalized)} chars, new content is {len(new_normalized)} chars")
                     if emit_callback: # Still forward pre-tool_start valid events
                         event_to_forward = {**event, "message_id": message_id or str(assistant_message_placeholder.id), "content_length": len(new_content)}
                         await emit_callback(event_to_forward)
@@ -960,6 +1009,15 @@ class ConversationService:
                 logger.info(f"Passing through text_delta event (pre-tool_start): '{event.get('text', '')[:50]}...'")
 
 
+            # Handle citation marker events
+            if event_type == "citation_marker":
+                logger.info(f"📍 Citation marker event received: {event.get('marker')} at index {event.get('citation_index')}")
+                # Citation markers are already injected into the text stream, just forward the event
+                if emit_callback:
+                    event = {**event, "message_id": message_id or str(assistant_message_placeholder.id)}
+                    await emit_callback(event)
+                return
+            
             # Forward ALL other events (or non-returned text_delta/content_update)
             if emit_callback:
                 if event.get("type") not in ["error"] and not event.get("message_id"):
@@ -1072,18 +1130,62 @@ class ConversationService:
         analysis_text = result.get("analysis_text", "")
         visualizations = result.get("visualizations", {})
         accumulated_metrics = result.get("metrics", [])
+        accumulated_citations = result.get("citations", [])
         
-        # CRITICAL: For streaming, we should NEVER use analysis_text from the API result
-        # The frontend already has the properly formatted text from streaming
-        # analysis_text is often unformatted and would overwrite the good content
+        logger.info(f"🔍 conversation_service received from analyze_with_visualization_tools_streaming: {len(accumulated_citations)} citations")
+        
+        # UPDATED: analysis_text now only contains initial content (not post-tool content)
+        # Post-tool content is sent as a separate message via new_message_start event
         logger.info(f"Current assistant message content length: {len(assistant_message_placeholder.content) if assistant_message_placeholder.content else 0}")
         if analysis_text:
-            logger.warning(f"⚠️ Ignoring analysis_text ({len(analysis_text)} chars) - using streaming content only")
+            logger.info(f"📊 Received analysis_text from API: {len(analysis_text)} chars (initial content only)")
+            
+            # Check if the analysis_text contains content not in our current message
+            # This can happen if post-tool content wasn't properly streamed
+            current_content = assistant_message_placeholder.content or ""
+            if current_content == "Processing your request...":
+                # No streaming content received, use analysis_text
+                logger.warning(f"⚠️ No streaming content received, using analysis_text")
+                assistant_message_placeholder.content = analysis_text
+                await self.conversation_repository.update_message(assistant_message_placeholder)
+            else:
+                # Check if analysis_text contains citation markers or other new content
+                import re
+                analysis_has_citations = bool(re.search(r'\[\d+\]', analysis_text))
+                current_has_citations = bool(re.search(r'\[\d+\]', current_content))
+                
+                # Update if:
+                # 1. analysis_text has citations but current doesn't
+                # 2. analysis_text is significantly longer (post-tool content)
+                # 3. analysis_text contains genuinely new content
+                if (analysis_has_citations and not current_has_citations):
+                    logger.info(f"✅ analysis_text contains citation markers, updating message")
+                    assistant_message_placeholder.content = analysis_text
+                    await self.conversation_repository.update_message(assistant_message_placeholder)
+                elif len(analysis_text) > len(current_content) + 100:
+                    # analysis_text is significantly longer, might contain post-tool content
+                    logger.info(f"📝 analysis_text is {len(analysis_text) - len(current_content)} chars longer than current content")
+                    # Check if it's genuinely new content or just a duplicate
+                    if not current_content or not analysis_text.startswith(current_content[:min(100, len(current_content))]):
+                        logger.info(f"✅ analysis_text contains new content, updating message")
+                        assistant_message_placeholder.content = analysis_text
+                        await self.conversation_repository.update_message(assistant_message_placeholder)
         
         # IMPORTANT: Preserve the streaming content we already have
         if has_good_content and last_good_content:
+            # Check if current content has citation markers that last_good_content doesn't
+            current_has_citations = bool(re.search(r'\[\d+\]', assistant_message_placeholder.content or ''))
+            last_good_has_citations = bool(re.search(r'\[\d+\]', last_good_content))
+            
+            # If current content has citations but last_good_content doesn't, use current
+            if current_has_citations and not last_good_has_citations:
+                logger.info(f"✅ Current content has citations, using it instead of last_good_content")
+                final_content = assistant_message_placeholder.content
+                assistant_message = assistant_message_placeholder
+                # Update last_good_content to include citations for future use
+                last_good_content = final_content
             # We had good formatted content - make sure it's preserved
-            if assistant_message_placeholder.content != last_good_content:
+            elif assistant_message_placeholder.content != last_good_content:
                 logger.warning(f"📝 Content was overwritten! Restoring good formatted content ({len(last_good_content)} chars)")
                 assistant_message_placeholder.content = last_good_content
                 assistant_message = await self.conversation_repository.update_message(assistant_message_placeholder)
@@ -1104,6 +1206,29 @@ class ConversationService:
             assistant_message_placeholder.content = final_content
             assistant_message = await self.conversation_repository.update_message(assistant_message_placeholder)
         
+        # Skip citation injection if we already added markers during streaming
+        if accumulated_citations:
+            logger.info(f"Found {len(accumulated_citations)} citations")
+            
+            # Check if markers were already injected during streaming
+            has_streaming_markers = any(f"[{i+1}]" in final_content for i in range(len(accumulated_citations)))
+            
+            if has_streaming_markers:
+                logger.info("✅ Citation markers already injected during streaming")
+            else:
+                # Fallback: Add citations post-streaming (for non-streaming responses)
+                logger.info("Adding citation markers post-streaming (fallback)")
+                citation_summary = "\n\nSources:"
+                for idx, citation in enumerate(accumulated_citations):
+                    citation_summary += f"\n[{idx + 1}] {citation.get('document_title', 'Document')} - Page {citation.get('start_page_number', 'Page ?')}"
+                
+                final_content += citation_summary
+                
+                # Update the message with citation markers
+                assistant_message_placeholder.content = final_content
+                assistant_message = await self.conversation_repository.update_message(assistant_message_placeholder)
+                logger.info(f"✅ Updated content with citation markers: {len(final_content)} chars")
+        
         logger.info(f"✅ Database updated with final content: {len(final_content)} chars")
         
         if not assistant_message:
@@ -1114,6 +1239,58 @@ class ConversationService:
             # The frontend will fetch the complete message from the database when needed
             # Sending updates here can cause formatting issues and duplicate content
             logger.info(f"✅ NOT sending message_update - frontend will fetch from DB when needed")
+        
+        # Store citations if any were found
+        if accumulated_citations:
+            logger.info(f"Storing {len(accumulated_citations)} citations for message {assistant_message.id}")
+            
+            # We need to save citations through the document repository
+            # Map document_index to actual document IDs
+            doc_id_map = {}
+            for idx, doc in enumerate(document_texts):
+                doc_id_map[idx] = doc.get("id")
+            
+            # Create and save citations
+            for citation_data in accumulated_citations:
+                try:
+                    # Get the actual document ID from the index
+                    doc_index = citation_data.get("document_index", 0)
+                    document_id = doc_id_map.get(doc_index)
+                    
+                    if not document_id:
+                        logger.warning(f"Could not find document ID for index {doc_index}, skipping citation")
+                        continue
+                    
+                    # Create citation through document repository
+                    citation_obj = {
+                        "document_id": document_id,
+                        "text": citation_data.get("cited_text", ""),
+                        "cited_text": citation_data.get("cited_text", ""),
+                        "document_title": citation_data.get("document_title", ""),
+                        "type": citation_data.get("type", "page_location"),
+                        "start_page_number": citation_data.get("start_page_number"),
+                        "end_page_number": citation_data.get("end_page_number"),
+                        "start_char_index": citation_data.get("start_char_index"),
+                        "end_char_index": citation_data.get("end_char_index"),
+                        "start_block_index": citation_data.get("start_block_index"),
+                        "end_block_index": citation_data.get("end_block_index"),
+                        "highlight_id": str(uuid.uuid4()),
+                        "rects": json.dumps([]),  # Empty array as JSON string
+                        "message_id": assistant_message.id,
+                        "analysis_id": None
+                    }
+                    
+                    # Create citation through document repository
+                    created_citation = await self.document_repository.create_citation_with_message(
+                        document_id=document_id,
+                        citation_data=citation_obj
+                    )
+                    logger.info(f"Created citation {created_citation.id} for document {document_id}")
+                    
+                except Exception as e:
+                    logger.error(f"Error creating citation: {str(e)}", exc_info=True)
+            
+            logger.info(f"✅ Citations processing completed for message {assistant_message.id}")
         
         # Debug logging for metrics
         logger.info(f"DEBUG: result.get('metrics'): {result.get('metrics', []) if 'result' in locals() else 'result not available'}")
@@ -1182,11 +1359,13 @@ class ConversationService:
                     logger.warning(f"Failed to serialize analysis blocks for message_complete event: {ser_err}")
 
                 if emit_callback:
+                    # Include citations in the message_complete event
                     await emit_callback({
                         "type": "message_complete",
                         "message_id": str(assistant_message.id),
                         "timestamp": datetime.utcnow().isoformat() + 'Z',
-                        "analysis_blocks": serialized_blocks  # provide blocks directly
+                        "analysis_blocks": serialized_blocks,  # provide blocks directly
+                        "citations": accumulated_citations  # Include citations for frontend
                     })
                     logger.info(
                         f"message_complete event sent for conversation {conversation_id} after analysis blocks – blocks: {len(serialized_blocks)}"
@@ -1202,7 +1381,8 @@ class ConversationService:
                 await emit_callback({
                     "type": "message_complete",
                     "message_id": str(assistant_message.id),
-                    "timestamp": datetime.utcnow().isoformat() + 'Z'
+                    "timestamp": datetime.utcnow().isoformat() + 'Z',
+                    "citations": accumulated_citations  # Include citations for frontend
                 })
                 logger.info(f"message_complete event sent for conversation {conversation_id} (no visualizations)")
         

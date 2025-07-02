@@ -61,7 +61,7 @@ export function MarkdownRenderer({
   // Create a mapping of citation text to citation ID for highlighting
   const citationTextToId = useMemo(() => {
     return citations.reduce((map, citation) => {
-      map[citation.text] = citation.id;
+      map[citation.citedText] = citation.id;
       return map;
     }, {} as Record<string, string>);
   }, [citations]);
@@ -74,7 +74,7 @@ export function MarkdownRenderer({
     }
 
     // Navigate to the PDF viewer with the document and highlight information
-    router.push(`/pdf-viewer/${citation.documentId}?highlightId=${citation.highlightId}&page=${citation.page}`);
+    router.push(`/pdf-viewer/${citation.documentId}?highlightId=${citation.highlightId}&page=${citation.startPageNumber || 1}`);
   };
 
   // Function to find citations within a text node and also process financial terms
@@ -83,8 +83,8 @@ export function MarkdownRenderer({
 
     // Sort citations by position in the text to ensure correct order
     const textCitations = citations
-      .filter(citation => text.includes(citation.text))
-      .sort((a, b) => text.indexOf(a.text) - text.indexOf(b.text));
+      .filter(citation => text.includes(citation.citedText))
+      .sort((a, b) => text.indexOf(a.citedText) - text.indexOf(b.citedText));
 
     // If no citations, process financial terms only
     if (!textCitations.length) {
@@ -127,7 +127,7 @@ export function MarkdownRenderer({
     let lastIndex = 0;
 
     textCitations.forEach(citation => {
-      const index = text.indexOf(citation.text, lastIndex);
+      const index = text.indexOf(citation.citedText, lastIndex);
       if (index > lastIndex) {
         const beforeText = text.substring(lastIndex, index);
         // Process the text before citation
@@ -160,12 +160,12 @@ export function MarkdownRenderer({
           className="inline-flex items-center px-1 py-0.5 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-200 cursor-pointer"
           onClick={() => handleCitationClick(citation)}
         >
-          <span>{citation.text}</span>
+          <span>{citation.citedText}</span>
           <ExternalLink className="ml-1 h-3 w-3" />
         </span>
       );
 
-      lastIndex = index + citation.text.length;
+      lastIndex = index + citation.citedText.length;
     });
 
     if (lastIndex < text.length) {

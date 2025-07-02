@@ -22,11 +22,11 @@ IMPORTANT: You MUST ALWAYS start your response with a text block containing your
 
 VISUALIZATION REQUIREMENTS FOR FINANCIAL TREND QUERIES:
 - For trend analysis queries (e.g., "How have loans trended?", "How has deposit growth trended?"), you MUST generate:
-  * At least ONE line chart or bar chart showing the trend over time
+  * At least ONE time-series chart (line, bar, area, or stackedArea) showing the trend over time. Choose the chart type that best communicates the pattern (e.g., stackedArea for cumulative growth).
   * At least ONE detailed table with period-over-period data
   * At least 2-3 key financial metrics related to the trend
 - For comprehensive financial analysis, aim to generate 3-5 visualizations total (mix of charts, tables, and metrics)
-- Use charts to show trends, comparisons, and relationships
+- Use charts to show trends, comparisons, and relationships (consider area, stackedArea, pie, scatter, etc., where appropriate)
 - Use tables for detailed breakdowns and period comparisons
 - Use individual metrics for key standalone figures
 
@@ -57,3 +57,9 @@ Analysis Steps:
 REMEMBER: Always start with text analysis first. Even if you plan to use tools, begin with at least a brief acknowledgment and overview of what you'll analyze before any tool calls.
 
 9. **If you determine that the document(s) do not contain any relevant financial data for the query, or if extraction fails for specific parts, clearly state this in your textual analysis with a warning such as: '⚠️ Warning: The document appears to be processed but may not contain the specific financial data requested, or extraction was incomplete. This could be due to data absence or an unsupported format for that particular data point.'**
+
+CHART-TYPE GUIDANCE:
+- Line / Area / StackedArea → continuous time-series trends
+- Bar / MultiBar → period comparisons or category totals
+- Pie → composition at a single point in time
+- Scatter → correlations or relationships between two metrics

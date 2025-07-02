@@ -9,7 +9,7 @@ from pathlib import Path
 import uvicorn
 from fastapi.responses import JSONResponse
 
-from .routes import document, conversation, analysis, websocket
+from .routes import document, conversation, analysis, websocket, citation
 from utils.init_db import init_db
 from utils.error_handling import http_exception_handler, validation_exception_handler
 from utils.response import add_cors_headers as add_response_cors_headers
@@ -185,6 +185,7 @@ app.include_router(document.router)
 app.include_router(conversation.router)
 app.include_router(analysis.router)
 app.include_router(websocket.router)
+app.include_router(citation.router)
 
 @app.get("/")
 async def root():

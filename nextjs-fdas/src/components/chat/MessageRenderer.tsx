@@ -30,6 +30,74 @@ function areEqual(prevProps: MessageRendererProps, nextProps: MessageRendererPro
 }
 
 function MessageRendererBase({ message, onCitationClick }: MessageRendererProps) {
+  // Function to render content with citation markers
+  const renderContentWithCitations = (
+    content: string,
+    citations: Citation[],
+    onCitationClick?: (citation: Citation) => void
+  ): React.ReactNode => {
+    if (!citations || citations.length === 0) {
+      return <MarkdownRenderer content={content} />;
+    }
+
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+
+    // Find and replace citation markers [1], [2], etc.
+    const citationPattern = /\[(\d+)\]/g;
+    let match;
+
+    while ((match = citationPattern.exec(content)) !== null) {
+      const citationIndex = parseInt(match[1], 10) - 1;
+      
+      // Add text before citation
+      if (match.index > lastIndex) {
+        parts.push(
+          <MarkdownRenderer 
+            key={`text-${lastIndex}`}
+            content={content.substring(lastIndex, match.index)} 
+          />
+        );
+      }
+
+      // Add clickable citation
+      if (citations[citationIndex]) {
+        const citation = citations[citationIndex];
+        parts.push(
+          <button
+            key={`cite-${citation.id}`}
+            className="citation-link inline-flex items-center px-1 py-0.5 mx-0.5 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-200 cursor-pointer text-xs align-top"
+            onClick={() => onCitationClick?.(citation)}
+            aria-label={`Citation ${citationIndex + 1}: ${citation.citedText.substring(0, 50)}...`}
+          >
+            <sup className="font-medium">{citationIndex + 1}</sup>
+          </button>
+        );
+      } else {
+        // Fallback if citation not found
+        parts.push(
+          <sup key={`cite-fallback-${match.index}`} className="text-gray-500">
+            [{match[1]}]
+          </sup>
+        );
+      }
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < content.length) {
+      parts.push(
+        <MarkdownRenderer 
+          key={`text-${lastIndex}`}
+          content={content.substring(lastIndex)} 
+        />
+      );
+    }
+
+    return <>{parts}</>;
+  };
+
   // Return early if no content
   if (!message.content) {
     return null;
@@ -146,7 +214,16 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
   // Apply duplicate detection and removal
   processedContent = detectDuplicateText(processedContent);
 
-  // For assistant messages, use whitespace-pre-wrap to preserve formatting
+  // For assistant messages with citations, render with citation markers
+  if (message.citations && message.citations.length > 0) {
+    return (
+      <div className="message-content">
+        {renderContentWithCitations(processedContent, message.citations, onCitationClick)}
+      </div>
+    );
+  }
+
+  // For assistant messages without citations, use whitespace-pre-wrap to preserve formatting
   return (
     <div className="message-content whitespace-pre-wrap">
       {processedContent}

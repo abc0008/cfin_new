@@ -11,8 +11,8 @@ on:
       - 'backend/tests/integration/test_claude_production_readiness.py'
   
   # Run nightly for continuous monitoring
-  schedule:
-    - cron: '0 6 * * *'  # 6 AM UTC daily
+  # schedule:
+  #   - cron: '0 6 * * *'  # 6 AM UTC daily
   
   # Allow manual triggering
   workflow_dispatch:

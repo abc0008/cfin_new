@@ -376,11 +376,14 @@ export const documentsApi = {
         // Validate each citation
         return response.map(citation => ({
           id: citation.id || '',
-          text: citation.text,
+          citedText: citation.text,
           documentId: citation.document_id,
-          highlightId: citation.highlight_id,
-          page: citation.page,
-          rects: citation.rects,
+          documentTitle: 'Document', // This should ideally come from the backend
+          type: 'page_location' as const,
+          highlightId: citation.highlight_id || '',
+          rects: citation.rects || [],
+          startPageNumber: citation.page,
+          endPageNumber: citation.page,
           messageId: citation.message_id,
           analysisId: citation.analysis_id
         }));
@@ -400,10 +403,10 @@ export const documentsApi = {
     try {
       // Convert to snake_case for the API
       const apiCitation: ApiCitation = {
-        text: citation.text,
+        text: citation.citedText,
         document_id: documentId,
         highlight_id: citation.highlightId,
-        page: citation.page,
+        page: citation.startPageNumber || 1,
         rects: citation.rects,
         message_id: citation.messageId,
         analysis_id: citation.analysisId
@@ -414,11 +417,14 @@ export const documentsApi = {
       // Convert response back to camelCase
       return {
         id: response.id || '',
-        text: response.text,
+        citedText: response.text,
         documentId: response.document_id,
-        highlightId: response.highlight_id,
-        page: response.page,
-        rects: response.rects,
+        documentTitle: citation.documentTitle,
+        type: citation.type,
+        highlightId: response.highlight_id || '',
+        rects: response.rects || [],
+        startPageNumber: response.page,
+        endPageNumber: response.page,
         messageId: response.message_id,
         analysisId: response.analysis_id
       };
