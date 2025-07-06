@@ -15,14 +15,14 @@ function areEqual(prevProps: MessageRendererProps, nextProps: MessageRendererPro
   const prevMsg = prevProps.message;
   const nextMsg = nextProps.message;
   
-  // If IDs are the same, they're the same message
-  if (prevMsg.id === nextMsg.id) return true;
-  
-  // If content is identical, don't re-render
-  if (prevMsg.content && nextMsg.content && 
-      prevMsg.content.trim() === nextMsg.content.trim() &&
-      prevMsg.role === nextMsg.role) {
-    return true;
+  // Shallow compare core fields – re-render only when something that affects rendering changes
+  if (
+    prevMsg.id === nextMsg.id &&
+    prevMsg.content?.trim() === nextMsg.content?.trim() &&
+    prevMsg.role === nextMsg.role &&
+    (prevMsg.citations?.length || 0) === (nextMsg.citations?.length || 0)
+  ) {
+    return true; // skip render
   }
   
   // Otherwise, re-render
@@ -131,8 +131,13 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
 
   // For assistant messages:
   // Process content to handle potential duplications from the backend
-  // Detect and remove duplicate content in assistant messages
+  // Detect and remove duplicate content in assistant messages.  **Important**: if
+  // the content already contains explicit citation markers ("[1]", "[2]", …) we
+  // skip the duplicate-removal routine entirely so we don't accidentally strip
+  // the markers that were appended later in the stream.
+
   let processedContent = message.content;
+  const hasCitationMarkers = /\[\d+\]/.test(processedContent);
   
   // Handle the case where formatted content is followed by unformatted duplicate
   // This happens when streaming content is duplicated without formatting
@@ -212,7 +217,9 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
   };
   
   // Apply duplicate detection and removal
-  processedContent = detectDuplicateText(processedContent);
+  if (!hasCitationMarkers) {
+    processedContent = detectDuplicateText(processedContent);
+  }
 
   // For assistant messages with citations, render with citation markers
   if (message.citations && message.citations.length > 0) {

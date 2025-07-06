@@ -8,7 +8,7 @@ import { useCitation } from '@/context/CitationContext';
 import { handleStreamingCitation } from '@/lib/pdf/citationService';
 
 export interface StreamingEvent {
-  type: 'message_start' | 'text_delta' | 'tool_start' | 'tool_complete' | 
+  type: 'message_start' | 'new_message_start' | 'text_delta' | 'tool_start' | 'tool_complete' | 
         'chart_ready' | 'table_ready' | 'metric_ready' | 'message_complete' | 
         'content_update' | 'error' | 'citations_delta' | 'content_block_delta';
   text?: string;
@@ -29,9 +29,12 @@ export interface StreamingEvent {
   // Enhanced metadata for better content handling
   is_initial_content?: boolean;
   is_post_tools?: boolean;
+  is_post_visualization?: boolean;
   content_length?: number;
   content_preserved?: boolean;
   post_tool_text?: string;
+  role?: string;
+  analysis_blocks?: any[];
 }
 
 export interface UseStreamingChatOptions {
@@ -91,11 +94,21 @@ export function useStreamingChatWithCitations({
     metrics: any[];
   }>({ charts: [], tables: [], metrics: [] });
 
+  // After we receive message_complete for the initial streaming message (with toolsStarted=true)
+  // we may still get follow-up text for a narrative summary. The backend SHOULD send
+  // a `new_message_start` event first, but today it often does not. When that happens we
+  // set this flag so the *very next* text_delta will automatically create a brand-new
+  // assistant message for the post-visualization narrative.
+  const [awaitingPostVisualization, setAwaitingPostVisualization] = useState(false);
+
   const handleStreamingEventRef = useRef<(event: StreamingEvent) => void>();
   const vizCreatedRef = useRef(false);
   const postVizCreatedRef = useRef(false);
   const lastCompletedMessageIdRef = useRef<string | null>(null);
   const dbFetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const streamingTextRef = useRef('');
+  const frozenInitialTextRef = useRef('');
 
   const handleStreamingEvent = useCallback((event: StreamingEvent) => {
     switch (event.type) {
@@ -131,7 +144,7 @@ export function useStreamingChatWithCitations({
             id: event.message_id || `post-viz-${Date.now()}`,
             sessionId: conversationId,
             timestamp: new Date().toISOString(),
-            role: event.role || 'assistant',
+            role: (event.role as 'assistant' | 'user' | 'system') || 'assistant',
             content: '',  // Will be filled by subsequent text_delta events
             referencedDocuments: [],
             referencedAnalyses: [],
@@ -158,7 +171,7 @@ export function useStreamingChatWithCitations({
         // Check if this text contains citation markers (e.g., [1], [2], etc.)
         const containsCitationMarkers = /\[\d+\]/.test(event.text);
         
-        // If we have a specific message_id in the event, this might be for a post-viz message
+        // 1) If this text belongs to a *known* post-viz message, append to it.
         if (event.message_id && event.message_id === postToolMessageId && onMessageUpdate) {
           // This is for the post-viz message, update it directly
           setPostVisualizationText(prev => {
@@ -183,9 +196,46 @@ export function useStreamingChatWithCitations({
             
             return newContent;
           });
-        } else if (messagePhase === 'initial' && !toolsStarted) {
-          setStreamingText(prev => prev + event.text);
-        } else if (messagePhase === 'post-tools') {
+        }
+        // 2) If tools have finished (toolsStarted === true) *and* we never saw a `new_message_start`
+        //    (or the flag was not set by the backend) we still need to create a fresh message for
+        //    the narrative that follows the visualisations. We use either the backend-supplied
+        //    message_id (if present and different from the initial one) or generate our own.
+        else if ((awaitingPostVisualization || (toolsStarted && !postToolMessageId)) && !postVizCreatedRef.current) {
+          const newPostVizId = event.message_id && event.message_id !== streamingMessageId
+            ? event.message_id
+            : `post-viz-${Date.now()}`;
+          setPostToolMessageId(newPostVizId);
+          setMessagePhase('post-tools');
+          setPhaseTransitions(prev => [...prev, 'post-tools']);
+
+          // Seed the new message with the first text chunk
+          const initialContent = event.text;
+          const postVizMessage: Message = {
+            id: newPostVizId,
+            sessionId: conversationId,
+            timestamp: new Date().toISOString(),
+            role: 'assistant',
+            content: initialContent,
+            referencedDocuments: [],
+            referencedAnalyses: [],
+            citations: [],
+            content_blocks: null,
+            analysis_blocks: []
+          };
+          if (onMessageUpdate) onMessageUpdate(postVizMessage);
+          setPostVisualizationText(initialContent);
+          // We successfully started the post-viz message; clear the awaiting flag so subsequent
+          // deltas just append.
+          setAwaitingPostVisualization(false);
+          postVizCreatedRef.current = true;
+        }
+        // 3) Normal initial streaming text handling
+        else if (messagePhase === 'initial' && !toolsStarted) {
+          appendToStreamingText(event.text);
+        }
+        // 4) Additional chunks for the already bootstrapped post-viz message
+        else if (messagePhase === 'post-tools') {
           // Handle post-tool text_delta for the post-viz message
           setPostVisualizationText(prev => {
             const newContent = prev + event.text;
@@ -219,13 +269,43 @@ export function useStreamingChatWithCitations({
           if (toolsStarted) {
             // IMPORTANT: Citation markers belong to the initial message, not post-viz
             // Update the frozen initial text with citation markers
-            setFrozenInitialText(prev => prev + event.text);
+            appendToFrozenInitial(event.text);
             // Also update streaming text to show citations immediately
-            setStreamingText(prev => prev + event.text);
+            appendToStreamingText(event.text);
           } else {
             // Append to initial streaming text if no tools were used
-            setStreamingText(prev => prev + event.text);
+            appendToStreamingText(event.text);
           }
+        }
+        // --- 0. Explicit post-tool flag handling (some backends set is_post_tools on text_delta) ---
+        if (event.is_post_tools && messagePhase !== 'post-tools') {
+          // If we haven't bootstrapped a post-viz message yet, do so now.
+          const newId = postToolMessageId || `post-viz-${Date.now()}`;
+          if (!postToolMessageId) {
+            setPostToolMessageId(newId);
+          }
+          setMessagePhase('post-tools');
+          setPhaseTransitions(prev => prev.includes('post-tools') ? prev : [...prev, 'post-tools']);
+          postVizCreatedRef.current = true;
+          setAwaitingPostVisualization(false);
+
+          const seedContent = event.text;
+          setPostVisualizationText(seedContent);
+          if (onMessageUpdate) {
+            onMessageUpdate({
+              id: newId,
+              sessionId: conversationId,
+              timestamp: new Date().toISOString(),
+              role: 'assistant',
+              content: seedContent,
+              referencedDocuments: [],
+              referencedAnalyses: [],
+              citations: [],
+              content_blocks: null,
+              analysis_blocks: []
+            });
+          }
+          return; // handled
         }
         break;
 
@@ -246,47 +326,104 @@ export function useStreamingChatWithCitations({
           
           // Update citation counter for display
           setCitationCounter(prev => prev + 1);
+          
+          // Opportunistically inject the marker into the visible streaming text **immediately**
+          const marker = `[${citationCounter}]`;
+          const citedSnippet = event.citation.cited_text || '';
+          if (citedSnippet && !streamingTextRef.current.includes(marker)) {
+            // Try to insert right after the cited snippet (case-insensitive)
+            const escaped = citedSnippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(escaped, 'i');
+            let updated = streamingTextRef.current;
+            if (regex.test(updated)) {
+              updated = updated.replace(regex, (match) => `${match}${marker}`);
+            } else {
+              // Fallback: append to the end
+              updated = `${updated}${marker}`;
+            }
+            setStreamingFromAccumulated(updated);
+            if (messagePhase === 'tools') {
+              setFrozenInitial(updated); // keep frozen copy in sync
+            }
+          }
         }
         break;
 
       case 'content_update':
         if (event.accumulated_text) {
-          if (messagePhase === 'initial' && !toolsStarted) {
-            // For initial phase, only update if the new text is genuinely different
-            // This prevents duplication when citations are added to the accumulated text
-            const currentLength = streamingText.length;
-            const newLength = event.accumulated_text.length;
-            
-            // If the new text is only slightly longer (likely just citations added),
-            // and we already have substantial content, skip the update
-            if (newLength > currentLength && newLength - currentLength < 20 && currentLength > 100) {
-              console.log('Skipping content_update - likely just citation markers added');
-              return;
-            }
-            
-            setStreamingText(event.accumulated_text);
-          } else if (event.is_post_tools || messagePhase === 'tools') {
-            // Transition to post-tools phase if needed
-            if (messagePhase !== 'post-tools') {
+          // If this belongs to the post-visualisation narrative treat it similarly to text_delta logic.
+          if (event.is_post_tools) {
+            const text = event.accumulated_text;
+
+            // If we already have a post-viz message ID, just update that message
+            if (postToolMessageId && messagePhase === 'post-tools') {
+              setPostVisualizationText(text);
+              if (onMessageUpdate) {
+                onMessageUpdate({
+                  id: postToolMessageId,
+                  sessionId: conversationId,
+                  timestamp: new Date().toISOString(),
+                  role: 'assistant',
+                  content: text,
+                  referencedDocuments: [],
+                  referencedAnalyses: [],
+                  citations: [],
+                  content_blocks: null,
+                  analysis_blocks: []
+                });
+              }
+            } else {
+              // Otherwise bootstrap a fresh post-viz message now
+              const newId = `post-viz-${Date.now()}`;
+              setPostToolMessageId(newId);
               setMessagePhase('post-tools');
               setPhaseTransitions(prev => [...prev, 'post-tools']);
+              setAwaitingPostVisualization(false);
+              postVizCreatedRef.current = true;
+              setPostVisualizationText(text);
+              if (onMessageUpdate) {
+                onMessageUpdate({
+                  id: newId,
+                  sessionId: conversationId,
+                  timestamp: new Date().toISOString(),
+                  role: 'assistant',
+                  content: text,
+                  referencedDocuments: [],
+                  referencedAnalyses: [],
+                  citations: [],
+                  content_blocks: null,
+                  analysis_blocks: []
+                });
+              }
             }
-            
-            // Handle post-tool content
-            if (event.post_tool_text) {
-              // Use the explicit post-tool text if provided
-              setPostVisualizationText(event.post_tool_text);
-            } else if (frozenInitialText && event.accumulated_text.startsWith(frozenInitialText)) {
-              // Extract only the post-tool portion
-              const postToolOnly = event.accumulated_text.substring(frozenInitialText.length).trim();
-              setPostVisualizationText(postToolOnly);
-            } else {
-              // Fallback to full text
-              setPostVisualizationText(event.accumulated_text);
-            }
-            
-            // Resume streaming for post-tool content
-            setIsStreaming(true);
+            return; // We've handled the post-tool update
+          }
+
+          // For the initial assistant answer we now accept updates in *both* the "initial" and
+          // "tools" phases because citation markers often arrive while tools are running.
+
+          const currentLength = streamingTextRef.current.length;
+          const newLength = event.accumulated_text.length;
+          const updateHasCitationMarkers = /\[\d+\]/.test(event.accumulated_text);
+          const currentHasCitationMarkers = /\[\d+\]/.test(streamingTextRef.current);
+
+          // If the update would REMOVE citation markers we already have, ignore it.
+          if (!updateHasCitationMarkers && currentHasCitationMarkers) {
+            console.log('Skipping content_update – would remove existing citation markers');
+            return;
+          }
+
+          // Skip micro-updates that don't introduce citations or meaningful new text
+          if (!updateHasCitationMarkers && newLength > currentLength && newLength - currentLength < 20 && currentLength > 100) {
+            console.log('Skipping content_update – minor diff with no citations');
+            return;
+          }
+
+          // Apply the accumulated text to both streaming & frozen refs so downstream logic sees it
+          setStreamingFromAccumulated(event.accumulated_text);
+          if (messagePhase !== 'initial') {
+            // Keep frozen copy in sync when we're already in the tools phase
+            setFrozenInitial(event.accumulated_text);
           }
         }
         break;
@@ -295,7 +432,7 @@ export function useStreamingChatWithCitations({
         if (messagePhase === 'initial' && streamingText) {
           setMessagePhase('tools');
           setPhaseTransitions(prev => [...prev, 'tools']);
-          setFrozenInitialText(streamingText);
+          setFrozenInitial(streamingTextRef.current);
           setToolsStarted(true);
           // Don't clear streamingText here - keep it visible during tool execution
           // setIsStreaming(false); // Also keep streaming state
@@ -345,12 +482,13 @@ export function useStreamingChatWithCitations({
                 documentTitle: citation.document_title || '',
                 citedText: citation.cited_text || '',
                 analysisId: citation.analysis_id || null,
-                createdAt: new Date().toISOString(),
                 startPageNumber: citation.start_page_number,
                 endPageNumber: citation.end_page_number,
                 startCharIndex: citation.start_char_index,
                 endCharIndex: citation.end_char_index,
-                highlightRects: []
+                highlightId: `hl-${Date.now()}-${Math.random()}`,
+                type: 'page_location',
+                rects: []
               });
             }
           });
@@ -365,36 +503,72 @@ export function useStreamingChatWithCitations({
         // We already have everything we need from streaming, including citation markers
         if (onMessageUpdate && streamingMessageId) {
           // Build final content - use the most up-to-date content available
+          const currentStreaming = streamingTextRef.current;
+          const currentFrozen = frozenInitialTextRef.current;
+          const streamingHasCitations = /\[\d+\]/.test(currentStreaming);
+          const frozenHasCitations = /\[\d+\]/.test(currentFrozen);
           let finalContent = '';
-          
-          if (toolsStarted) {
-            // If we have updated streaming text with citations, use it
-            // Otherwise use frozen initial text
-            const streamingHasCitations = /\[\d+\]/.test(streamingText);
-            const frozenHasCitations = /\[\d+\]/.test(frozenInitialText);
-            
-            if (streamingHasCitations && streamingText.length >= frozenInitialText.length) {
-              finalContent = streamingText;
-              console.log('Using streaming text with citations');
-            } else if (frozenHasCitations) {
-              finalContent = frozenInitialText;
-              console.log('Using frozen text with citations');
-            } else {
-              // Fallback to whichever has content
-              finalContent = streamingText || frozenInitialText;
-              console.log('Using fallback content');
-            }
+
+          // 1. Prefer whichever version actually contains citation markers
+          if (streamingHasCitations && !frozenHasCitations) {
+            finalContent = currentStreaming;
+          } else if (frozenHasCitations && !streamingHasCitations) {
+            finalContent = currentFrozen;
           } else {
-            // No tools, use streaming text directly
-            finalContent = streamingText;
+            // 2. If both (or neither) have citations, choose the longer unless tools never ran
+            if (toolsStarted) {
+              finalContent = currentStreaming.length >= currentFrozen.length ? currentStreaming : currentFrozen;
+            } else {
+              // No tools – streaming text is authoritative
+              finalContent = currentStreaming;
+            }
           }
+          
+          // If we somehow still lack citation markers but have citation data, attempt to inject
+          // them heuristically. We append markers immediately after the first occurrence of
+          // each citedText snippet (case-insensitive) and fall back to appending at the end if
+          // not found. This guarantees the superscript links appear in the UI even when the
+          // backend omits the marker tokens.
+          if (!/\[\d+\]/.test(finalContent) && allCitations.length > 0) {
+            let workingContent = finalContent;
+            allCitations.forEach((cit, idx) => {
+              const marker = `[${idx + 1}]`;
+              // Escape RegExp special chars in citedText
+              const escaped = cit.citedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const regex = new RegExp(escaped, 'i');
+              if (regex.test(workingContent) && !workingContent.includes(marker)) {
+                workingContent = workingContent.replace(regex, (match) => `${match}${marker}`);
+              } else if (!workingContent.includes(marker)) {
+                // Fallback: append marker at the end
+                workingContent += ` ${marker}`;
+              }
+            });
+            finalContent = workingContent;
+          }
+          
+          // -------- De-duplicate trailing unformatted restatement --------
+          const deduplicate = (content: string): string => {
+            // Heuristic: split by double newline, check if last block is large and largely contained in previous blocks (plain-text) – if so, drop it.
+            const blocks = content.split(/\n{2,}/);
+            if (blocks.length < 2) return content;
+            const last = blocks[blocks.length - 1].trim();
+            if (last.length < 200) return content;
+            const plain = (s: string) => s.replace(/\[\d+\]/g, '').replace(/\s+/g, ' ').trim();
+            const lastPlain = plain(last).slice(0, 120);
+            const prevPlain = plain(blocks.slice(0, -1).join(' '));
+            if (prevPlain.includes(lastPlain)) {
+              return blocks.slice(0, -1).join('\n\n').trim();
+            }
+            return content;
+          };
+          finalContent = deduplicate(finalContent);
           
           // Log the final content for debugging
           console.log('Final streamed content:', {
             toolsStarted,
-            frozenInitialTextLength: frozenInitialText.length,
+            frozenInitialTextLength: currentFrozen.length,
             postVisualizationTextLength: postVisualizationText.length,
-            streamingTextLength: streamingText.length,
+            streamingTextLength: currentStreaming.length,
             finalContentLength: finalContent.length,
             hasAnalysisBlocks: event.analysis_blocks && event.analysis_blocks.length > 0
           });
@@ -467,6 +641,13 @@ export function useStreamingChatWithCitations({
         setActiveMessageId(null);
         setMessagePhase('complete');
         lastCompletedMessageIdRef.current = streamingMessageId;
+
+        // If tools were used we expect a follow-up narrative. If the backend does *not* emit a
+        // new_message_start we will catch the first subsequent text_delta and create the message
+        // ourselves.
+        if (toolsStarted) {
+          setAwaitingPostVisualization(true);
+        }
         break;
 
       // ... (other cases remain the same)
@@ -475,7 +656,7 @@ export function useStreamingChatWithCitations({
     }
   }, [messagePhase, toolsStarted, streamingText, frozenInitialText, activeMessageId, 
       streamingMessageId, postToolMessageId, conversationId, onMessageUpdate, pendingCitations, 
-      documentMap, addCitations]);
+      documentMap, addCitations, awaitingPostVisualization]);
 
   // ... (rest of the hook implementation remains the same)
   
@@ -775,6 +956,24 @@ export function useStreamingChatWithCitations({
       setIsConnected(false);
     }
   }, [conversationId]);
+
+  // Helper functions (hoisted) to keep refs and state in sync
+  function appendToStreamingText(delta: string) {
+    streamingTextRef.current += delta;
+    setStreamingText(prev => prev + delta);
+  }
+  function setStreamingFromAccumulated(text: string) {
+    streamingTextRef.current = text;
+    setStreamingText(text);
+  }
+  function appendToFrozenInitial(delta: string) {
+    frozenInitialTextRef.current += delta;
+    setFrozenInitialText(prev => prev + delta);
+  }
+  function setFrozenInitial(text: string) {
+    frozenInitialTextRef.current = text;
+    setFrozenInitialText(text);
+  }
 
   // Return the same interface as the original hook
   return {

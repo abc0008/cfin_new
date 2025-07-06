@@ -2017,6 +2017,8 @@ Follow these guidelines:
             accumulated_metrics = []
             accumulated_citations = []
             streaming_citations = []  # Collect citations from streaming events
+            # Buffer for narrative text that arrives AFTER tool execution (will be emitted later)
+            post_tool_buffer = ""
             
             max_turns = 5  # Limit iterations
             
@@ -2030,7 +2032,7 @@ Follow these guidelines:
                     try:
                         # Create a filtering callback for subsequent turns
                         async def filtered_emit_callback(event: Dict[str, Any]):
-                            nonlocal streaming_citations
+                            nonlocal streaming_citations, post_tool_buffer
                             
                             # Capture citations from streaming events (for ALL turns, not just subsequent ones)
                             if event.get('type') == 'citations_delta' and event.get('citation'):
@@ -2043,7 +2045,10 @@ Follow these guidelines:
                                 event_type = event.get('type')
                                 
                                 # Always allow tool-related events, citation events, and final events
-                                allowed_types = {'tool_start', 'tool_complete', 'chart_ready', 'table_ready', 'metric_ready', 'message_stop', 'citation_marker', 'citations_delta'}
+                                allowed_types = {
+                                    'tool_start', 'tool_complete', 'chart_ready', 'table_ready',
+                                    'metric_ready', 'message_stop', 'citation_marker', 'citations_delta'
+                                }
                                 
                                 # Allow post-tool content updates (these contain new insights)
                                 if event_type == 'content_update' and event.get('is_post_tools') and event.get('post_tool_text'):
@@ -2154,9 +2159,14 @@ Follow these guidelines:
                                         logger.warning(f"Turn {turn + 1}: Detected duplicate content - ignoring")
                                 
                                 if not is_duplicate and new_content and new_content.strip():
-                                    # This is new content, accumulate it
-                                    accumulated_text = accumulated_text + "\n\n" + new_content.strip()
-                                    logger.info(f"Turn {turn + 1}: Added {len(new_content.strip())} chars to accumulated_text. Total: {len(accumulated_text)}")
+                                    # This is new narrative content produced after tools.
+                                    new_segment = new_content.strip()
+                                    accumulated_text = accumulated_text + "\n\n" + new_segment
+                                    # Add to post_tool_buffer for later emission.
+                                    post_tool_buffer = (post_tool_buffer + "\n\n" + new_segment).strip() if post_tool_buffer else new_segment
+                                    logger.info(
+                                        f"Turn {turn + 1}: Added {len(new_segment)} chars to accumulated_text and post_tool_buffer. Total accumulated_text: {len(accumulated_text)}"
+                                    )
                                 else:
                                     logger.info(f"Turn {turn + 1}: Skipped duplicate content")
                     
@@ -2285,6 +2295,97 @@ Follow these guidelines:
             # IMPORTANT: Only return the initial text (before tools)
             # Post-tool content is sent as a separate message via events
             # Including accumulated_text would cause duplication when conversation_service compares content
+            
+            # --- NEW LOGIC: if no post-tool narrative was streamed, generate one now and emit it ---
+            if (accumulated_text.strip() == initial_text_only.strip()) and emit_callback:
+                try:
+                    import uuid
+
+                    # Build a lightweight prompt that gives Claude the titles of generated artefacts
+                    chart_titles = ", ".join([c.get("title", "Unnamed Chart") for c in accumulated_charts])
+                    table_titles = ", ".join([t.get("title", "Unnamed Table") for t in accumulated_tables])
+                    metric_names = ", ".join([m.get("name", "metric") for m in accumulated_metrics])
+
+                    summary_prompt = (
+                        "You have just produced the following visualisations for a financial-document analysis session. "
+                        "Write a concise (1-2 paragraph) narrative that explains the key takeaways from these artefacts.\n\n"
+                        f"Charts: {chart_titles or 'None'}\n"
+                        f"Tables: {table_titles or 'None'}\n"
+                        f"Metrics: {metric_names or 'None'}"
+                    )
+
+                    summary_text_raw = await self.generate_response(
+                        system_prompt=("You are a financial analyst generating a wrap-up narrative. "
+                                       "Summaries MUST be clear, precise, and reference the visuals that were just created."),
+                        messages=[{"role": "user", "content": summary_prompt}],
+                        model=settings.MODEL_HAIKU,  # fast & cheap
+                        max_tokens=600,
+                        temperature=0.4
+                    )
+
+                    concluding_text = str(summary_text_raw).strip()
+                    if concluding_text:
+                        # Log the full narrative (may be long; truncate after 800 chars for readability)
+                        preview_len = 800
+                        logger.info("Post-tool narrative preview: %s%s", concluding_text[:preview_len], "…" if len(concluding_text) > preview_len else "")
+                        new_msg_id = str(uuid.uuid4())
+                        logger.info(f"✅ Generated post-tool summary ({len(concluding_text)} chars); emitting as new message {new_msg_id}")
+
+                        await emit_callback({
+                            "type": "new_message_start",
+                            "role": "assistant",
+                            "is_post_tools": True,
+                            "is_post_visualization": True,
+                            "message_id": new_msg_id
+                        })
+                        await emit_callback({
+                            "type": "text_delta",
+                            "text": concluding_text,
+                            "is_post_tools": True,
+                            "is_post_visualization": True,
+                            "message_id": new_msg_id
+                        })
+                        await emit_callback({
+                            "type": "message_complete",
+                            "is_post_visualization": True,
+                            "message_id": new_msg_id
+                        })
+                except Exception as summary_err:
+                    logger.error(f"Failed to auto-generate post-tool summary: {summary_err}", exc_info=True)
+            
+            # Emit buffered post-tool narrative if any (and if not already emitted via content_update)
+            if post_tool_buffer.strip() and emit_callback:
+                try:
+                    import uuid
+                    new_msg_id = str(uuid.uuid4())
+                    logger.info(
+                        f"✅ Emitting captured post-tool narrative ({len(post_tool_buffer.strip())} chars) as NEW message {new_msg_id}"
+                    )
+                    # Start new message
+                    await emit_callback({
+                        "type": "new_message_start",
+                        "role": "assistant",
+                        "is_post_tools": True,
+                        "is_post_visualization": True,
+                        "message_id": new_msg_id
+                    })
+                    # Stream the entire text as one delta
+                    await emit_callback({
+                        "type": "text_delta",
+                        "is_post_tools": True,
+                        "is_post_visualization": True,
+                        "text": post_tool_buffer.strip(),
+                        "message_id": new_msg_id
+                    })
+                    # Complete the message
+                    await emit_callback({
+                        "type": "message_complete",
+                        "is_post_visualization": True,
+                        "message_id": new_msg_id
+                    })
+                except Exception as err:
+                    logger.error(f"Failed to emit post-tool narrative: {err}")
+
             final_text = initial_text_only if initial_text_only else accumulated_text
             
             logger.info(f"Streaming mode: Returning initial text only ({len(final_text)} chars) for backend processing")

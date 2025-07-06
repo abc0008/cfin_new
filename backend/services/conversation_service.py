@@ -886,14 +886,39 @@ class ConversationService:
         # A new flag to indicate tool_start has been processed by this callback
         # This is specific to the current streaming interaction via this callback instance.
         tool_start_processed_in_current_stream = False
+        # Track whether we've already sent a message_complete for the initial streamed answer.
+        initial_message_completed = False
         
         async def enhanced_emit_callback(event: Dict[str, Any]):
-            nonlocal has_good_content, last_good_content, tool_start_processed_in_current_stream
+            nonlocal has_good_content, last_good_content, tool_start_processed_in_current_stream, initial_message_completed
             
             event_type = event.get("type")
 
+            # Finalise the initial streamed message **after citations finish** – that is right when the
+            # Claude stream emits its own `message_stop` / non-post-tool `message_complete` *before* any
+            # tool_start event.
+            if (event_type in ["message_stop", "message_complete"]) and not event.get("is_post_tools") and not tool_start_processed_in_current_stream:
+                if not initial_message_completed:
+                    initial_message_completed = True
+                    completion_msg_id = message_id if message_id else (
+                        str(assistant_message_placeholder.id) if assistant_message_placeholder else "unknown"
+                    )
+                    if emit_callback:
+                        await emit_callback({
+                            "type": "message_complete",
+                            "message_id": completion_msg_id,
+                            "timestamp": datetime.utcnow().isoformat() + 'Z',
+                            "is_post_tools": False,
+                            "is_post_visualization": False
+                        })
+                        logger.info(
+                            f"🔒 Emitted message_complete after citations for initial answer (message_id={completion_msg_id})"
+                        )
+                # We do *not* forward the original message_stop to frontend (to avoid confusion).
+                return
+
             if event_type == "tool_start":
-                tool_start_processed_in_current_stream = True # Mark that tool_start passed through here
+                tool_start_processed_in_current_stream = True  # Mark that tool_start was seen
                 if assistant_message_placeholder.content and len(assistant_message_placeholder.content) > 100:
                     has_good_content = True
                     last_good_content = assistant_message_placeholder.content
@@ -943,7 +968,7 @@ class ConversationService:
                 return
             
             # Block regular text_delta after tool_start, but not post-tool content or citations
-            if tool_start_processed_in_current_stream and event_type == "text_delta":
+            if tool_start_processed_in_current_stream and event_type == "text_delta" and not event.get("is_post_visualization"):
                 text_content = event.get('text', '')
                 # Check if this is a citation marker text_delta (format: " [1] [2] [3]")
                 import re
@@ -981,7 +1006,7 @@ class ConversationService:
                 if current_normalized and len(current_normalized) > 1000 and len(new_normalized) <= len(current_normalized) + 50:
                     logger.info(f"📝 Blocking content update to DB - already have {len(current_normalized)} chars, new content is {len(new_normalized)} chars")
                     if emit_callback: # Still forward pre-tool_start valid events
-                        event_to_forward = {**event, "message_id": message_id or str(assistant_message_placeholder.id), "content_length": len(new_content)}
+                        event_to_forward = {**event, "message_id": message_id if message_id else (str(assistant_message_placeholder.id) if assistant_message_placeholder else "unknown"), "content_length": len(new_content)}
                         await emit_callback(event_to_forward)
                     return
 
@@ -997,13 +1022,20 @@ class ConversationService:
                         logger.info(f"📝 Detected good formatted content with {newline_count} newlines (pre-tool_start)")
                 
                 if emit_callback:
-                    enhanced_event = {**event, "message_id": message_id or str(assistant_message_placeholder.id), "content_length": len(new_content)}
+                    enhanced_event = {**event, "message_id": message_id if message_id else (str(assistant_message_placeholder.id) if assistant_message_placeholder else "unknown"), "content_length": len(new_content)}
                     await emit_callback(enhanced_event)
                 return
 
             # Fallback for text_delta events (if not blocked by tool_start_processed_in_current_stream)
             if event_type == "text_delta":
-                if tool_start_processed_in_current_stream: 
+                # If this delta belongs to a post-visualisation message, always forward it.
+                if event.get("is_post_visualization"):
+                    if emit_callback:
+                        await emit_callback(event)
+                    return
+
+                # Otherwise, respect the tool_start gating logic
+                if tool_start_processed_in_current_stream:
                     logger.warning("Text_delta reached main processing block despite tool_start_processed_in_current_stream. This is unexpected.")
                     return
                 logger.info(f"Passing through text_delta event (pre-tool_start): '{event.get('text', '')[:50]}...'")
@@ -1014,14 +1046,14 @@ class ConversationService:
                 logger.info(f"📍 Citation marker event received: {event.get('marker')} at index {event.get('citation_index')}")
                 # Citation markers are already injected into the text stream, just forward the event
                 if emit_callback:
-                    event = {**event, "message_id": message_id or str(assistant_message_placeholder.id)}
+                    event = {**event, "message_id": message_id if message_id else (str(assistant_message_placeholder.id) if assistant_message_placeholder else "unknown")}
                     await emit_callback(event)
                 return
             
             # Forward ALL other events (or non-returned text_delta/content_update)
             if emit_callback:
                 if event.get("type") not in ["error"] and not event.get("message_id"):
-                    event = {**event, "message_id": message_id or str(assistant_message_placeholder.id)}
+                    event = {**event, "message_id": message_id if message_id else (str(assistant_message_placeholder.id) if assistant_message_placeholder else "unknown")}
                 await emit_callback(event)
         
         # Note: message_start event is already sent by WebSocket handler
@@ -1340,8 +1372,15 @@ class ConversationService:
                     visualizations=items_for_analysis_blocks
                 )
                 
-                # NOW send message_complete event after analysis blocks are stored atomically
-                logger.info(f"Sending message_complete event for conversation {conversation_id} after analysis blocks stored")
+                # NOW send message_complete event after analysis blocks are stored atomically unless we already sent it earlier
+                if initial_message_completed:
+                    logger.info(
+                        "Skipping duplicate message_complete for initial message; it was already sent at first tool_start"
+                    )
+                else:
+                    logger.info(
+                        f"Sending message_complete event for conversation {conversation_id} after analysis blocks stored"
+                    )
 
                 # Serialize analysis blocks for immediate frontend rendering
                 serialized_blocks = []

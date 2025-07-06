@@ -26,7 +26,8 @@ class StreamingSession:
     conversation_id: str
     active: bool = True
     has_sent_start: bool = False
-    created_at: datetime = None
+    post_visualization_message_id: Optional[str] = None
+    created_at: Optional[datetime] = None
     
     def __post_init__(self):
         if self.created_at is None:
@@ -41,6 +42,10 @@ def cleanup_stale_sessions(max_age_minutes: int = 30):
     sessions_to_remove = []
     
     for session_key, session in streaming_sessions.items():
+        if session.created_at is None:
+            # Skip sessions without a timestamp (should not happen)
+            continue
+
         age = (now - session.created_at).total_seconds() / 60
         if age > max_age_minutes and not session.active:
             sessions_to_remove.append(session_key)
@@ -299,10 +304,21 @@ async def handle_streaming_message(
             
             event_type = event.get("type", "unknown")
             
-            # For new_message_start events, allow the new message_id
-            if event_type == "new_message_start" and event.get("is_post_visualization"):
+            # For new_message_start events related to the post-visualisation wrap-up, allow the new message_id
+            # We consider both the explicit `is_post_visualization` flag *and* the more generic
+            # `is_post_tools` flag because earlier back-end versions only set the latter.
+            if event_type == "new_message_start" and (event.get("is_post_visualization") or event.get("is_post_tools")):
                 # This is a new post-visualization message, don't override its ID
                 logger.info(f"Allowing new message_id {event.get('message_id')} for post-visualization message")
+                # Persist the allowed post-visualization message_id on the session so that
+                # subsequent text_delta / citations_delta / message_complete events are not rewritten
+                current_session.post_visualization_message_id = event.get("message_id")
+
+            # Skip ID correction when the event belongs to the post-visualisation message or carries the proper flags
+            if event.get("is_post_visualization") or event.get("is_post_tools") or (
+                current_session.post_visualization_message_id and event.get("message_id") == current_session.post_visualization_message_id
+            ):
+                pass  # keep the original message_id as-is
             else:
                 # For other events, use the session's message_id to ensure consistency
                 if event.get("message_id") != current_session.message_id:
