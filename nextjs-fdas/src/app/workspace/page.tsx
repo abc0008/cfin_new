@@ -6,7 +6,7 @@ import { FileText, BarChart2, Upload, FileUp, Zap, ChevronRight, FileSearch } fr
 import { StreamingChatInterface } from '../../components/chat/StreamingChatInterface'
 import { UploadForm } from '../../components/document/UploadForm'
 import dynamic from 'next/dynamic'
-import { ProcessedDocument, AnalysisResult, Message } from '@/types'
+import { ProcessedDocument, AnalysisResult, Message, Citation } from '@/types'
 import { conversationApi } from '@/lib/api/conversation'
 import { analysisApi } from '@/lib/api/analysis'
 import Canvas from '@/components/visualization/Canvas'
@@ -614,6 +614,15 @@ export default function Workspace() {
     });
   }, []);
 
+  // Handle clicking a citation marker in the chat – switch to the document tab and
+  // scroll to the related highlight (if we have its ID)
+  const handleNavigateToHighlight = useCallback((citation: Citation) => {
+    if (citation) {
+      setHighlightId(citation.id);
+      setActiveTab('document');
+    }
+  }, []);
+
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-background to-muted/20">
       <div className="container mx-auto px-4 pt-2">
@@ -642,6 +651,7 @@ export default function Workspace() {
               isLoading={isLoading}
               conversationId={sessionId || undefined}
               onMessageUpdate={handleMessageUpdate}
+              onNavigateToHighlight={handleNavigateToHighlight}
             />
           </div>
         </div>

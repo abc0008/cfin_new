@@ -10,36 +10,74 @@ declare module 'react-pdf-highlighter' {
   }
 }
 
-export const convertCitationToHighlight = (citation: Citation): IHighlight => {
-  // Handle empty rects by using a placeholder
-  const boundingRect = citation.rects[0] || {
-    x1: 0, y1: 0, x2: 0, y2: 0, width: 0, height: 0, pageNumber: 1
+export const convertCitationToHighlight = (citation: Citation, viewport?: any): IHighlight => {
+  // Use real viewport dimensions
+  const PAGE_WIDTH = viewport?.width || 612;
+  const PAGE_HEIGHT = viewport?.height || 792;
+
+  const toScaledRect = (rect: CitationRect) => {
+    // Some backend citations only give width/height + pageNumber. Default missing
+    // coordinates to 0 so we at least jump to the correct page.
+    const hasCoords = typeof rect.x1 === 'number' && typeof rect.y1 === 'number';
+    const x1Abs = hasCoords ? rect.x1 : 0;
+    const y1Abs = hasCoords ? rect.y1 : 0;
+    const x2Abs = rect.x2 ?? (hasCoords ? x1Abs + (rect.width ?? 0) : 0);
+    const y2Abs = rect.y2 ?? (hasCoords ? y1Abs + (rect.height ?? 0) : 0);
+
+    // React-pdf-highlighter expects viewport coordinates (in PDF points) not
+    // values normalised to 0-1.  Pass through the absolute values so the
+    // overlay is the correct size on the rendered page.
+    return {
+      x1: x1Abs,
+      y1: y1Abs,
+      x2: x2Abs,
+      y2: y2Abs,
+      left: x1Abs,
+      top: y1Abs,
+      width: x2Abs - x1Abs,
+      height: y2Abs - y1Abs,
+      pageNumber: rect.pageNumber,
+    };
   };
 
-  // Convert CitationRect to the format expected by react-pdf-highlighter
-  const convertRect = (rect: CitationRect) => ({
-    x1: rect.x1,
-    y1: rect.y1,
-    x2: rect.x2,
-    y2: rect.y2,
-    width: rect.width,
-    height: rect.height,
-    pageNumber: rect.pageNumber
-  });
+  // If no rects, log warning but create minimal highlight
+  if (citation.rects.length === 0) {
+    console.warn('Citation has no rects, using placeholder');
+  }
+
+  // Use first rect or fall back to placeholder at (0,0)
+  const boundingRect = citation.rects.length > 0
+    ? toScaledRect(citation.rects[0])
+    : {
+        x1: 0,
+        y1: 0,
+        x2: 100,
+        y2: 15,
+        left: 0,
+        top: 0,
+        width: 100,
+        height: 15,
+        pageNumber: citation.startPageNumber || 1,
+      };
+
+  // Convert all rects (or placeholder) for React component
+  const convertRect = (rect: CitationRect) => toScaledRect(rect);
 
   return {
-    id: citation.highlightId,
+    // Always use the stable citation UUID as the main highlight id so the
+    // chat-panel click (which passes citation.id) matches a highlight.
+    id: citation.id,
     content: {
       text: citation.citedText
     },
     position: {
-      boundingRect: convertRect(boundingRect),
-      rects: citation.rects.length > 0 ? citation.rects.map(convertRect) : [convertRect(boundingRect)],
+      boundingRect: boundingRect,
+      rects: citation.rects.length > 0 ? citation.rects.map(toScaledRect) : [boundingRect],
       pageNumber: citation.startPageNumber || 1
     },
     comment: {
       text: citation.citedText,
-      emoji: "📍"
+      emoji: "" // No pin icon; we rely on rect highlight only
     },
     isAICitation: true,
     rawClaudeCitation: {
@@ -52,8 +90,9 @@ export const convertCitationToHighlight = (citation: Citation): IHighlight => {
       start_char_index: citation.startCharIndex,
       end_char_index: citation.endCharIndex,
       start_block_index: citation.startBlockIndex,
-      end_block_index: citation.endBlockIndex
-    }
+      end_block_index: citation.endBlockIndex,
+      highlightId: citation.highlightId as unknown
+    } as any
   };
 };
 

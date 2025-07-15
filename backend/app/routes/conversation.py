@@ -5,6 +5,7 @@ import logging
 import json
 import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
+from enum import Enum
 
 from models.message import ConversationCreateRequest, MessageRequest, MessageResponse
 from utils.dependencies import get_conversation_service, get_document_service
@@ -242,7 +243,9 @@ async def get_conversation_history(
                 'documentIndex': 0,  # Keep for backward compatibility
                 'documentTitle': doc_title,
                 'highlightId': citation.highlight_id or str(citation.id),
-                'rects': []  # TODO: Parse rects from citation.rects if available
+                'rects': (lambda r: [] if not r else (
+                    (json.loads(r) if isinstance(r, str) else r)
+                ))(citation.rects)
             }
             
             if citation_type == 'page_location' or citation_type == CitationType.PAGE_LOCATION:
@@ -715,7 +718,9 @@ async def get_message(
                 'documentIndex': 0,  # Keep for backward compatibility
                 'documentTitle': doc_title,
                 'highlightId': citation.highlight_id or str(citation.id),
-                'rects': []  # TODO: Parse rects from citation.rects if available
+                'rects': (lambda r: [] if not r else (
+                    (json.loads(r) if isinstance(r, str) else r)
+                ))(citation.rects)
             }
             
             if citation_type == 'page_location' or citation_type == CitationType.PAGE_LOCATION:

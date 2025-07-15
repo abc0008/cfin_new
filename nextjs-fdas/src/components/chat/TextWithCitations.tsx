@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Citation } from '@/lib/api/types';
+import { Citation } from '@/types';
 
 interface TextWithCitationsProps {
   text: string;
@@ -41,7 +41,13 @@ export function TextWithCitations({
             key={`citation-${match.index}`}
             onClick={() => onCitationClick?.(citation)}
             className="inline-flex items-center px-1 py-0.5 mx-0.5 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200 transition-colors cursor-pointer"
-            title={`Page ${citation.pageNumber || 'N/A'}`}
+            title={`Page ${
+              // Prefer explicit startPageNumber if present, otherwise fallback
+              citation.startPageNumber ??
+              (citation.rects && citation.rects.length > 0 ? citation.rects[0].pageNumber : undefined) ??
+              citation.endPageNumber ??
+              'N/A'
+            }`}
           >
             [{match[1]}]
           </button>

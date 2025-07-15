@@ -7,7 +7,7 @@ import json
 from typing import Dict, List, Tuple, Optional, Any
 from models.citation import (
     Citation, CitationPayload, CitationType, 
-    CharLocationCitation, PageLocationCitation, ContentBlockLocationCitation
+    CharLocationCitation, PageLocationCitation, ContentBlockLocationCitation, CitationRect
 )
 
 
@@ -85,6 +85,22 @@ def create_citation_from_anthropic(
     Returns:
         CitationPayload object
     """
+    # Build rects list: if Anthropic did not supply any and we have a page
+    # number, fabricate a 0×0 rectangle at (0,0) so the frontend can still
+    # scroll to the correct page.
+    rects_input = data.get("rects", []) or []
+    if not rects_input and data.get("type") == "page_location":
+        if (sp := data.get("start_page_number")) is not None:
+            rects_input = [{
+                "x1": 0, "y1": 0,
+                "x2": 0, "y2": 0,
+                "width": 0, "height": 0,
+                "pageNumber": sp
+            }]
+
+    # Convert to CitationRect objects for validation
+    rect_objs = [CitationRect(**r) for r in rects_input] if rects_input else []
+
     # Base fields common to all citation types
     base_fields = {
         "id": citation_id,
@@ -93,7 +109,7 @@ def create_citation_from_anthropic(
         "type": CitationType(data["type"]),
         "cited_text": data.get("cited_text", ""),
         "document_title": data.get("document_title", ""),
-        "rects": []  # Will be populated later with coordinate mapping
+        "rects": rect_objs
     }
     
     # Add type-specific fields

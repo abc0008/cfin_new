@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3-Message Architecture Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background: #f5f5f5;
+        }
+        .message.assistant {
+            background: #e3f2fd;
+        }
+        .message.user {
+            background: #f3e5f5;
+        }
+        .message.tools {
+            background: #fff3e0;
+            border: 2px dashed #ff9800;
+        }
+        .message.post-viz {
+            background: #e8f5e9;
+        }
+        .tool-indicator {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #2196f3;
+            color: white;
+            border-radius: 4px;
+            font-size: 12px;
+            margin: 2px;
+        }
+        .citation {
+            color: #1976d2;
+            text-decoration: underline;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .log-entry {
+            font-family: monospace;
+            font-size: 12px;
+            margin: 2px 0;
+            padding: 2px 5px;
+        }
+        .log-entry.info { background: #e3f2fd; }
+        .log-entry.warning { background: #fff3e0; }
+        .log-entry.error { background: #ffebee; }
+        .log-entry.success { background: #e8f5e9; }
+        .phase-indicator {
+            display: inline-block;
+            padding: 2px 6px;
+            background: #9c27b0;
+            color: white;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+        #event-log {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            background: #fafafa;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 0 5px;
+            border: none;
+            border-radius: 4px;
+            background: #2196f3;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status.connected { background: #e8f5e9; color: #2e7d32; }
+        .status.disconnected { background: #ffebee; color: #c62828; }
+        .message-complete-indicator {
+            display: inline-block;
+            padding: 2px 6px;
+            background: #4caf50;
+            color: white;
+            border-radius: 3px;
+            font-size: 11px;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>3-Message Architecture Flow Test</h1>
+    
+    <div class="status disconnected" id="connection-status">Disconnected</div>
+    
+    <div class="controls">
+        <button onclick="connect()">Connect WebSocket</button>
+        <button onclick="disconnect()">Disconnect</button>
+        <button onclick="sendTestMessage()">Send Test Message</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div class="test-container">
+        <div class="panel">
+            <h2>Chat Messages</h2>
+            <div id="messages"></div>
+        </div>
+        
+        <div class="panel">
+            <h2>Event Log</h2>
+            <div id="event-log"></div>
+        </div>
+    </div>
+    
+    <script>
+        let ws = null;
+        let messagePhase = null;
+        let toolsInProgress = new Map();
+        let streamingMessageId = null;
+        let streamingText = '';
+        let frozenInitialText = '';
+        let citationCounter = 0;
+        let receivedCitations = new Set();
+        let highestCitation = 0;
+        let messagesMap = new Map(); // Track messages by ID
+        let activeMessageId = null;
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('event-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toISOString().split('T')[1].slice(0, 8)}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connection-status');
+            status.className = connected ? 'status connected' : 'status disconnected';
+            status.textContent = connected ? 'Connected' : 'Disconnected';
+        }
+        
+        function renderMessages() {
+            const container = document.getElementById('messages');
+            container.innerHTML = '';
+            
+            messagesMap.forEach((message, id) => {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = `message ${message.role} ${message.type || ''}`;
+                
+                // Add phase indicator
+                if (message.phase) {
+                    msgDiv.innerHTML += `<span class="phase-indicator">${message.phase}</span> `;
+                }
+                
+                // Add content
+                if (message.content) {
+                    msgDiv.innerHTML += message.content;
+                }
+                
+                // Add tools in progress
+                if (message.toolsInProgress && message.toolsInProgress.length > 0) {
+                    msgDiv.innerHTML += '<div style="margin-top: 5px;">';
+                    message.toolsInProgress.forEach(tool => {
+                        msgDiv.innerHTML += `<span class="tool-indicator">${getToolLabel(tool.name)}</span>`;
+                    });
+                    msgDiv.innerHTML += '</div>';
+                }
+                
+                // Add completion indicator
+                if (message.completed) {
+                    msgDiv.innerHTML += '<span class="message-complete-indicator">✓ Complete</span>';
+                }
+                
+                container.appendChild(msgDiv);
+            });
+        }
+        
+        function getToolLabel(name) {
+            switch (name) {
+                case 'generate_graph_data': return '📊 Creating chart...';
+                case 'generate_table_data': return '📋 Building table...';
+                case 'generate_financial_metric': return '📈 Calculating metric...';
+                default: return '⚙️ Processing...';
+            }
+        }
+        
+        function handleStreamingEvent(event) {
+            const eventType = event.type;
+            log(`Event: ${eventType}${event.message_id ? ` (msg: ${event.message_id})` : ''}`);
+            
+            switch (eventType) {
+                case 'connected':
+                    log('WebSocket connected successfully', 'success');
+                    break;
+                    
+                case 'message_start':
+                    streamingMessageId = event.message_id;
+                    activeMessageId = event.message_id;
+                    streamingText = '';
+                    frozenInitialText = '';
+                    messagePhase = 'initial';
+                    citationCounter = 0;
+                    receivedCitations.clear();
+                    highestCitation = 0;
+                    
+                    messagesMap.set(streamingMessageId, {
+                        id: streamingMessageId,
+                        role: 'assistant',
+                        content: '',
+                        phase: 'initial',
+                        toolsInProgress: []
+                    });
+                    
+                    log(`Started new message: ${streamingMessageId}`, 'success');
+                    renderMessages();
+                    break;
+                    
+                case 'new_message_start':
+                    const newMsgId = event.message_id;
+                    
+                    if (event.is_tools_message) {
+                        log(`New tools message: ${newMsgId}`, 'info');
+                        messagesMap.set(newMsgId, {
+                            id: newMsgId,
+                            role: 'assistant',
+                            content: '🔧 Processing tools...',
+                            type: 'tools',
+                            phase: 'tools',
+                            toolsInProgress: Array.from(toolsInProgress.entries()).map(([id, name]) => ({ id, name }))
+                        });
+                    } else if (event.is_post_visualization) {
+                        log(`New post-visualization message: ${newMsgId}`, 'info');
+                        messagesMap.set(newMsgId, {
+                            id: newMsgId,
+                            role: 'assistant',
+                            content: '',
+                            type: 'post-viz',
+                            phase: 'post-viz'
+                        });
+                        activeMessageId = newMsgId;
+                    }
+                    renderMessages();
+                    break;
+                    
+                case 'text_delta':
+                    if (!event.text) break;
+                    
+                    const hasCitationMarkers = /\[\d+\]/.test(event.text);
+                    
+                    if (hasCitationMarkers) {
+                        // Extract citation numbers
+                        const citations = event.text.match(/\[(\d+)\]/g);
+                        if (citations) {
+                            citations.forEach(marker => {
+                                const num = parseInt(marker.match(/\d+/)[0]);
+                                receivedCitations.add(num);
+                                highestCitation = Math.max(highestCitation, num);
+                            });
+                            log(`Citation markers received: ${citations.join(', ')}. Total: ${receivedCitations.size}/${highestCitation}`, 'info');
+                        }
+                    }
+                    
+                    // Update the appropriate message
+                    const targetMessageId = event.message_id || activeMessageId || streamingMessageId;
+                    const targetMessage = messagesMap.get(targetMessageId);
+                    
+                    if (targetMessage) {
+                        targetMessage.content += event.text;
+                        
+                        // Update frozen text if in initial phase
+                        if (messagePhase === 'initial') {
+                            streamingText += event.text;
+                        }
+                        
+                        renderMessages();
+                    }
+                    break;
+                    
+                case 'tool_start':
+                    if (event.tool_id && event.tool_name) {
+                        toolsInProgress.set(event.tool_id, event.tool_name);
+                        log(`Tool started: ${event.tool_name} (${event.tool_id})`, 'info');
+                        
+                        // Freeze initial text
+                        if (messagePhase === 'initial') {
+                            frozenInitialText = streamingText;
+                            messagePhase = 'tools';
+                            log(`Phase transition: initial → tools. Frozen text length: ${frozenInitialText.length}`, 'warning');
+                        }
+                        
+                        // Update tools message if it exists
+                        messagesMap.forEach((msg) => {
+                            if (msg.type === 'tools') {
+                                msg.toolsInProgress = Array.from(toolsInProgress.entries()).map(([id, name]) => ({ id, name }));
+                            }
+                        });
+                        
+                        renderMessages();
+                    }
+                    break;
+                    
+                case 'tool_complete':
+                    if (event.tool_id) {
+                        const toolName = toolsInProgress.get(event.tool_id) || 'unknown';
+                        toolsInProgress.delete(event.tool_id);
+                        log(`Tool completed: ${toolName} (${event.tool_id}). Remaining: ${toolsInProgress.size}`, 'success');
+                        
+                        // Update tools message
+                        messagesMap.forEach((msg) => {
+                            if (msg.type === 'tools') {
+                                msg.toolsInProgress = Array.from(toolsInProgress.entries()).map(([id, name]) => ({ id, name }));
+                                if (toolsInProgress.size === 0) {
+                                    msg.content = '✅ Tools processing complete';
+                                }
+                            }
+                        });
+                        
+                        renderMessages();
+                    }
+                    break;
+                    
+                case 'message_complete':
+                    const completedId = event.message_id;
+                    const completedMsg = messagesMap.get(completedId);
+                    
+                    if (completedMsg) {
+                        completedMsg.completed = true;
+                        
+                        if (event.is_tools_message) {
+                            log(`Tools message completed: ${completedId}`, 'success');
+                        } else if (event.is_post_visualization) {
+                            log(`Post-visualization message completed: ${completedId}`, 'success');
+                        } else {
+                            log(`Initial message completed: ${completedId}. Citations: ${receivedCitations.size}/${highestCitation}`, 'success');
+                        }
+                        
+                        renderMessages();
+                    }
+                    break;
+                    
+                case 'error':
+                    log(`Error: ${event.message}`, 'error');
+                    break;
+            }
+        }
+        
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Already connected', 'warning');
+                return;
+            }
+            
+            const wsUrl = 'ws://localhost:8000/ws/conversation/test-conversation-' + Date.now();
+            log(`Connecting to: ${wsUrl}`);
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                updateConnectionStatus(true);
+                log('WebSocket opened', 'success');
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleStreamingEvent(data);
+                } catch (e) {
+                    log(`Error parsing message: ${e.message}`, 'error');
+                }
+            };
+            
+            ws.onerror = (error) => {
+                log(`WebSocket error: ${error}`, 'error');
+            };
+            
+            ws.onclose = () => {
+                updateConnectionStatus(false);
+                log('WebSocket closed', 'warning');
+                ws = null;
+            };
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        function sendTestMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('Not connected', 'error');
+                return;
+            }
+            
+            // Add user message
+            const userMsgId = 'user-' + Date.now();
+            messagesMap.set(userMsgId, {
+                id: userMsgId,
+                role: 'user',
+                content: 'Analyze the financial performance trends and create visualizations for key metrics.'
+            });
+            renderMessages();
+            
+            // Send message
+            const message = {
+                type: 'message',
+                content: 'Analyze the financial performance trends and create visualizations for key metrics.',
+                options: {
+                    referenced_documents: ['doc-123']
+                }
+            };
+            
+            ws.send(JSON.stringify(message));
+            log('Sent test message', 'info');
+        }
+        
+        function clearLog() {
+            document.getElementById('event-log').innerHTML = '';
+            document.getElementById('messages').innerHTML = '';
+            messagesMap.clear();
+        }
+        
+        // Simulate the complete flow
+        async function simulateFlow() {
+            log('=== Starting 3-Message Flow Simulation ===', 'success');
+            
+            // 1. Message start
+            handleStreamingEvent({ type: 'message_start', message_id: 'msg-1' });
+            await sleep(100);
+            
+            // 2. Initial text streaming
+            handleStreamingEvent({ type: 'text_delta', text: 'I\'ll analyze the financial performance trends ' });
+            await sleep(100);
+            handleStreamingEvent({ type: 'text_delta', text: 'and create visualizations for the key metrics. ' });
+            await sleep(100);
+            handleStreamingEvent({ type: 'text_delta', text: 'Let me examine the data and generate the appropriate charts.' });
+            await sleep(200);
+            
+            // 3. Tool start (triggers citation completion)
+            handleStreamingEvent({ type: 'tool_start', tool_id: 'tool-1', tool_name: 'generate_graph_data' });
+            await sleep(200);
+            
+            // 4. Citation markers arrive after tool_start
+            handleStreamingEvent({ type: 'text_delta', text: ' [1] [2] [3]' });
+            await sleep(200);
+            
+            // 5. Message complete for initial message
+            handleStreamingEvent({ type: 'message_complete', message_id: 'msg-1' });
+            await sleep(200);
+            
+            // 6. New tools message
+            handleStreamingEvent({ type: 'new_message_start', message_id: 'msg-2', is_tools_message: true });
+            await sleep(100);
+            
+            // 7. More tools
+            handleStreamingEvent({ type: 'tool_start', tool_id: 'tool-2', tool_name: 'generate_table_data' });
+            await sleep(300);
+            handleStreamingEvent({ type: 'tool_start', tool_id: 'tool-3', tool_name: 'generate_financial_metric' });
+            await sleep(300);
+            
+            // 8. Tools complete
+            handleStreamingEvent({ type: 'tool_complete', tool_id: 'tool-1' });
+            await sleep(200);
+            handleStreamingEvent({ type: 'tool_complete', tool_id: 'tool-2' });
+            await sleep(200);
+            handleStreamingEvent({ type: 'tool_complete', tool_id: 'tool-3' });
+            await sleep(200);
+            
+            // 9. Tools message complete
+            handleStreamingEvent({ type: 'message_complete', message_id: 'msg-2', is_tools_message: true });
+            await sleep(200);
+            
+            // 10. Post-visualization message
+            handleStreamingEvent({ type: 'new_message_start', message_id: 'msg-3', is_post_visualization: true });
+            await sleep(100);
+            handleStreamingEvent({ type: 'text_delta', text: 'Based on the analysis, here are the key insights:\n\n' });
+            await sleep(100);
+            handleStreamingEvent({ type: 'text_delta', text: '1. Revenue growth has been consistent at 12% YoY\n' });
+            await sleep(100);
+            handleStreamingEvent({ type: 'text_delta', text: '2. Operating margins improved by 3 percentage points\n' });
+            await sleep(100);
+            handleStreamingEvent({ type: 'text_delta', text: '3. Cash flow remains strong with positive trends' });
+            await sleep(200);
+            
+            // 11. Final message complete
+            handleStreamingEvent({ type: 'message_complete', message_id: 'msg-3', is_post_visualization: true });
+            
+            log('=== Simulation Complete ===', 'success');
+        }
+        
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        // Add simulation button
+        const controlsDiv = document.querySelector('.controls');
+        const simButton = document.createElement('button');
+        simButton.textContent = 'Run Simulation';
+        simButton.onclick = simulateFlow;
+        controlsDiv.appendChild(simButton);
+    </script>
+</body>
+</html>

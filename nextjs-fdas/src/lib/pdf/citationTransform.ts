@@ -26,7 +26,7 @@ export const transformClaudeCitation = (
     documentTitle: claudeCitation.document_title || '',
     type: (claudeCitation.type || 'page_location') as Citation['type'],
     citedText: claudeCitation.cited_text || (claudeCitation as any).citedText || '',
-    rects: [],  // TODO: Parse from backend when available
+    rects: (claudeCitation as any).rects || [],  // Use rects from backend if available
     // Handle both snake_case and camelCase field names
     startPageNumber: claudeCitation.start_page_number || 
       (claudeCitation as any).startPageNumber || 

@@ -208,3 +208,150 @@ With these changes the user sees:
 6. **CitationContext** → Stores citations globally
 7. **MessageList** → Displays text with citation markers
 8. **PDFViewer** → Highlights cited passages
+
+## 8. Three-Message Architecture (2025-07-07)
+
+This section describes the **3-message architecture** implemented to fix message ordering issues where tool calls were sharing the same message_id as the initial message, causing timestamp problems.
+
+### 8.1 Problem Statement
+
+Previously, the system used the same `message_id` for:
+- Initial assistant response with citations
+- Tool/visualization execution events
+- Analysis blocks storage
+
+This caused the initial message's `message_complete` to be delayed until after all tools finished, resulting in incorrect timestamp ordering.
+
+### 8.2 Solution: Three Distinct Messages
+
+The system now creates **3 separate messages** with unique IDs:
+
+| Message Type | Content | When Created | Message ID |
+|--------------|---------|--------------|------------|
+| **Initial Message** | Text response with citation markers `[1]`, `[2]`, etc. | At conversation start | `M1` (original streaming ID) |
+| **Tools Message** | Analysis blocks only (charts, tables, metrics) | When first `tool_start` detected | `M2` (new ID) |
+| **Post-Viz Message** | Concluding analysis narrative | After tools complete | `M3` (new ID) |
+
+### 8.3 Backend Implementation Changes
+
+#### `/backend/services/conversation_service.py`
+
+**Initial Message Completion (Lines 929-959):**
+- When `tool_start` is detected, checks if citation markers are present
+- If citations exist: Immediately sends `message_complete` for initial message
+- If no citations yet: Sets `waiting_for_citations = True` and defers completion
+
+**Citation Race Condition Handling (Lines 1017-1040):**
+- When citation markers arrive after `tool_start`:
+  - Updates database with complete content
+  - Sends deferred `message_complete` if waiting
+  - Ensures initial message always includes its citations
+
+**Tools Message Creation (Lines 1356-1377):**
+```python
+# Create a NEW message for tools/visualizations
+tools_message = await self.conversation_repository.add_message(
+    conversation_id=conversation_id,
+    role="assistant",
+    content="",  # Tools message has no text content
+    referenced_documents=[],
+    referenced_analyses=[]
+)
+
+# Emit new_message_start for the tools message
+if emit_callback:
+    await emit_callback({
+        "type": "new_message_start",
+        "message_id": str(tools_message.id),
+        "role": "assistant",
+        "is_tools_message": True
+    })
+```
+
+**Analysis Blocks Storage (Lines 1403-1410):**
+- Analysis blocks are now stored on the `tools_message`, not the initial message
+- Tools message completion includes `is_tools_message: True` flag
+
+#### `/backend/app/routes/websocket.py`
+
+**StreamingSession Updates (Lines 28-29):**
+```python
+tools_message_id: Optional[str] = None  # Track tools message separately
+```
+
+**Message ID Routing (Lines 310-324):**
+- Recognizes `is_tools_message` flag in `new_message_start` events
+- Stores `tools_message_id` in session
+- Prevents ID correction for tools message events
+
+### 8.4 Frontend Implementation Changes
+
+#### `/nextjs-fdas/src/hooks/useStreamingChatWithCitations.ts`
+
+**StreamingEvent Interface (Line 33):**
+```typescript
+is_tools_message?: boolean;  // New flag for tools messages
+```
+
+**Tools Message Handling (Lines 142-162):**
+```typescript
+case 'new_message_start':
+  // Handle new message for tools/visualization content
+  if (event.is_tools_message && onMessageUpdate) {
+    const toolsMessage: Message = {
+      id: event.message_id || `tools-${Date.now()}`,
+      sessionId: conversationId,
+      timestamp: new Date().toISOString(),
+      role: 'assistant',
+      content: '',  // Tools message has no text content
+      analysis_blocks: []  // Will be populated by tool events
+    };
+    onMessageUpdate(toolsMessage);
+    setActiveMessageId(event.message_id || null);
+  }
+```
+
+**Tools Message Completion (Lines 471-490):**
+```typescript
+if (event.is_tools_message) {
+  // Update tools message with analysis blocks
+  if (onMessageUpdate && event.message_id && event.analysis_blocks) {
+    onMessageUpdate({
+      id: event.message_id,
+      content: '',  // Tools message has no text content
+      analysis_blocks: event.analysis_blocks || []
+    });
+  }
+  return;
+}
+```
+
+### 8.5 Event Flow Timeline
+
+| Time | Event | Message ID | Result |
+|------|-------|------------|--------|
+| T0 | User sends question | - | User message created |
+| T1 | `message_start` | M1 | Initial assistant message created |
+| T2 | `text_delta` + citations | M1 | Text streams with `[1]`, `[2]` markers |
+| T3 | `citations_delta` | M1 | Citation metadata collected |
+| T4 | `tool_start` detected | M1 | **Initial message completed** ✓ |
+| T5 | `new_message_start` | M2 | **Tools message created** |
+| T6 | `tool_complete` events | M2 | Visualizations added to tools message |
+| T7 | `message_complete` | M2 | **Tools message completed** ✓ |
+| T8 | `new_message_start` | M3 | **Post-viz message created** |
+| T9 | `text_delta` | M3 | Concluding narrative streams |
+| T10 | `message_complete` | M3 | **Post-viz message completed** ✓ |
+
+### 8.6 Benefits
+
+1. **Correct Timestamps**: Each message gets its timestamp when created, maintaining proper chronological order
+2. **Clean Separation**: Initial text, visualizations, and conclusions are clearly separated
+3. **Race Condition Handling**: Citations that arrive after `tool_start` are properly handled
+4. **Backward Compatible**: Existing post-visualization logic remains intact
+
+### 8.7 Key Invariants
+
+1. Initial message ALWAYS completes with its citations before tools message starts
+2. Tools message contains ONLY analysis blocks, no text content
+3. Each message has a unique ID and timestamp
+4. Citation markers are never lost, even if they arrive after `tool_start`

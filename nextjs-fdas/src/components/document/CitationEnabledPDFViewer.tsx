@@ -17,8 +17,9 @@ interface CitationNavigationEvent extends CustomEvent {
 
 export function CitationEnabledPDFViewer(props: React.ComponentProps<typeof PDFViewer>) {
   const { openCitation } = useCitation();
-  const { measureCitationLoad, measureSearch, startTimer, endTimer } = usePerformanceMonitor();
+  const { measureCitationLoad, startTimer, endTimer } = usePerformanceMonitor();
   const [navigatingToCitation, setNavigatingToCitation] = useState<string | null>(null);
+  const [localCitations, setLocalCitations] = useState<Citation[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
@@ -37,11 +38,16 @@ export function CitationEnabledPDFViewer(props: React.ComponentProps<typeof PDFV
     const handleCitationNavigation = async (event: Event) => {
       const citationEvent = event as CitationNavigationEvent;
       const { citation } = citationEvent.detail;
+      console.log('[CitationEnabledPDFViewer] Received citation-navigation event for citation:', citation);
       
       // If this viewer is showing the citation's document, scroll to it
       if (props.document?.metadata.id === citation.documentId) {
         startTimer(`nav_${citation.id}`);
-        setNavigatingToCitation(citation.highlightId);
+
+        // Ensure placeholder is known to the viewer so scroll works immediately
+        setLocalCitations([citation]);
+        console.log('[CitationEnabledPDFViewer] Navigating to citation in this viewer:', citation.id);
+        setNavigatingToCitation(citation.id);
         
         // Record navigation performance
         setTimeout(() => {
@@ -62,6 +68,7 @@ export function CitationEnabledPDFViewer(props: React.ComponentProps<typeof PDFV
 
   // Handle citation clicks using CitationContext with performance monitoring
   const handleCitationClick = async (citationOrHighlight: Citation | any) => {
+    console.log('[CitationEnabledPDFViewer] Citation clicked:', citationOrHighlight);
     if ('highlightId' in citationOrHighlight && 'documentId' in citationOrHighlight) {
       // It's a Citation object - measure load time
       await measureCitationLoad(citationOrHighlight.id, async () => {
@@ -78,6 +85,7 @@ export function CitationEnabledPDFViewer(props: React.ComponentProps<typeof PDFV
     ...props,
     highlightId: navigatingToCitation || props.highlightId,
     onCitationClick: handleCitationClick,
+    extraCitations: localCitations,
     onCitationsLoaded: (citations: any[]) => {
       setFoundCitations(citations.length);
       if (props.onCitationsLoaded) {
@@ -88,7 +96,10 @@ export function CitationEnabledPDFViewer(props: React.ComponentProps<typeof PDFV
 
   return (
     <>
-      <PDFViewer {...enhancedProps} />
+      <PDFViewer
+        key={props.document?.metadata.id}
+        {...enhancedProps}
+      />
       <CitationSearchProgress
         isSearching={isSearching}
         searchProgress={searchProgress}

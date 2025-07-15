@@ -112,7 +112,7 @@ export const conversationsApi = {
   async getConversationHistory(sessionId: string, limit: number = 50): Promise<Message[]> {
     try {
       const response = await apiService.get<any[]>(
-        `/conversation/${sessionId}/history?limit=${limit}`
+        `/api/conversation/${sessionId}/history?limit=${limit}`
       );
       
       
@@ -181,7 +181,7 @@ export const conversationsApi = {
       
       // Send request 
       const response = await apiService.post<any>(
-        `/conversation/${sessionId}/message`,
+        `/api/conversation/${sessionId}/message`,
         data
       );
       
@@ -270,7 +270,7 @@ export const conversationsApi = {
       
       // Use the streaming API
       await apiService.stream<any>(
-        `/conversation/${sessionId}/message/stream`,
+        `/api/conversation/${sessionId}/message/stream`,
         data,
         // Handle each chunk
         (chunk) => {

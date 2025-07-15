@@ -26,3 +26,4 @@ psutil
 greenlet
 backoff
 colorama
+PyMuPDF>=1.23

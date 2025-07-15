@@ -62,6 +62,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete, func
 import os
+import json
 
 from models.database_models import Document, Citation, DocumentType, ProcessingStatusEnum
 from models.document import ProcessedDocument, DocumentMetadata, DocumentUploadResponse, Citation as CitationSchema
@@ -527,7 +528,9 @@ class DocumentRepository:
             document_title=citation_data.get("document_title", ""),
             type=citation_data.get("type", "page_location"),
             highlight_id=citation_data.get("highlight_id", citation_id),
-            rects=citation_data.get("rects", "[]"),
+            # Ensure rects is stored as JSON string, regardless of whether we
+            # received a Python list or already-serialized string.
+            rects=json.dumps(citation_data.get("rects", [])) if not isinstance(citation_data.get("rects"), str) else citation_data.get("rects"),
             page=citation_data.get("start_page_number"),
             start_page_number=citation_data.get("start_page_number"),
             end_page_number=citation_data.get("end_page_number"),
@@ -675,14 +678,119 @@ class DocumentRepository:
         from models.citation import CitationPayload, CitationType, CitationRect
         import json
         
-        # Parse rects from JSON if stored as string
+        # Parse rects from JSON if stored as string. If none found, attempt to
+        # compute bounding box automatically for page_location citations.
         rects = []
         if citation.rects:
             try:
                 rects_data = json.loads(citation.rects) if isinstance(citation.rects, str) else citation.rects
                 rects = [CitationRect(**rect) for rect in rects_data]
-            except:
+            except Exception:
                 logger.warning(f"Failed to parse rects for citation {citation.id}")
+        
+        def _is_zero_area(r: CitationRect) -> bool:
+            """Return True if the rectangle has no visible area (height or width == 0)."""
+            return (r.width == 0 or r.height == 0)  # any dimension zero -> fallback rectangle
+
+        has_only_zero_area = rects and all(_is_zero_area(r) for r in rects)
+
+        # Determine citation type value (handles both Enum and plain string)
+        citation_type_val: str
+        try:
+            # Enum case
+            from models.citation import CitationType  # local import to avoid circular deps
+            if isinstance(citation.type, CitationType):
+                citation_type_val = citation.type.value  # e.g. "page_location"
+            else:
+                citation_type_val = str(citation.type)
+        except Exception:
+            citation_type_val = str(citation.type)
+
+        # Normalise possible Enum string such as "CitationType.page_location" → "page_location"
+        if "." in citation_type_val:
+            citation_type_val = citation_type_val.split(".")[-1]
+
+        # Auto-compute if we have no rects OR only zero-area placeholders and citation is page-level
+        needs_autocompute = bool(
+            (not rects or has_only_zero_area)
+            and citation_type_val == "page_location"
+            and citation.cited_text
+        )
+
+        logger.info(
+            "citation %s – needs_autocompute=%s (rects_before=%d, zero_area=%s, type=%s, cited_text_present=%s)",
+            citation.id,
+            needs_autocompute,
+            len(rects),
+            has_only_zero_area,
+            citation_type_val,
+            bool(citation.cited_text),
+        )
+
+        if needs_autocompute:
+            try:
+                from pdf_processing.rect_finder import find_rects_for_text
+                pdf_path = self.get_document_file_path(citation.document_id)
+
+                # Build list of pages to try – start_page_number .. end_page_number (inclusive)
+                start_pg = citation.start_page_number or citation.page or 1
+                end_pg = citation.end_page_number or start_pg
+                pages_to_try = list(range(start_pg, end_pg + 1))
+
+                # Use a shorter search string for very long cited_text to avoid
+                # grabbing entire tables.  We keep only the first 4 whitespace-
+                # separated tokens if the original text is longer than 120 chars.
+                from pdf_processing.rect_finder import _normalise_whitespace
+
+                raw_search_text = str(citation.cited_text or "")
+                if len(raw_search_text) > 120:
+                    search_text = " ".join(_normalise_whitespace(raw_search_text).split(" ")[:4])
+                else:
+                    search_text = raw_search_text
+
+                for pg in pages_to_try:
+                    rects_data_page = find_rects_for_text(
+                        pdf_path=pdf_path,
+                        page_number=pg,
+                        cited_text=search_text,
+                    )
+                    if rects_data_page:
+                        rects_found = rects_data_page
+                        break  # Stop at the first page that yields a hit
+
+                # 🛡️  Fallback: scan the rest of the document if nothing matched in
+                # the declared page range.  This covers cases where Claude’s page
+                # numbers are off-by-one or tables flowed onto an unexpected page.
+                if rects_found:
+                    # Convert dicts to CitationRect models
+                    rects = [CitationRect(**r) if not isinstance(r, CitationRect) else r for r in rects_found]
+                    logger.info("✅ Auto-bbox found %d rect(s) for citation %s on page %s", len(rects), citation.id, pg)
+                elif not rects_found:
+                    try:
+                        from pdf_processing.rect_finder import _normalise_whitespace
+
+                        # small heuristic: if the cited text starts with a year like
+                        # "2024Q1" we keep that prefix for faster matches.
+                        prefix = " ".join(_normalise_whitespace(citation.cited_text).split(" ")[:4])
+
+                        import fitz
+                        doc_tmp = fitz.open(pdf_path)
+                        for pg in range(1, doc_tmp.page_count + 1):
+                            if pg in pages_to_try:
+                                continue  # already examined
+                            rects_data_page = find_rects_for_text(
+                                pdf_path=pdf_path,
+                                page_number=pg,
+                                cited_text=prefix,
+                            )
+                            if rects_data_page:
+                                rects_found = rects_data_page
+                                break
+                        doc_tmp.close()
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.warning(f"Auto-bbox failed for citation {citation.id}: {e}")
         
         # Build the CitationPayload
         # Use cited_text if available, otherwise fall back to text field
@@ -710,7 +818,9 @@ class DocumentRepository:
         )
         
         # Return as dict with camelCase keys
-        return payload.model_dump(by_alias=True)
+        logger.info("↩️ Returning citation %s with %d rect(s)", citation.id, len(payload.rects))
+        # Dump to a plain JSON-serialisable dict (including nested CitationRect models)
+        return payload.model_dump(mode="json", by_alias=True)
         
     def get_document_file_path(self, document_id: str) -> str:
         """

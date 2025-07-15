@@ -888,32 +888,29 @@ class ConversationService:
         tool_start_processed_in_current_stream = False
         # Track whether we've already sent a message_complete for the initial streamed answer.
         initial_message_completed = False
+        # Track the tools/visualization message if created
+        tools_message = None
+        # Track if we're waiting for citations to complete
+        waiting_for_citations = False
+        # Track pending citation markers
+        pending_citation_markers = []
+        # Track expected citation count based on highest marker seen
+        highest_citation_marker = 0
+        # Track received citation markers
+        received_citation_markers = set()
+        # Track last citation time to detect when citations are done
+        last_citation_time = None
+        # Citation completion timer
+        citation_completion_timer = None
         
         async def enhanced_emit_callback(event: Dict[str, Any]):
-            nonlocal has_good_content, last_good_content, tool_start_processed_in_current_stream, initial_message_completed
+            nonlocal has_good_content, last_good_content, tool_start_processed_in_current_stream, initial_message_completed, waiting_for_citations, pending_citation_markers, highest_citation_marker, received_citation_markers
             
             event_type = event.get("type")
 
-            # Finalise the initial streamed message **after citations finish** – that is right when the
-            # Claude stream emits its own `message_stop` / non-post-tool `message_complete` *before* any
-            # tool_start event.
+            # Block early message_stop/message_complete events - we'll send our own when ready
             if (event_type in ["message_stop", "message_complete"]) and not event.get("is_post_tools") and not tool_start_processed_in_current_stream:
-                if not initial_message_completed:
-                    initial_message_completed = True
-                    completion_msg_id = message_id if message_id else (
-                        str(assistant_message_placeholder.id) if assistant_message_placeholder else "unknown"
-                    )
-                    if emit_callback:
-                        await emit_callback({
-                            "type": "message_complete",
-                            "message_id": completion_msg_id,
-                            "timestamp": datetime.utcnow().isoformat() + 'Z',
-                            "is_post_tools": False,
-                            "is_post_visualization": False
-                        })
-                        logger.info(
-                            f"🔒 Emitted message_complete after citations for initial answer (message_id={completion_msg_id})"
-                        )
+                logger.info(f"🚫 Blocking early {event_type} event - will send message_complete when appropriate")
                 # We do *not* forward the original message_stop to frontend (to avoid confusion).
                 return
 
@@ -923,6 +920,41 @@ class ConversationService:
                     has_good_content = True
                     last_good_content = assistant_message_placeholder.content
                     logger.info(f"🔒 Freezing content at tool_start: {len(last_good_content)} chars")
+                
+                # Check if we have pending citations before completing the initial message
+                import re
+                current_content = assistant_message_placeholder.content or ""
+                has_citation_markers = bool(re.search(r'\[\d+\]', current_content))
+                
+                # Extract all citation numbers to check if we have them all
+                citation_numbers = re.findall(r'\[(\d+)\]', current_content)
+                for num_str in citation_numbers:
+                    citation_num = int(num_str)
+                    received_citation_markers.add(citation_num)
+                    highest_citation_marker = max(highest_citation_marker, citation_num)
+                
+                # Check if we have all expected citations
+                expected_citations = set(range(1, highest_citation_marker + 1)) if highest_citation_marker > 0 else set()
+                all_citations_received = expected_citations == received_citation_markers if expected_citations else False
+                
+                # Always defer completion when tool_start arrives to ensure we have all citations
+                if not initial_message_completed:
+                    logger.warning(f"⚠️ tool_start arrived. Have citations {sorted(received_citation_markers)}. Deferring message_complete to ensure all citations are received.")
+                    waiting_for_citations = True
+                    
+                    # Update content with what we have so far including any citations
+                    if has_good_content and last_good_content:
+                        assistant_message_placeholder.content = last_good_content
+                        await self.conversation_repository.update_message(assistant_message_placeholder)
+            
+            # Track citation markers as they arrive
+            if event_type == "citation_marker" or event_type == "citations_delta":
+                # Extract the citation index to track which citations we've received
+                citation_index = event.get("citation_index") or event.get("citation", {}).get("citation_index")
+                if citation_index:
+                    received_citation_markers.add(citation_index)
+                    highest_citation_marker = max(highest_citation_marker, citation_index)
+                    logger.info(f"📍 Received citation marker {citation_index}. Total received: {len(received_citation_markers)}/{highest_citation_marker}")
             
             # NEW: Handle post-tool content_update events properly
             if event_type == "content_update" and event.get("is_post_tools") and event.get("post_tool_text", "").strip():
@@ -979,6 +1011,78 @@ class ConversationService:
                     if has_good_content and last_good_content:
                         last_good_content += text_content
                         logger.info(f"📝 Updated frozen content with citation markers. New length: {len(last_good_content)}")
+                    
+                    # Store citation markers that arrive after tool_start
+                    pending_citation_markers.append(text_content)
+                    
+                    # Extract citation numbers from the text to track progress
+                    import re
+                    citation_numbers = re.findall(r'\[(\d+)\]', text_content)
+                    for num_str in citation_numbers:
+                        citation_num = int(num_str)
+                        received_citation_markers.add(citation_num)
+                        highest_citation_marker = max(highest_citation_marker, citation_num)
+                    
+                    # If we were waiting for citations and haven't completed the initial message yet
+                    if waiting_for_citations and not initial_message_completed:
+                        # Check if we have all expected citations (1 through highest_citation_marker)
+                        expected_citations = set(range(1, highest_citation_marker + 1))
+                        all_citations_received = expected_citations == received_citation_markers
+                        
+                        logger.info(f"📊 Citation progress: received {sorted(received_citation_markers)}, expecting {sorted(expected_citations)}, complete: {all_citations_received}")
+                        
+                        # Use a heuristic: if we receive multiple citations at once or see a gap in the sequence being filled,
+                        # assume we have all citations
+                        citations_in_current_batch = len(citation_numbers)
+                        
+                        # Complete when we have all expected citations
+                        # For 3+ citations, wait until we have them all
+                        # For 1-2 citations, wait for a batch or a slight delay
+                        should_complete = False
+                        
+                        if all_citations_received:
+                            if highest_citation_marker >= 3:
+                                # For 3+ citations, complete as soon as we have them all
+                                should_complete = True
+                                logger.info(f"✅ All {highest_citation_marker} citations received, completing message")
+                            elif highest_citation_marker == 2 and len(received_citation_markers) == 2:
+                                # For exactly 2 citations, complete when we have both
+                                should_complete = True
+                                logger.info(f"✅ Both citations received, completing message")
+                            elif highest_citation_marker == 1 and citations_in_current_batch >= 1:
+                                # For single citation, complete when we receive it
+                                should_complete = True
+                                logger.info(f"✅ Single citation received, completing message")
+                        elif citations_in_current_batch >= 2:
+                            # If we get multiple citations in a batch, that's often a sign we have them all
+                            should_complete = True
+                            logger.info(f"✅ Received batch of {citations_in_current_batch} citations, completing message")
+                        
+                        if should_complete:
+                            # Update the database with the citation markers
+                            assistant_message_placeholder.content = last_good_content
+                            await self.conversation_repository.update_message(assistant_message_placeholder)
+                            
+                            # Now send the deferred message_complete
+                            initial_message_completed = True
+                            completion_msg_id = message_id if message_id else (
+                                str(assistant_message_placeholder.id) if assistant_message_placeholder else "unknown"
+                            )
+                            if emit_callback:
+                                await emit_callback({
+                                    "type": "message_complete",
+                                    "message_id": completion_msg_id,
+                                    "timestamp": datetime.utcnow().isoformat() + 'Z',
+                                    "is_post_tools": False,
+                                    "is_post_visualization": False
+                                })
+                                logger.info(
+                                    f"✅ Emitted deferred message_complete after receiving {highest_citation_marker} citations (batch size: {citations_in_current_batch}) (message_id={completion_msg_id})"
+                                )
+                            waiting_for_citations = False
+                        else:
+                            logger.info(f"⏳ Still waiting for more citations. Have {len(received_citation_markers)} citations, highest: {highest_citation_marker}, batch size: {citations_in_current_batch}")
+                            
                 else:
                     logger.info(f"🚫 Blocking regular text_delta after tool_start. Text: '{text_content[:50]}...'")
                     return
@@ -1332,6 +1436,25 @@ class ConversationService:
         logger.info(f"Processing visualizations for conversation {conversation_id}: charts={len(visualizations.get('charts', []))}, tables={len(visualizations.get('tables', []))}, metrics={len(accumulated_metrics)}")
         
         if visualizations.get("charts") or visualizations.get("tables") or accumulated_metrics:
+            # Create a NEW message for tools/visualizations
+            tools_message = await self.conversation_repository.add_message(
+                conversation_id=conversation_id,
+                role="assistant",
+                content="",  # Tools message has no text content, only analysis blocks
+                referenced_documents=[],
+                referenced_analyses=[]
+            )
+            logger.info(f"✅ Created new message for tools/visualizations: {tools_message.id}")
+            
+            # Emit new_message_start for the tools message
+            if emit_callback:
+                await emit_callback({
+                    "type": "new_message_start",
+                    "message_id": str(tools_message.id),
+                    "role": "assistant",
+                    "is_tools_message": True
+                })
+            
             items_for_analysis_blocks = []
             
             # Process charts
@@ -1365,10 +1488,10 @@ class ConversationService:
                 items_for_analysis_blocks.append(processed_metric_item)
             
             # Store analysis blocks atomically with final content verification
-            if items_for_analysis_blocks:
-                logger.info(f"Storing {len(items_for_analysis_blocks)} analysis blocks for streaming message {assistant_message.id}")
+            if items_for_analysis_blocks and tools_message:
+                logger.info(f"Storing {len(items_for_analysis_blocks)} analysis blocks for tools message {tools_message.id}")
                 await self._store_analysis_blocks_atomically(
-                    message=assistant_message,
+                    message=tools_message,
                     visualizations=items_for_analysis_blocks
                 )
                 
@@ -1385,7 +1508,9 @@ class ConversationService:
                 # Serialize analysis blocks for immediate frontend rendering
                 serialized_blocks = []
                 try:
-                    for block in (assistant_message.analysis_blocks or []):
+                    # Refresh tools_message to get the analysis blocks
+                    await self.conversation_repository.db.refresh(tools_message, attribute_names=['analysis_blocks'])
+                    for block in (tools_message.analysis_blocks or []):
                         serialized_blocks.append({
                             "id": block.id,
                             "block_type": block.block_type,
@@ -1398,16 +1523,16 @@ class ConversationService:
                     logger.warning(f"Failed to serialize analysis blocks for message_complete event: {ser_err}")
 
                 if emit_callback:
-                    # Include citations in the message_complete event
+                    # Send message_complete for the tools message
                     await emit_callback({
                         "type": "message_complete",
-                        "message_id": str(assistant_message.id),
+                        "message_id": str(tools_message.id),
                         "timestamp": datetime.utcnow().isoformat() + 'Z',
                         "analysis_blocks": serialized_blocks,  # provide blocks directly
-                        "citations": accumulated_citations  # Include citations for frontend
+                        "is_tools_message": True
                     })
                     logger.info(
-                        f"message_complete event sent for conversation {conversation_id} after analysis blocks – blocks: {len(serialized_blocks)}"
+                        f"message_complete event sent for tools message {tools_message.id} – blocks: {len(serialized_blocks)}"
                     )
                 else:
                     logger.warning(

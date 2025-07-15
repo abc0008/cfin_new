@@ -58,7 +58,7 @@ export function ToolProgressIndicator({ toolName, toolId }: ToolProgressIndicato
 
 interface StreamingMessageProps {
   text: string;
-  toolsInProgress: string[];
+  toolsInProgress: { id: string; name: string }[];
   showTypingIndicator?: boolean;
   citations?: any[];
   onCitationClick?: (citation: any) => void;
@@ -101,11 +101,11 @@ export function StreamingMessage({
         {/* Show tools in progress */}
         {toolsInProgress.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
-            {toolsInProgress.map(toolId => (
+            {toolsInProgress.map(tool => (
               <ToolProgressIndicator 
-                key={toolId} 
-                toolName="unknown" 
-                toolId={toolId} 
+                key={tool.id} 
+                toolName={tool.name} 
+                toolId={tool.id} 
               />
             ))}
           </div>

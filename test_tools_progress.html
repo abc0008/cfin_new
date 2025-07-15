@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tools Progress Test</title>
+    <style>
+        .tool-indicator {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            background-color: #e3f2fd;
+            color: #1976d2;
+            border-radius: 4px;
+            font-size: 12px;
+            margin: 4px;
+        }
+        .tool-icon {
+            margin-right: 4px;
+        }
+        .tools-container {
+            margin: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+        .log {
+            margin: 10px 0;
+            padding: 5px;
+            background: #f5f5f5;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Tools Progress Tracking Test</h1>
+    
+    <div class="tools-container">
+        <h2>Tools In Progress:</h2>
+        <div id="tools-progress"></div>
+    </div>
+    
+    <div class="tools-container">
+        <h2>Event Log:</h2>
+        <div id="event-log"></div>
+    </div>
+    
+    <script>
+        // Simulate the Map structure used in the React hook
+        let toolsInProgress = new Map();
+        
+        function log(message) {
+            const logDiv = document.getElementById('event-log');
+            const entry = document.createElement('div');
+            entry.className = 'log';
+            entry.textContent = `[${new Date().toISOString()}] ${message}`;
+            logDiv.appendChild(entry);
+        }
+        
+        function renderTools() {
+            const container = document.getElementById('tools-progress');
+            container.innerHTML = '';
+            
+            if (toolsInProgress.size === 0) {
+                container.textContent = 'No tools in progress';
+                return;
+            }
+            
+            // Convert Map to array format like in the hook
+            const toolsArray = Array.from(toolsInProgress.entries()).map(([id, name]) => ({ id, name }));
+            
+            toolsArray.forEach(tool => {
+                const indicator = document.createElement('div');
+                indicator.className = 'tool-indicator';
+                indicator.innerHTML = `
+                    <span class="tool-icon">⚙️</span>
+                    <span>${getToolLabel(tool.name)}</span>
+                `;
+                container.appendChild(indicator);
+            });
+        }
+        
+        function getToolLabel(name) {
+            switch (name) {
+                case 'generate_graph_data':
+                    return 'Creating chart...';
+                case 'generate_table_data':
+                    return 'Building table...';
+                case 'generate_financial_metric':
+                    return 'Calculating metric...';
+                default:
+                    return 'Processing...';
+            }
+        }
+        
+        // Simulate tool events
+        function simulateToolStart(toolId, toolName) {
+            toolsInProgress.set(toolId, toolName);
+            log(`Tool started: ${toolName} (${toolId})`);
+            renderTools();
+        }
+        
+        function simulateToolComplete(toolId) {
+            const toolName = toolsInProgress.get(toolId) || 'unknown';
+            toolsInProgress.delete(toolId);
+            log(`Tool completed: ${toolName} (${toolId}), remaining: ${toolsInProgress.size}`);
+            renderTools();
+        }
+        
+        // Run simulation
+        async function runSimulation() {
+            log('Starting simulation...');
+            
+            // Start multiple tools
+            await new Promise(resolve => setTimeout(resolve, 500));
+            simulateToolStart('tool-1', 'generate_graph_data');
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            simulateToolStart('tool-2', 'generate_table_data');
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            simulateToolStart('tool-3', 'generate_financial_metric');
+            
+            // Complete tools in different order
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            simulateToolComplete('tool-2');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            simulateToolComplete('tool-1');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            simulateToolComplete('tool-3');
+            
+            log('Simulation complete!');
+        }
+        
+        // Initial render
+        renderTools();
+        
+        // Start simulation after page load
+        window.addEventListener('load', () => {
+            setTimeout(runSimulation, 1000);
+        });
+    </script>
+</body>
+</html>

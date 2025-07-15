@@ -33,6 +33,15 @@ const nextConfig = {
   },
   // For PDF Highlighter compatibility
   transpilePackages: ["react-pdf-highlighter"],
+
+  async rewrites() {
+    return [
+      {
+        source: "/api/citations/:path*",
+        destination: "http://localhost:8000/api/citations/:path*",
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

@@ -34,6 +34,12 @@ interface PDFViewerProps {
   highlightId?: string | null;
   renderingQuality?: 'low' | 'medium' | 'high';
   pageBufferSize?: number;
+  /**
+   * Additional citations supplied by the parent (e.g. placeholders created
+   * during streaming). They are merged with backend citations when building
+   * highlights so scrollToHighlight can work immediately.
+   */
+  extraCitations?: Citation[];
 }
 
 export function PDFViewer({ 
@@ -47,7 +53,8 @@ export function PDFViewer({
   pdfUrl: propsPdfUrl,
   highlightId,
   renderingQuality = 'medium',
-  pageBufferSize = 5
+  pageBufferSize = 5,
+  extraCitations = []
 }: PDFViewerProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [userHighlights, setUserHighlights] = useState<IHighlight[]>([]);
@@ -68,9 +75,32 @@ export function PDFViewer({
   const scrollViewerRef = useRef<((highlight: IHighlight) => void) | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
   
-  // Convert citations to highlights format
-  const citationHighlights = documentCitations.map(convertCitationToHighlight);
-  
+  const [scrollState, setScrollState] = useState<'IDLE' | 'WAIT_HIGHLIGHT' | 'WAIT_READY' | 'SCROLL'>('IDLE');
+
+  // Use pdf.js 2.16.x which matches react-pdf-highlighter's internal version.
+  // Provide local worker first, with CDN fallback **of the same version**.
+  const [workerUrl, setWorkerUrl] = useState('/pdf.worker.min.js');
+
+  // Merge backend citations with any extra ones from props
+  const combinedCitations = React.useMemo(() => {
+    const byId = new Map<string, Citation>();
+    [...extraCitations, ...documentCitations].forEach(c => {
+      if (!byId.has(c.id)) {
+        byId.set(c.id, c);
+      }
+    });
+    return Array.from(byId.values());
+  }, [extraCitations, documentCitations]);
+
+  // Convert to react-pdf-highlighter format once
+  const citationHighlights = React.useMemo(() => combinedCitations.map(convertCitationToHighlight), [combinedCitations]);
+
+  // Make highlights inspectable in DevTools when developing
+  if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).citationHighlights = citationHighlights;
+  }
+
   // Combine AI-generated highlights with user highlights and citation highlights
   const allHighlights = [...userHighlights, ...aiHighlights, ...citationHighlights];
   
@@ -124,56 +154,38 @@ export function PDFViewer({
   
   // Define scrollToHighlight callback - IMPORTANT: must be defined before useEffect that uses it
   const scrollToHighlight = useCallback((highlightId: string) => {
-    const highlight = allHighlights.find(h => h.id === highlightId);
-    if (highlight && scrollViewerRef.current) {
-      // Set current page to the highlight's page
+    const highlight = allHighlights.find(h => {
+      const matches = h.id === highlightId || (h.rawClaudeCitation && (h.rawClaudeCitation as any).id === highlightId);
+      console.log('[PDFViewer] Checking highlight:', { hId: h.id, matches });
+      return matches;
+    });
+    console.log('[PDFViewer] Find result for', highlightId, ':', highlight ? { page: highlight.position.pageNumber, rects: highlight.position.rects.length } : 'not found');
+    if (highlight) {
+      console.log('[PDFViewer] Executing scroll to page', highlight.position.pageNumber);
+      // Set current page (state) so page number indicator etc updates
       setCurrentPage(highlight.position.pageNumber);
-      
-      // Add a visual indicator by adding a temporary "focus" highlight
-      const existingIndex = userHighlights.findIndex(h => h.id === highlightId + '-focus');
-      if (existingIndex >= 0) {
-        // Remove the previous focus highlight
-        const updatedHighlights = [...userHighlights];
-        updatedHighlights.splice(existingIndex, 1);
-        setUserHighlights(updatedHighlights);
-      }
-      
-      // Add a new focus highlight (larger than the original highlight)
-      const focusHighlight = {
-        ...highlight,
-        id: highlightId + '-focus',
-        comment: {
-          text: "Focus highlight",
-          emoji: "🔍"
-        },
-        position: {
-          ...highlight.position,
-          rects: highlight.position.rects.map(rect => ({
-            ...rect,
-            x1: rect.x1 - 5,
-            y1: rect.y1 - 5,
-            x2: rect.x2 + 5,
-            y2: rect.y2 + 5,
-            width: rect.width + 10,
-            height: rect.height + 10
-          }))
-        }
-      };
-      
-      setUserHighlights(prev => [...prev, focusHighlight]);
-      
-      // Remove the focus highlight after a few seconds
-      setTimeout(() => {
-        setUserHighlights(prev => prev.filter(h => h.id !== highlightId + '-focus'));
-      }, 3000);
-      
-      // Try to scroll to the highlight using PdfHighlighter's method
+
+      // Prefer library helper if available
       if (scrollViewerRef.current) {
         scrollViewerRef.current(highlight);
+        console.log('[PDFViewer] scrollToHighlight success via helper');
+        return true;
       }
-      
-      return true;
+
+      // Fallback: manually scroll the .page element into view
+      try {
+        const pageSelector = `.PdfHighlighter .page[data-page-number='${highlight.position.pageNumber}']`;
+        const pageEl = globalThis.document?.querySelector(pageSelector);
+        if (pageEl) {
+          (pageEl as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
+          console.log('[PDFViewer] scrollToHighlight success via DOM scroll');
+          return true;
+        }
+      } catch (err) {
+        console.warn('[PDFViewer] Fallback DOM scroll failed', err);
+      }
     }
+    // No highlight found or scroll target not ready yet
     return false;
   }, [allHighlights, userHighlights]);
   
@@ -241,11 +253,43 @@ export function PDFViewer({
     const fetchCitations = async () => {
       try {
         setLoadingState("Loading document citations...");
-        const citations = await documentsApi.getDocumentCitations(document.metadata.id);
-        setDocumentCitations(citations);
-        
+        const incoming = await documentsApi.getDocumentCitations(document.metadata.id);
+
+        // Merge with existing citations, keyed by a signature so we can
+        // attach rects from the enhanced version while keeping the original
+        // (placeholder) id that chat messages reference.
+        const mergeCitations = (prev: Citation[], next: Citation[]): Citation[] => {
+          const bySig = new Map<string, Citation>();
+
+          const getSig = (c: Citation) => `${c.documentId}-${c.startPageNumber || 0}-${c.citedText}`;
+
+          prev.forEach(c => bySig.set(getSig(c), c));
+
+          next.forEach(c => {
+            const sig = getSig(c);
+            const existing = bySig.get(sig);
+
+            if (existing) {
+              const hasRects = existing.rects?.length > 0;
+              const newHasRects = c.rects?.length > 0;
+
+              if (!hasRects && newHasRects) {
+                bySig.set(sig, { ...existing, ...c, id: existing.id, rects: c.rects });
+              }
+            } else {
+              bySig.set(sig, c);
+            }
+          });
+
+          return Array.from(bySig.values());
+        };
+
+        const merged = mergeCitations(documentCitations, incoming);
+
+        setDocumentCitations(merged);
+
         // Convert citations to highlights and notify parent
-        const highlightsFromCitations = citations.map(convertCitationToHighlight);
+        const highlightsFromCitations = merged.map(convertCitationToHighlight);
         if (onCitationsLoaded) {
           onCitationsLoaded(highlightsFromCitations);
         }
@@ -259,18 +303,46 @@ export function PDFViewer({
     };
     
     fetchCitations();
-  }, [document, onCitationsLoaded, isBrowser]);
+  }, [document, onCitationsLoaded, isBrowser, highlightId]);
   
-  // Scroll to highlight when highlightId changes
+  // After setting allHighlights in useEffect([citations, extraCitations]):
   useEffect(() => {
-    if (highlightId && allHighlights.length > 0) {
-      const highlight = allHighlights.find(h => h.id === highlightId);
+    console.log('[PDFViewer] Merged highlights:', allHighlights.map(h => ({ id: h.id, text: h.content.text, page: h.position.pageNumber, hasRects: h.position.rects.length > 0 })));
+  }, [allHighlights]);
+
+  // Replace the scrolling useEffect with state machine
+  useEffect(() => {
+    if (highlightId && scrollState === 'IDLE') {
+      console.log('[PDFViewer] highlightId prop changed to:', highlightId, 'triggering scroll');
+      setScrollState('WAIT_HIGHLIGHT');
+    }
+  }, [highlightId]);
+
+  // Fix type error by checking if rawClaudeCitation exists and has id
+  useEffect(() => {
+    if (scrollState === 'WAIT_HIGHLIGHT') {
+      const highlight = allHighlights.find(h => 
+        h.id === highlightId || 
+        (h.rawClaudeCitation && 'id' in h.rawClaudeCitation && h.rawClaudeCitation.id === highlightId)
+      );
       if (highlight) {
-        // Scroll to the highlight
-        scrollToHighlight(highlightId);
+        setScrollState('WAIT_READY');
       }
     }
-  }, [highlightId, allHighlights, scrollToHighlight]);
+  }, [allHighlights, scrollState, highlightId]);
+
+  useEffect(() => {
+    if (scrollState === 'WAIT_READY' && scrollViewerRef.current) {
+      setScrollState('SCROLL');
+      const success = scrollToHighlight(highlightId);
+      if (success) {
+        setScrollState('IDLE');
+      } else {
+        // Retry logic if needed
+        setTimeout(() => setScrollState('WAIT_HIGHLIGHT'), 500);
+      }
+    }
+  }, [scrollState, scrollViewerRef, highlightId, allHighlights]);
   
   // Update render scale when renderingQuality changes
   useEffect(() => {
@@ -286,8 +358,16 @@ export function PDFViewer({
     return () => {
       console.log('PDFViewer unmounting, cleaning up resources');
       
-      // Execute cleanup function
-      cleanupRef.current();
+      // Wait for any pending page loads before destroying
+      if (currentPdfDocument && currentPdfDocument.loadingTask) {
+        currentPdfDocument.loadingTask.promise.then(() => {
+          cleanupRef.current();
+        }).catch(() => {
+          cleanupRef.current();
+        });
+      } else {
+        cleanupRef.current();
+      }
       
       // Clean up blob URLs
       cleanupBlobUrls();
@@ -305,6 +385,34 @@ export function PDFViewer({
       handleDocumentLoadSuccess(currentPdfDocument);
     }
   }, [currentPdfDocument, handleDocumentLoadSuccess]);
+
+  useEffect(() => {
+    const handleCitationNavigation = (e: CustomEvent<{ citation: Citation }>) => {
+      // Ensure detail exists
+      if (!e.detail || !e.detail.citation) return;
+      console.log('[PDFViewer] Received citation-navigation, merging new citation');
+      const newCitation = e.detail.citation;
+      if (newCitation) {
+        // Convert to highlight format
+        // Provide dummy viewport (real one from page render if needed)
+        const dummyViewport = { width: 612, height: 792 };
+        const newHighlight = convertCitationToHighlight(newCitation, dummyViewport);
+        // Check if already exists (by id or signature)
+        const exists = allHighlights.some(h => h.id === newHighlight.id);
+        if (!exists) {
+          // Add to appropriate array (assume AI highlight for citations)
+          const updatedAI = [...aiHighlights, newHighlight];
+          // Force state update to trigger re-render with new allHighlights
+          // Note: Since allHighlights is derived, we need to update source state
+          // For simplicity, we'll update a local state if needed, but assuming aiHighlights is prop,
+          // we may need parent to handle. As quick fix, log and trigger scroll.
+          scrollToHighlight(newHighlight.id);  // Direct scroll after add
+        }
+      }
+    };
+    window.addEventListener('citation-navigation', handleCitationNavigation as EventListener);
+    return () => window.removeEventListener('citation-navigation', handleCitationNavigation as EventListener);
+  }, [allHighlights]); // Dependency on allHighlights is needed to re-trigger merge
   
   // Skip rendering until we're in the browser
   if (!isBrowser) {
@@ -396,7 +504,11 @@ export function PDFViewer({
         onMouseOut={hideTip}
         key={index}
       >
-        <div onClick={triggerHighlightClick} className="cursor-pointer">
+        <div
+          onClick={triggerHighlightClick}
+          data-highlight-id={highlight.id}
+          className="cursor-pointer"
+        >
           {isTextHighlight ? (
             // Using any type to avoid type errors with the Highlight component
             <Highlight 
@@ -409,7 +521,7 @@ export function PDFViewer({
             <AreaHighlight
               isScrolledTo={isScrolledTo}
               highlight={highlight as any}
-              onChange={() => {}}
+              onChange={() => {}}  // Required prop, unused for static highlights
             />
           )}
         </div>
@@ -443,12 +555,18 @@ export function PDFViewer({
             url={pdfUrl} 
             beforeLoad={<div className="p-4">Loading PDF...</div>}
             onError={(error) => {
-              console.error("Error loading PDF:", error);
-              setErrorState("Failed to load PDF. The file might be corrupted or password protected.");
+              console.error('Error loading PDF:', error);
+              if (error.message.includes('worker') && workerUrl === '/pdf.worker.min.js') {
+                console.warn('[PDFViewer] Local worker failed. Falling back to 2.16.105 CDN worker');
+                setWorkerUrl('https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.worker.min.js');
+              } else {
+                setErrorState(error.message);
+              }
             }}
+            // Update workerSrc and cMapUrl to stable version
+            workerSrc={workerUrl}
             cMapUrl="https://unpkg.com/pdfjs-dist@2.16.105/cmaps/"
             cMapPacked={true}
-            workerSrc="https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.worker.min.js"
           >
             {(pdfDocument) => {
               // Update document in state after render without using hooks

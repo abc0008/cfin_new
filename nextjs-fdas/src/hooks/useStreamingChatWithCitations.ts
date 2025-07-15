@@ -30,6 +30,7 @@ export interface StreamingEvent {
   is_initial_content?: boolean;
   is_post_tools?: boolean;
   is_post_visualization?: boolean;
+  is_tools_message?: boolean;
   content_length?: number;
   content_preserved?: boolean;
   post_tool_text?: string;
@@ -87,7 +88,7 @@ export function useStreamingChatWithCitations({
   const [phaseTransitions, setPhaseTransitions] = useState<string[]>([]);
   
   // Track streaming state
-  const [toolsInProgress, setToolsInProgress] = useState<Set<string>>(new Set());
+  const [toolsInProgress, setToolsInProgress] = useState<Map<string, string>>(new Map()); // Map of toolId -> toolName
   const [completedVisualizations, setCompletedVisualizations] = useState<{
     charts: any[];
     tables: any[];
@@ -138,8 +139,30 @@ export function useStreamingChatWithCitations({
         break;
 
       case 'new_message_start':
+        // Handle new message for tools/visualization content
+        if (event.is_tools_message && onMessageUpdate) {
+          const toolsMessage: Message = {
+            id: event.message_id || `tools-${Date.now()}`,
+            sessionId: conversationId,
+            timestamp: new Date().toISOString(),
+            role: (event.role as 'assistant' | 'user' | 'system') || 'assistant',
+            content: '',  // Tools message has no text content, only analysis blocks
+            referencedDocuments: [],
+            referencedAnalyses: [],
+            citations: [],
+            content_blocks: null,
+            analysis_blocks: []  // Will be populated by tool events
+          };
+          
+          // Add the new message to the chat
+          onMessageUpdate(toolsMessage);
+          
+          // Keep the message phase as 'tools' since this is for visualizations
+          setActiveMessageId(event.message_id || null);
+          // Don't change phase - we're still in tools phase
+        }
         // Handle new message for post-visualization content
-        if (event.is_post_visualization && onMessageUpdate) {
+        else if (event.is_post_visualization && onMessageUpdate) {
           const postVizMessage: Message = {
             id: event.message_id || `post-viz-${Date.now()}`,
             sessionId: conversationId,
@@ -438,13 +461,67 @@ export function useStreamingChatWithCitations({
           // setIsStreaming(false); // Also keep streaming state
         }
         
+        if (event.tool_id && event.tool_name) {
+          setToolsInProgress(prev => {
+            const newMap = new Map(prev);
+            newMap.set(event.tool_id!, event.tool_name!);
+            console.log(`Tool started: ${event.tool_name} (${event.tool_id})`);
+            return newMap;
+          });
+        }
+        break;
+
+      case 'tool_complete':
+        // Remove completed tool from in-progress set
         if (event.tool_id) {
-          setToolsInProgress(prev => new Set(prev).add(event.tool_id!));
+          setToolsInProgress(prev => {
+            const newMap = new Map(prev);
+            const toolName = newMap.get(event.tool_id!) || 'unknown';
+            newMap.delete(event.tool_id!);
+            console.log(`Tool completed: ${toolName} (${event.tool_id}), remaining in progress: ${newMap.size}`);
+            return newMap;
+          });
+        }
+        
+        // Process visualization data if present
+        if (event.result && onVisualizationReady) {
+          const toolName = event.tool_name;
+          const toolData = event.result;
+          
+          if (toolName === 'generate_graph_data') {
+            onVisualizationReady('chart', toolData, 0);
+          } else if (toolName === 'generate_table_data') {
+            onVisualizationReady('table', toolData, 0);
+          } else if (toolName === 'generate_financial_metric') {
+            onVisualizationReady('metric', toolData, 0);
+          }
         }
         break;
 
       case 'message_complete':
         console.log('Message complete - processing citations');
+        
+        // Check if this is a tools message completion
+        if (event.is_tools_message) {
+          // For tools messages, update with analysis blocks if provided
+          if (onMessageUpdate && event.message_id && event.analysis_blocks) {
+            onMessageUpdate({
+              id: event.message_id,
+              sessionId: conversationId,
+              timestamp: new Date().toISOString(),
+              role: 'assistant',
+              content: '',  // Tools message has no text content
+              referencedDocuments: [],
+              referencedAnalyses: [],
+              citations: [],
+              content_blocks: null,
+              analysis_blocks: event.analysis_blocks || []
+            });
+          }
+          setActiveMessageId(null);
+          lastCompletedMessageIdRef.current = event.message_id || null;
+          return;
+        }
         
         // Check if this is a post-visualization message completion
         if (event.is_post_visualization) {
@@ -632,6 +709,76 @@ export function useStreamingChatWithCitations({
                   });
               });
             }, 500); // Small delay to ensure backend has finished processing
+          }
+          
+          // Also fetch enhanced citations with rects from the API if we have streaming citations
+          if (allCitations.length > 0) {
+            console.log('Fetching enhanced citations with rects for', allCitations.length, 'citations...');
+            
+            // Get unique document IDs from citations
+            const documentIds = [...new Set(allCitations.map(c => c.documentId).filter(Boolean))];
+            
+            // Fetch enhanced citations for each document
+            Promise.all(
+              documentIds.map(documentId => 
+                import('@/lib/api/documents').then(({ documentsApi }) => 
+                  documentsApi.getDocumentCitations(documentId).catch(error => {
+                    console.error(`Error fetching citations for document ${documentId}:`, error);
+                    return [];
+                  })
+                )
+              )
+            ).then(citationArrays => {
+              const enhancedCitations = citationArrays.flat();
+              
+              if (enhancedCitations.length > 0) {
+                console.log(`Fetched ${enhancedCitations.length} enhanced citations with rects`);
+
+                // Merge enhanced citations with existing ones by signature,
+                // preferring entries that contain rects.
+                const bySignature = new Map<string, Citation>();
+
+                // Helper to build unique key (reuse function from citationService)
+                const { getCitationSignature } = require('@/lib/pdf/citationService');
+
+                const mergeCitation = (cit: Citation) => {
+                  const sig = getCitationSignature(cit);
+                  const existing = bySignature.get(sig);
+                  if (!existing) {
+                    bySignature.set(sig, cit);
+                  } else {
+                    // Prefer the one with rects
+                    const existingHasRects = existing.rects && existing.rects.length > 0;
+                    const newHasRects = cit.rects && cit.rects.length > 0;
+                    if (!existingHasRects && newHasRects) {
+                      bySignature.set(sig, cit);
+                    }
+                  }
+                };
+
+                // First add current (streaming) citations
+                allCitations.forEach(mergeCitation);
+                // Then overlay enhanced citations (these will replace where rects exist)
+                enhancedCitations.forEach(mergeCitation);
+
+                const mergedCitations = Array.from(bySignature.values());
+
+                const enhancedMessage: Message = {
+                  ...message,
+                  citations: mergedCitations
+                };
+
+                // Log merged rect counts for debugging
+                console.log('[useStreaming] merged citations', mergedCitations.map(c => ({ id: c.id, rectCount: c.rects?.length || 0 })));
+
+                // Update global citation cache with merged set
+                addCitations(mergedCitations);
+
+                onMessageUpdate(enhancedMessage);
+                }
+            }).catch(error => {
+              console.error('Error fetching enhanced citations:', error);
+            });
           }
         }
         
@@ -984,7 +1131,7 @@ export function useStreamingChatWithCitations({
     // Streaming content - don't concatenate post-viz text as it's a separate message
     streamingText: streamingText,
     streamingMessageId,
-    toolsInProgress: Array.from(toolsInProgress),
+    toolsInProgress: Array.from(toolsInProgress.entries()).map(([id, name]) => ({ id, name })),
     completedVisualizations,
     
     // Citations
