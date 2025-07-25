@@ -42,21 +42,23 @@ export const convertCitationToHighlight = (citation: Citation, viewport?: any): 
 
   // If no rects, log warning but create minimal highlight
   if (citation.rects.length === 0) {
-    console.warn('Citation has no rects, using placeholder');
+    console.warn('Citation has no rects, will need to search for text:', citation.searchableText || citation.citedText);
+    // TODO: Could implement automatic rect finding here using searchableText
   }
 
-  // Use first rect or fall back to placeholder at (0,0)
+  // Use first rect or fall back to a small placeholder
+  // For citations without rects, create a minimal highlight that won't cover the whole page
   const boundingRect = citation.rects.length > 0
     ? toScaledRect(citation.rects[0])
     : {
         x1: 0,
         y1: 0,
-        x2: 100,
-        y2: 15,
+        x2: 1,  // Minimal width to avoid full-page highlight
+        y2: 1,  // Minimal height
         left: 0,
         top: 0,
-        width: 100,
-        height: 15,
+        width: 1,
+        height: 1,
         pageNumber: citation.startPageNumber || 1,
       };
 
@@ -68,7 +70,7 @@ export const convertCitationToHighlight = (citation: Citation, viewport?: any): 
     // chat-panel click (which passes citation.id) matches a highlight.
     id: citation.id,
     content: {
-      text: citation.citedText
+      text: citation.searchableText || citation.citedText
     },
     position: {
       boundingRect: boundingRect,
@@ -76,7 +78,7 @@ export const convertCitationToHighlight = (citation: Citation, viewport?: any): 
       pageNumber: citation.startPageNumber || 1
     },
     comment: {
-      text: citation.citedText,
+      text: citation.displayText || citation.citedText,
       emoji: "" // No pin icon; we rely on rect highlight only
     },
     isAICitation: true,
@@ -91,7 +93,10 @@ export const convertCitationToHighlight = (citation: Citation, viewport?: any): 
       end_char_index: citation.endCharIndex,
       start_block_index: citation.startBlockIndex,
       end_block_index: citation.endBlockIndex,
-      highlightId: citation.highlightId as unknown
+      highlightId: citation.highlightId,
+      id: citation.id,  // Preserve original citation ID for temp ID lookup
+      // Store any temp ID that might have been associated with this citation
+      tempId: citation.id.startsWith('cite-') ? citation.id : undefined
     } as any
   };
 };
@@ -173,7 +178,14 @@ export const searchAndHighlightText = async (
 };
 
 export const getCitationSignature = (citation: Citation): string => {
-  return `${citation.documentId}-${citation.startPageNumber || 0}-${citation.citedText}`;
+  // Normalize cited text for better matching
+  const normalizedText = (citation.citedText || '')
+    .trim()
+    .replace(/\r\n/g, '\n')  // Normalize line endings first
+    .replace(/\s+/g, ' ')    // Normalize whitespace
+    .toLowerCase()           // Case insensitive
+    .substring(0, 100);      // Limit length for comparison
+  return `${citation.documentId}-${citation.startPageNumber || 0}-${normalizedText}`;
 };
 
 export const deduplicateCitations = (citations: Citation[]): Citation[] => {
@@ -208,8 +220,18 @@ export const handleStreamingCitation = (
   
   // Check if we have a valid document ID
   if (!newCitation.documentId) {
-    console.warn(`No document found for citation:`, delta.citation);
-    return;
+    console.warn(`No document found for citation:`, {
+      citation: delta.citation,
+      documentMap: Array.from(documentMap.entries()),
+      transformedCitation: newCitation
+    });
+    // If we have exactly one document in the map, use it as fallback
+    if (documentMap.size === 1) {
+      newCitation.documentId = Array.from(documentMap.values())[0];
+      console.log(`[citationService] Using single document as fallback:`, newCitation.documentId);
+    }
+    // Don't return - still add the citation even without documentId
+    // The documentId might be added later when the citation is processed
   }
   
   // Deduplicate by signature
@@ -217,7 +239,12 @@ export const handleStreamingCitation = (
   if (!citations.some(c => getCitationSignature(c) === signature)) {
     citations.push(newCitation);
     pendingCitations.set(currentBlockIndex, citations);
-    console.log(`Added citation ${newCitation.id} to block ${currentBlockIndex}`, newCitation);
+    console.log(`Added citation ${newCitation.id} to block ${currentBlockIndex}`, {
+      id: newCitation.id,
+      documentId: newCitation.documentId,
+      page: newCitation.startPageNumber,
+      hasRects: newCitation.rects?.length > 0
+    });
   }
 };
 

@@ -93,7 +93,14 @@ export function PDFViewer({
   }, [extraCitations, documentCitations]);
 
   // Convert to react-pdf-highlighter format once
-  const citationHighlights = React.useMemo(() => combinedCitations.map(convertCitationToHighlight), [combinedCitations]);
+  const citationHighlights = React.useMemo(() => {
+    console.log('[PDFViewer] Converting citations to highlights:', {
+      extraCitations: extraCitations.map(c => ({ id: c.id, text: c.citedText, searchableText: c.searchableText, hasRects: c.rects?.length > 0 })),
+      documentCitations: documentCitations.map(c => ({ id: c.id, text: c.citedText, searchableText: c.searchableText, hasRects: c.rects?.length > 0 })),
+      combined: combinedCitations.map(c => ({ id: c.id, text: c.citedText, searchableText: c.searchableText, hasRects: c.rects?.length > 0 }))
+    });
+    return combinedCitations.map(convertCitationToHighlight);
+  }, [combinedCitations, extraCitations, documentCitations]);
 
   // Make highlights inspectable in DevTools when developing
   if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
@@ -132,6 +139,49 @@ export function PDFViewer({
   const handleDocumentLoadSuccess = useCallback((pdfDocument: any) => {
     setTotalPages(pdfDocument.numPages);
     
+    // Patch getPagesOverview to handle unloaded pages gracefully
+    if (typeof window !== 'undefined' && (window as any).PDFViewerApplication) {
+      const pdfViewer = (window as any).PDFViewerApplication.pdfViewer;
+      if (pdfViewer && pdfViewer.getPagesOverview) {
+        const originalGetPagesOverview = pdfViewer.getPagesOverview.bind(pdfViewer);
+        pdfViewer.getPagesOverview = function() {
+          try {
+            // Check if all pages are loaded before calling original method
+            const allPagesLoaded = this._pages && this._pages.every((pageView: any) => 
+              pageView && pageView.pdfPage
+            );
+            
+            if (!allPagesLoaded) {
+              console.warn('[PDFViewer] getPagesOverview called but not all pages are loaded');
+              // Return a safe default overview
+              return this._pages.map((pageView: any, index: number) => {
+                if (pageView && pageView.pdfPage) {
+                  const viewport = pageView.pdfPage.getViewport({ scale: 1 });
+                  return {
+                    width: viewport.width,
+                    height: viewport.height,
+                    rotation: viewport.rotation || 0
+                  };
+                }
+                // Return default dimensions for unloaded pages
+                return {
+                  width: 612, // Default US Letter width in points
+                  height: 792, // Default US Letter height in points
+                  rotation: 0
+                };
+              });
+            }
+            
+            return originalGetPagesOverview();
+          } catch (error) {
+            console.error('[PDFViewer] Error in getPagesOverview:', error);
+            // Return empty array as fallback
+            return [];
+          }
+        };
+      }
+    }
+    
     // Store cleanup function
     cleanupRef.current = () => {
       // Attempt to clean up PDF.js worker
@@ -154,12 +204,89 @@ export function PDFViewer({
   
   // Define scrollToHighlight callback - IMPORTANT: must be defined before useEffect that uses it
   const scrollToHighlight = useCallback((highlightId: string) => {
-    const highlight = allHighlights.find(h => {
-      const matches = h.id === highlightId || (h.rawClaudeCitation && (h.rawClaudeCitation as any).id === highlightId);
-      console.log('[PDFViewer] Checking highlight:', { hId: h.id, matches });
+    // Check temp-to-backend mapping first
+    const tempToBackendMap = (window as any).citationTempToBackendMap as Map<string, string>;
+    if (tempToBackendMap && tempToBackendMap.has(highlightId)) {
+      const backendId = tempToBackendMap.get(highlightId);
+      console.log('[PDFViewer] Using temp-to-backend mapping:', {
+        tempId: highlightId,
+        backendId: backendId
+      });
+      if (backendId) {
+        highlightId = backendId;
+      }
+    }
+
+    // First try direct match
+    let highlight = allHighlights.find(h => {
+      // Check multiple ID fields to handle temp ID vs UUID mismatch
+      const matches = h.id === highlightId || 
+        (h.rawClaudeCitation && (h.rawClaudeCitation as any).id === highlightId) ||
+        (h.rawClaudeCitation && (h.rawClaudeCitation as any).highlightId === highlightId) ||
+        (h.rawClaudeCitation && (h.rawClaudeCitation as any).tempId === highlightId) ||
+        (h.rawClaudeCitation && (h.rawClaudeCitation as any).tempHighlightId === highlightId);
+      
+      if (matches) {
+        console.log('[PDFViewer] Found highlight match:', { 
+          searchId: highlightId, 
+          highlightId: h.id, 
+          rawId: (h.rawClaudeCitation as any)?.id,
+          rawHighlightId: (h.rawClaudeCitation as any)?.highlightId,
+          hasRects: h.position.rects.length
+        });
+      }
       return matches;
     });
-    console.log('[PDFViewer] Find result for', highlightId, ':', highlight ? { page: highlight.position.pageNumber, rects: highlight.position.rects.length } : 'not found');
+    
+    // If not found and it's a temp ID, try fuzzy matching
+    if (!highlight && highlightId.startsWith('cite-')) {
+      console.log('[PDFViewer] Temp ID not found, trying fuzzy matching...');
+      
+      // Try to match by page and text content
+      const searchForSimilar = () => {
+        // Extract page number from existing highlights to narrow search
+        for (const h of allHighlights) {
+          // Check if this might be a match based on content
+          if (h.position.rects.length > 0 && h.content.text) {
+            // If we have raw citation data with temp IDs, check those
+            const raw = h.rawClaudeCitation as any;
+            if (raw && (raw.tempId === highlightId || raw.tempHighlightId === highlightId)) {
+              return h;
+            }
+          }
+        }
+        return null;
+      };
+      
+      highlight = searchForSimilar();
+      
+      if (highlight) {
+        console.log('[PDFViewer] Found highlight via fuzzy match:', {
+          tempId: highlightId,
+          foundId: highlight.id,
+          page: highlight.position.pageNumber,
+          rects: highlight.position.rects.length
+        });
+      }
+    }
+    
+    if (!highlight) {
+      console.warn('[PDFViewer] scrollToHighlight failed to find:', {
+        searchId: highlightId,
+        availableHighlights: allHighlights.map(h => ({
+          id: h.id,
+          rawId: (h.rawClaudeCitation as any)?.id,
+          rawHighlightId: (h.rawClaudeCitation as any)?.highlightId,
+          page: h.position.pageNumber,
+          hasRects: h.position.rects.length
+        }))
+      });
+    } else {
+      console.log('[PDFViewer] Find result for', highlightId, ':', { 
+        page: highlight.position.pageNumber, 
+        rects: highlight.position.rects.length 
+      });
+    }
     if (highlight) {
       console.log('[PDFViewer] Executing scroll to page', highlight.position.pageNumber);
       // Set current page (state) so page number indicator etc updates
@@ -260,11 +387,18 @@ export function PDFViewer({
         // (placeholder) id that chat messages reference.
         const mergeCitations = (prev: Citation[], next: Citation[]): Citation[] => {
           const bySig = new Map<string, Citation>();
+          const tempToBackend = new Map<string, string>(); // Map temp IDs to backend IDs
 
-          const getSig = (c: Citation) => `${c.documentId}-${c.startPageNumber || 0}-${c.citedText}`;
+          const getSig = (c: Citation) => {
+            // Normalize cited text for better matching
+            const normalizedText = (c.citedText || '').trim().replace(/\s+/g, ' ');
+            return `${c.documentId}-${c.startPageNumber || 0}-${normalizedText}`;
+          };
 
+          // First, add all previous citations (which may include temp citations)
           prev.forEach(c => bySig.set(getSig(c), c));
 
+          // Then process new citations from backend
           next.forEach(c => {
             const sig = getSig(c);
             const existing = bySig.get(sig);
@@ -273,13 +407,33 @@ export function PDFViewer({
               const hasRects = existing.rects?.length > 0;
               const newHasRects = c.rects?.length > 0;
 
-              if (!hasRects && newHasRects) {
-                bySig.set(sig, { ...existing, ...c, id: existing.id, rects: c.rects });
+              // If existing is a temp citation and new has rects, merge them
+              if (existing.id.startsWith('cite-') && !hasRects && newHasRects) {
+                // Map temp ID to backend ID
+                tempToBackend.set(existing.id, c.id);
+                tempToBackend.set(existing.highlightId || existing.id, c.id);
+                
+                // Keep the backend citation but preserve temp ID mapping
+                const merged = {
+                  ...c,
+                  tempId: existing.id,
+                  tempHighlightId: existing.highlightId
+                };
+                bySig.set(sig, merged);
+                console.log('[PDFViewer] Mapped temp citation to backend:', {
+                  tempId: existing.id,
+                  backendId: c.id,
+                  hasRects: c.rects.length,
+                  page: c.startPageNumber
+                });
               }
             } else {
               bySig.set(sig, c);
             }
           });
+
+          // Store the mapping for later use
+          (window as any).citationTempToBackendMap = tempToBackend;
 
           return Array.from(bySig.values());
         };
@@ -323,13 +477,44 @@ export function PDFViewer({
     if (scrollState === 'WAIT_HIGHLIGHT') {
       const highlight = allHighlights.find(h => 
         h.id === highlightId || 
-        (h.rawClaudeCitation && 'id' in h.rawClaudeCitation && h.rawClaudeCitation.id === highlightId)
+        (h.rawClaudeCitation && 'id' in h.rawClaudeCitation && h.rawClaudeCitation.id === highlightId) ||
+        (h.rawClaudeCitation && 'highlightId' in h.rawClaudeCitation && (h.rawClaudeCitation as any).highlightId === highlightId)
       );
+      
       if (highlight) {
+        console.log('[PDFViewer] Found highlight in WAIT_HIGHLIGHT state:', {
+          searchId: highlightId,
+          foundId: highlight.id,
+          page: highlight.position.pageNumber,
+          hasRects: highlight.position.rects.length > 0
+        });
         setScrollState('WAIT_READY');
+      } else if (highlightId) {
+        // If highlight not found, check if we have a citation in extraCitations
+        const tempCitation = extraCitations.find(c => 
+          c.id === highlightId || 
+          c.highlightId === highlightId
+        );
+        
+        if (tempCitation && tempCitation.startPageNumber) {
+          console.log('[PDFViewer] Citation not in highlights, but found in extraCitations. Navigating to page:', tempCitation.startPageNumber);
+          // Navigate directly to the page
+          setCurrentPage(tempCitation.startPageNumber);
+          setScrollState('IDLE');
+          
+          // Manually scroll to the page
+          setTimeout(() => {
+            const pageSelector = `.PdfHighlighter .page[data-page-number='${tempCitation.startPageNumber}']`;
+            const pageEl = globalThis.document?.querySelector(pageSelector);
+            if (pageEl) {
+              (pageEl as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
+              console.log('[PDFViewer] Scrolled to page via extraCitations fallback');
+            }
+          }, 100);
+        }
       }
     }
-  }, [allHighlights, scrollState, highlightId]);
+  }, [allHighlights, scrollState, highlightId, extraCitations]);
 
   useEffect(() => {
     if (scrollState === 'WAIT_READY' && scrollViewerRef.current) {
@@ -390,29 +575,47 @@ export function PDFViewer({
     const handleCitationNavigation = (e: CustomEvent<{ citation: Citation }>) => {
       // Ensure detail exists
       if (!e.detail || !e.detail.citation) return;
-      console.log('[PDFViewer] Received citation-navigation, merging new citation');
       const newCitation = e.detail.citation;
+      console.log('[PDFViewer] Received citation-navigation event:', {
+        citationId: newCitation.id,
+        highlightId: newCitation.highlightId,
+        hasRects: newCitation.rects?.length > 0,
+        page: newCitation.startPageNumber
+      });
+      
       if (newCitation) {
         // Convert to highlight format
-        // Provide dummy viewport (real one from page render if needed)
         const dummyViewport = { width: 612, height: 792 };
         const newHighlight = convertCitationToHighlight(newCitation, dummyViewport);
-        // Check if already exists (by id or signature)
-        const exists = allHighlights.some(h => h.id === newHighlight.id);
+        
+        // Check if already exists (by any of its IDs)
+        const exists = allHighlights.some(h => 
+          h.id === newHighlight.id ||
+          h.id === newCitation.id ||
+          h.id === newCitation.highlightId ||
+          (h.rawClaudeCitation && (h.rawClaudeCitation as any).id === newCitation.id)
+        );
+        
+        console.log('[PDFViewer] Citation exists in highlights:', exists);
+        
         if (!exists) {
-          // Add to appropriate array (assume AI highlight for citations)
-          const updatedAI = [...aiHighlights, newHighlight];
-          // Force state update to trigger re-render with new allHighlights
-          // Note: Since allHighlights is derived, we need to update source state
-          // For simplicity, we'll update a local state if needed, but assuming aiHighlights is prop,
-          // we may need parent to handle. As quick fix, log and trigger scroll.
-          scrollToHighlight(newHighlight.id);  // Direct scroll after add
+          console.warn('[PDFViewer] Citation not found in highlights, cannot add dynamically to prop-based array');
+        }
+        
+        // Try to scroll using the original citation ID (which might be temp ID)
+        // The scrollToHighlight function will handle ID matching
+        scrollToHighlight(newCitation.id);
+        
+        // Also try with highlightId if different from id
+        if (newCitation.highlightId && newCitation.highlightId !== newCitation.id) {
+          console.log('[PDFViewer] Also trying to scroll with highlightId:', newCitation.highlightId);
+          scrollToHighlight(newCitation.highlightId);
         }
       }
     };
     window.addEventListener('citation-navigation', handleCitationNavigation as EventListener);
     return () => window.removeEventListener('citation-navigation', handleCitationNavigation as EventListener);
-  }, [allHighlights]); // Dependency on allHighlights is needed to re-trigger merge
+  }, [allHighlights, scrollToHighlight]); // Dependencies needed to avoid stale closures
   
   // Skip rendering until we're in the browser
   if (!isBrowser) {

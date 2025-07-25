@@ -47,7 +47,9 @@ def find_rects_for_text(
 
     cited_text_norm = _normalise_whitespace(cited_text)
 
-    logger.debug("🔍 find_rects_for_text(page=%s) – raw length=%s, normalised length=%s", page_number, len(cited_text), len(cited_text_norm))
+    logger.debug("🔍 find_rects_for_text(page=%s) – searching for: '%s' (normalized from %d to %d chars)", 
+                 page_number, cited_text_norm[:50] + "..." if len(cited_text_norm) > 50 else cited_text_norm, 
+                 len(cited_text), len(cited_text_norm))
     if not cited_text_norm:
         return []
 
@@ -84,6 +86,14 @@ def find_rects_for_text(
                 })
         # Merge overlapping rects
         merged_rects = merge_overlapping_rects(all_rects)
+        
+        if merged_rects:
+            logger.debug("✅ Found %d rect(s) for '%s' on page(s) %s", 
+                        len(merged_rects), cited_text_norm[:30] + "..." if len(cited_text_norm) > 30 else cited_text_norm,
+                        list(set(r["pageNumber"] for r in merged_rects)))
+        else:
+            logger.debug("❌ No rects found for '%s'", cited_text_norm[:50] + "..." if len(cited_text_norm) > 50 else cited_text_norm)
+            
         return merged_rects[:max_hits]
     finally:
         doc.close()

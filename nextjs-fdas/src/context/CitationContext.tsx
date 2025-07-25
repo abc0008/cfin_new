@@ -57,7 +57,9 @@ export const CitationProvider: React.FC<CitationProviderProps> = ({ children }) 
 
     console.log('[CitationContext] loadCitation fetching from API', { citationId });
     try {
-      const response = await fetch(`/api/citations/${citationId}`);
+      // Use backend API URL
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE_URL}/api/citations/${citationId}`);
       if (!response.ok) {
         throw new Error(`Failed to load citation: ${response.statusText}`);
       }
@@ -87,7 +89,9 @@ export const CitationProvider: React.FC<CitationProviderProps> = ({ children }) 
 
     console.log('[CitationContext] loadDocument fetching from API', { documentId });
     try {
-      const response = await fetch(`/api/documents/${documentId}`);
+      // Use backend API URL
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE_URL}/api/documents/${documentId}`);
       if (!response.ok) {
         throw new Error(`Failed to load document: ${response.statusText}`);
       }
@@ -106,17 +110,75 @@ export const CitationProvider: React.FC<CitationProviderProps> = ({ children }) 
   }, [documents]);
 
   const getDocumentUrl = useCallback((documentId: string): string => {
-    return `/api/documents/${documentId}/file`;
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    return `${API_BASE_URL}/api/documents/${documentId}/file`;
   }, []);
 
   const openCitation = useCallback(async (citationId: string): Promise<void> => {
-    console.log('[CitationContext] openCitation start', { citationId });
+    console.log('[CitationContext] openCitation start', { 
+      citationId,
+      isTempId: citationId.startsWith('cite-'),
+      cachedCitations: Array.from(citations.keys())
+    });
     try {
       // Load citation if not cached
       let citation = citations.get(citationId);
+      
+      // If not found by ID and it's a temp ID, search by various methods
+      if (!citation && citationId.startsWith('cite-')) {
+        console.log('[CitationContext] Temp ID not found, searching by various methods...');
+        
+        // Method 1: Search by highlightId
+        for (const [id, cit] of Array.from(citations)) {
+          if (cit.highlightId === citationId || cit.id === citationId) {
+            citation = cit;
+            console.log('[CitationContext] Found citation by highlightId match:', {
+              searchId: citationId,
+              foundId: cit.id,
+              highlightId: cit.highlightId,
+              hasRects: cit.rects?.length > 0
+            });
+            break;
+          }
+        }
+        
+        // Method 2: If still not found, search by signature for similar citations
+        if (!citation) {
+          // Extract key info from the temp ID to find matching backend citation
+          for (const [id, cit] of Array.from(citations)) {
+            // Check if this is a backend citation (UUID format) with rects
+            if (!id.startsWith('cite-') && cit.rects && cit.rects.length > 0) {
+              // Compare by document and page to find potential matches
+              const tempCit = citations.get(citationId);
+              if (tempCit && 
+                  cit.documentId === tempCit.documentId && 
+                  cit.startPageNumber === tempCit.startPageNumber &&
+                  textSimilarity(cit.citedText, tempCit.citedText) > 0.8) {
+                citation = cit;
+                console.log('[CitationContext] Found backend citation by similarity:', {
+                  searchId: citationId,
+                  foundId: cit.id,
+                  hasRects: cit.rects.length,
+                  page: cit.startPageNumber
+                });
+                break;
+              }
+            }
+          }
+        }
+      }
+      
       if (!citation) {
-        console.log('[CitationContext] openCitation – citation not in cache, loading…');
-        citation = await loadCitation(citationId);
+        console.log('[CitationContext] openCitation – citation not in cache, loading…', {
+          citationId,
+          availableIds: Array.from(citations.keys())
+        });
+        // Only try to load from API if it's not a temp ID
+        if (!citationId.startsWith('cite-')) {
+          citation = await loadCitation(citationId);
+        } else {
+          throw new Error(`Temp citation ${citationId} not found in cache and cannot be loaded from API`);
+        }
       }
 
       // Load document if not cached
@@ -148,8 +210,15 @@ export const CitationProvider: React.FC<CitationProviderProps> = ({ children }) 
         console.log(`Navigate to content block ${citation.startBlockIndex}-${citation.endBlockIndex}`);
       }
 
-      // TODO: Emit event for PDF viewer to handle navigation
-      console.log('[CitationContext] Dispatching citation-navigation event for:', citationId, 'with documentUrl:', getDocumentUrl(citation.documentId));
+      // Emit event for PDF viewer to handle navigation
+      console.log('[CitationContext] Dispatching citation-navigation event:', {
+        originalId: citationId,
+        citationId: citation.id,
+        highlightId: citation.highlightId,
+        hasRects: citation.rects?.length > 0,
+        page: citation.startPageNumber,
+        documentUrl: getDocumentUrl(citation.documentId)
+      });
       window.dispatchEvent(new CustomEvent('citation-navigation', {
         detail: { citation, documentUrl: getDocumentUrl(citation.documentId) }
       }));
@@ -164,10 +233,16 @@ export const CitationProvider: React.FC<CitationProviderProps> = ({ children }) 
     setActiveDocumentId(documentId);
   }, []);
 
-  // Replace getSignature with a more robust version
+  // Replace getSignature with a more robust version that matches citationService
   const getSignature = (c: Citation) => {
-    const text = (c.citedText || '').trim().replace(/\s+/g, ' ').toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_~()]/g, '');
-    return `${c.documentId}-${c.startPageNumber || 0}-${text}`;
+    // This should match the signature generation in citationService.ts
+    const normalizedText = (c.citedText || '')
+      .trim()
+      .replace(/\r\n/g, '\n')  // Normalize line endings first
+      .replace(/\s+/g, ' ')    // Normalize whitespace
+      .toLowerCase()           // Case insensitive
+      .substring(0, 100);      // Limit length for comparison
+    return `${c.documentId}-${c.startPageNumber || 0}-${normalizedText}`;
   };
 
   const addCitations = useCallback((newCitations: Citation[]) => {
@@ -199,7 +274,14 @@ export const CitationProvider: React.FC<CitationProviderProps> = ({ children }) 
             const existingHasRects = existing.rects && existing.rects.length > 0;
             const newHasRects = citation.rects && citation.rects.length > 0;
             if (!existingHasRects && newHasRects) {
-              console.log('[CitationContext] rects patched for', citation.id, citation.rects);
+              console.log('[CitationContext] Merging citation with rects:', {
+                existingId: existing.id,
+                existingHighlightId: existing.highlightId,
+                newId: citation.id,
+                newHighlightId: citation.highlightId,
+                rectCount: citation.rects.length,
+                preservedId: existing.id
+              });
               const merged: Citation = {
                 ...existing,
                 ...citation,
@@ -215,6 +297,12 @@ export const CitationProvider: React.FC<CitationProviderProps> = ({ children }) 
           }
         } else {
           // No match, add as new
+          console.log('[CitationContext] Adding new citation:', {
+            id: citation.id,
+            highlightId: citation.highlightId,
+            isTempId: citation.id.startsWith('cite-'),
+            hasRects: citation.rects?.length > 0
+          });
           updated.set(citation.id, citation);
         }
       });
@@ -255,7 +343,31 @@ export const CitationProvider: React.FC<CitationProviderProps> = ({ children }) 
 export default CitationContext;
 
 const textSimilarity = (a: string, b: string): number => {
-  const normA = a.trim().toLowerCase();
-  const normB = b.trim().toLowerCase();
-  return normA.includes(normB) || normB.includes(normA) ? 1 : 0; // Simple for now
+  // Normalize both texts
+  const normalize = (text: string) => text
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')  // Normalize whitespace
+    .replace(/[.,;:!?'"]/g, '')  // Remove punctuation
+    .substring(0, 100);  // Compare first 100 chars
+  
+  const normA = normalize(a);
+  const normB = normalize(b);
+  
+  // Check exact match first
+  if (normA === normB) return 1;
+  
+  // Check if one contains the other
+  if (normA.includes(normB) || normB.includes(normA)) return 0.9;
+  
+  // Check if they share significant substring (at least 20 chars)
+  const minLength = Math.min(normA.length, normB.length);
+  if (minLength >= 20) {
+    for (let i = 0; i <= normA.length - 20; i++) {
+      const substr = normA.substring(i, i + 20);
+      if (normB.includes(substr)) return 0.8;
+    }
+  }
+  
+  return 0;
 };

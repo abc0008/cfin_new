@@ -9,15 +9,38 @@ export const transformClaudeCitation = (
   citationIndex?: number
 ): Citation => {
   // Get document ID from map or use the provided one
-  const documentId = (claudeCitation as any).documentId || 
-    documentMap.get(claudeCitation.document_index) || 
-    '';
+  // CRITICAL FIX: Always use the first/only document if document_index is 0 or undefined
+  let documentId = (claudeCitation as any).documentId;
+  
+  if (!documentId) {
+    // If document_index is provided, try to get from map
+    if (claudeCitation.document_index !== undefined) {
+      documentId = documentMap.get(claudeCitation.document_index);
+    }
+    
+    // If still no documentId and we have any documents, use the first one
+    // This handles the common case where there's only one document
+    if (!documentId && documentMap.size > 0) {
+      // For single document case or when document_index is 0
+      if (documentMap.size === 1 || claudeCitation.document_index === 0) {
+        documentId = Array.from(documentMap.values())[0];
+      }
+    }
+  }
+  
+  documentId = documentId || '';
 
-  // Generate IDs if not provided
-  const id = (claudeCitation as any).id || 
-    `cite-${Date.now()}-${citationIndex || Math.random()}`;
-  const highlightId = (claudeCitation as any).highlightId || 
-    `hl-${Date.now()}-${citationIndex || Math.random()}`;
+  console.log('[citationTransform] transformClaudeCitation:', {
+    claudeCitation,
+    document_index: claudeCitation.document_index,
+    documentMap: Array.from(documentMap.entries()),
+    resolvedDocumentId: documentId,
+    mapSize: documentMap.size
+  });
+
+  // Use IDs from backend, don't generate temporary ones
+  const id = (claudeCitation as any).id || '';
+  const highlightId = (claudeCitation as any).highlightId || '';
 
   return {
     id,

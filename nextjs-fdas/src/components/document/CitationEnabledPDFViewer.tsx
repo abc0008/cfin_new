@@ -85,7 +85,8 @@ export function CitationEnabledPDFViewer(props: React.ComponentProps<typeof PDFV
     ...props,
     highlightId: navigatingToCitation || props.highlightId,
     onCitationClick: handleCitationClick,
-    extraCitations: localCitations,
+    // Merge extraCitations from props with localCitations instead of replacing
+    extraCitations: [...(props.extraCitations || []), ...localCitations],
     onCitationsLoaded: (citations: any[]) => {
       setFoundCitations(citations.length);
       if (props.onCitationsLoaded) {

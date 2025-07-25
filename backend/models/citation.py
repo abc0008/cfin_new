@@ -67,8 +67,9 @@ class CitationPayload(BaseModel):
     id: str
     document_id: str = Field(..., alias="documentId")
     type: CitationType
-    text: str  # Primary text field expected by frontend
-    cited_text: str = Field(..., alias="citedText")  # Keep for backward compatibility
+    cited_text: str = Field(..., alias="citedText")  # Primary text field expected by frontend
+    display_text: Optional[str] = Field(None, alias="displayText")  # Processed text for display (e.g., "Interest Income: $900.0M")
+    searchable_text: Optional[str] = Field(None, alias="searchableText")  # Text for PDF rect finding (e.g., "900.0")
     document_title: str = Field(..., alias="documentTitle")
     highlight_id: str = Field(..., alias="highlightId")
     rects: List[CitationRect] = Field(default_factory=list)

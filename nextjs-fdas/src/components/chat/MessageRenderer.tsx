@@ -68,7 +68,7 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
             key={`cite-${citation.id}`}
             className="citation-link inline-flex items-center px-1 py-0.5 mx-0.5 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-200 cursor-pointer text-xs align-top"
             onClick={() => onCitationClick?.(citation)}
-            aria-label={`Citation ${citationIndex + 1}: ${citation.citedText.substring(0, 50)}...`}
+            aria-label={`Citation ${citationIndex + 1}: ${(citation.displayText || citation.citedText).substring(0, 50)}...`}
           >
             <sup className="font-medium">{citationIndex + 1}</sup>
           </button>

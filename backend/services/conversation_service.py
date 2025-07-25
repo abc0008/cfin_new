@@ -1148,10 +1148,9 @@ class ConversationService:
             # Handle citation marker events
             if event_type == "citation_marker":
                 logger.info(f"📍 Citation marker event received: {event.get('marker')} at index {event.get('citation_index')}")
-                # Citation markers are already injected into the text stream, just forward the event
-                if emit_callback:
-                    event = {**event, "message_id": message_id if message_id else (str(assistant_message_placeholder.id) if assistant_message_placeholder else "unknown")}
-                    await emit_callback(event)
+                # IMPORTANT: Don't forward citation markers until citations are fully processed
+                # This prevents showing empty citations to users
+                logger.info(f"🚫 Blocking citation_marker event - citations will be shown after full processing")
                 return
             
             # Forward ALL other events (or non-returned text_delta/content_update)
@@ -1269,6 +1268,11 @@ class ConversationService:
         accumulated_citations = result.get("citations", [])
         
         logger.info(f"🔍 conversation_service received from analyze_with_visualization_tools_streaming: {len(accumulated_citations)} citations")
+        
+        # Debug: Log the first few citations to see if they have processed cited_text
+        for i, cit in enumerate(accumulated_citations[:3]):
+            logger.info(f"📊 Citation {i+1} cited_text: '{cit.get('cited_text', 'NO CITED TEXT')[:100]}...'")
+            logger.info(f"📊 Citation {i+1} was_processed: {cit.get('was_processed', False)}")
         
         # UPDATED: analysis_text now only contains initial content (not post-tool content)
         # Post-tool content is sent as a separate message via new_message_start event
@@ -1397,11 +1401,32 @@ class ConversationService:
                         logger.warning(f"Could not find document ID for index {doc_index}, skipping citation")
                         continue
                     
+                    # Log the citation data to verify it has been processed
+                    logger.info(f"📊 Saving citation - cited_text: '{citation_data.get('cited_text', 'NO CITED TEXT')[:100]}...', was_processed: {citation_data.get('was_processed', False)}")
+                    # Additional debug logging
+                    if 'original_cited_text' in citation_data:
+                        logger.info(f"📊 Citation has original_cited_text: '{citation_data['original_cited_text'][:50]}...'")
+                    logger.info(f"📊 Full citation_data keys: {list(citation_data.keys())}")
+                    
                     # Create citation through document repository
+                    # Use the processed cited_text if available, otherwise fall back to original
+                    cited_text = citation_data.get("cited_text", "")
+                    was_processed = citation_data.get("was_processed", False)
+                    
+                    # If citation was processed, it should have the extracted specific value
+                    if was_processed:
+                        logger.info(f"✅ Using processed citation text: '{cited_text[:100]}...'")
+                    else:
+                        # Fallback to original if not processed
+                        original_text = citation_data.get("original_cited_text", cited_text)
+                        logger.warning(f"⚠️ Citation not processed, using original text: '{original_text[:100]}...'")
+                    
                     citation_obj = {
                         "document_id": document_id,
-                        "text": citation_data.get("cited_text", ""),
-                        "cited_text": citation_data.get("cited_text", ""),
+                        "text": cited_text,  # Use the processed cited_text
+                        "cited_text": cited_text,  # Use the processed cited_text
+                        "display_text": citation_data.get("display_text"),  # Processed text for display
+                        "searchable_text": citation_data.get("searchable_text"),  # Text for PDF rect finding
                         "document_title": citation_data.get("document_title", ""),
                         "type": citation_data.get("type", "page_location"),
                         "start_page_number": citation_data.get("start_page_number"),
@@ -1415,6 +1440,12 @@ class ConversationService:
                         "message_id": assistant_message.id,
                         "analysis_id": None
                     }
+                    
+                    # Debug logging for searchable_text
+                    if citation_obj.get("searchable_text"):
+                        logger.info(f"✅ Citation has searchable_text: '{citation_obj['searchable_text']}'")
+                    else:
+                        logger.warning(f"⚠️ Citation missing searchable_text - will use full cited_text for rect finding")
                     
                     # Create citation through document repository
                     created_citation = await self.document_repository.create_citation_with_message(
@@ -1566,6 +1597,9 @@ class ConversationService:
         Returns:
             System prompt string
         """
+        # Import citation instructions
+        from services.citation_instructions import GRANULAR_CITATION_INSTRUCTIONS
+        
         prompt = """You are a financial document analysis assistant specialized in analyzing financial statements and reports.
 Your role is to help users understand financial documents, extract insights, and provide financial analysis.
 
@@ -1578,7 +1612,7 @@ Here are some important guidelines:
 6. When analyzing financial documents, focus on key metrics, trends, and insights.
 7. Provide context and explanations for financial terms and concepts.
 
-"""
+""" + GRANULAR_CITATION_INSTRUCTIONS + "\n"
         
         # Add document context if available
         if document_texts and len(document_texts) > 0:

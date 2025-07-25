@@ -15,6 +15,8 @@ export interface Citation {
   documentTitle: string;
   type: 'page_location' | 'char_location' | 'content_block_location';
   citedText: string;
+  displayText?: string;  // Processed text to show to users (e.g., "Interest Income: $900.0M")
+  searchableText?: string;  // Text that actually exists in the PDF for highlighting
   rects: CitationRect[];
   startPageNumber?: number;
   endPageNumber?: number;
@@ -44,6 +46,8 @@ export interface CitationPayload {
   documentId: string;
   type: 'page_location' | 'char_location' | 'content_block_location';
   citedText: string;
+  displayText?: string;  // Processed text to show to users
+  searchableText?: string;  // Text that actually exists in the PDF for highlighting
   documentTitle: string;
   highlightId: string;
   rects: CitationRect[];
@@ -54,7 +58,6 @@ export interface CitationPayload {
   startBlockIndex?: number;
   endBlockIndex?: number;
   page?: number; // Legacy field for backward compatibility
-  text?: string;  // Legacy field for backward compatibility
 }
 
 export interface CitationApiResponse {

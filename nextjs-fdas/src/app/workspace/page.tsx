@@ -12,14 +12,23 @@ import { analysisApi } from '@/lib/api/analysis'
 import Canvas from '@/components/visualization/Canvas'
 import { AnalysisControls } from '@/components/analysis/AnalysisControls'
 import { AnalysisResultSchema } from '@/validation/schemas'
+import { useCitation } from '@/context/CitationContext'
 
 // Import CitationEnabledPDFViewer component with dynamic import to avoid SSR issues
 const PDFViewer = dynamic(
   () => import('../../components/document/CitationEnabledPDFViewer').then(mod => mod.CitationEnabledPDFViewer),
-  { ssr: false }
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-muted-foreground">Loading PDF viewer...</div>
+      </div>
+    )
+  }
 )
 
 export default function Workspace() {
+  const { citations } = useCitation();
   const [activeTab, setActiveTab] = useState<'document' | 'analysis'>('document')
   // Store messages as a normalized object with ID as key for better deduplication
   const [messagesMap, setMessagesMap] = useState<Record<string, Message>>({});
@@ -618,6 +627,13 @@ export default function Workspace() {
   // scroll to the related highlight (if we have its ID)
   const handleNavigateToHighlight = useCallback((citation: Citation) => {
     if (citation) {
+      // Use the citation ID (which might be a temp ID)
+      // The PDFViewer has been updated to handle both temp IDs and UUIDs
+      console.log('[WorkspacePage] handleNavigateToHighlight:', {
+        citationId: citation.id,
+        highlightId: citation.highlightId,
+        page: citation.startPageNumber
+      });
       setHighlightId(citation.id);
       setActiveTab('document');
     }
@@ -699,6 +715,28 @@ export default function Workspace() {
                     <PDFViewer 
                       document={selectedDocument}
                       highlightId={highlightId}
+                      extraCitations={(() => {
+                        const allCitations = Array.from(citations.values());
+                        const filtered = allCitations.filter(c => 
+                          c.documentId === selectedDocument?.metadata.id
+                        );
+                        console.log('[workspace] PDFViewer extraCitations:', {
+                          selectedDocId: selectedDocument?.metadata.id,
+                          allCitations: allCitations.map(c => ({
+                            id: c.id,
+                            documentId: c.documentId,
+                            hasRects: c.rects?.length > 0,
+                            text: c.citedText?.substring(0, 50)
+                          })),
+                          filtered: filtered.map(c => ({
+                            id: c.id,
+                            documentId: c.documentId,
+                            hasRects: c.rects?.length > 0,
+                            text: c.citedText?.substring(0, 50)
+                          }))
+                        });
+                        return filtered;
+                      })()}
                       onCitationCreate={(citation) => {
                         console.log('Citation created:', citation);
                         // You can add citation handling logic here

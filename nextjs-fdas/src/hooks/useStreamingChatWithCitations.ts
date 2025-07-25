@@ -5,7 +5,6 @@ import { Message, Citation } from '@/types';
 import { ClaudeCitation } from '@/types/citation';
 import { conversationApi } from '@/lib/api/conversation';
 import { useCitation } from '@/context/CitationContext';
-import { handleStreamingCitation } from '@/lib/pdf/citationService';
 
 export interface StreamingEvent {
   type: 'message_start' | 'new_message_start' | 'text_delta' | 'tool_start' | 'tool_complete' | 
@@ -36,6 +35,7 @@ export interface StreamingEvent {
   post_tool_text?: string;
   role?: string;
   analysis_blocks?: any[];
+  result?: any; // Tool completion result
 }
 
 export interface UseStreamingChatOptions {
@@ -60,9 +60,7 @@ export function useStreamingChatWithCitations({
   const [isConnected, setIsConnected] = useState(false);
   
   // Citation tracking
-  const [pendingCitations, setPendingCitations] = useState<Map<number, Citation[]>>(new Map());
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
-  const [citationCounter, setCitationCounter] = useState(1);
   
   // ... (rest of the original useStreamingChat state variables)
   const [toolsStarted, setToolsStarted] = useState(false);
@@ -133,8 +131,7 @@ export function useStreamingChatWithCitations({
         setPostToolMessageId(null);
         vizCreatedRef.current = false;
         postVizCreatedRef.current = false;
-        setPendingCitations(new Map());
-        setCitationCounter(1);
+        // Citations will be fetched from backend after message complete
         setCurrentBlockIndex(0);
         break;
 
@@ -339,37 +336,8 @@ export function useStreamingChatWithCitations({
         break;
 
       case 'citations_delta':
-        if (event.citation && event.block_index !== undefined) {
-          handleStreamingCitation(
-            { type: 'citations_delta', citation: event.citation },
-            event.block_index,
-            pendingCitations,
-            documentMap
-          );
-          
-          // Update citation counter for display
-          setCitationCounter(prev => prev + 1);
-          
-          // Opportunistically inject the marker into the visible streaming text **immediately**
-          const marker = `[${citationCounter}]`;
-          const citedSnippet = event.citation.cited_text || '';
-          if (citedSnippet && !streamingTextRef.current.includes(marker)) {
-            // Try to insert right after the cited snippet (case-insensitive)
-            const escaped = citedSnippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(escaped, 'i');
-            let updated = streamingTextRef.current;
-            if (regex.test(updated)) {
-              updated = updated.replace(regex, (match) => `${match}${marker}`);
-            } else {
-              // Fallback: append to the end
-              updated = `${updated}${marker}`;
-            }
-            setStreamingFromAccumulated(updated);
-            if (messagePhase === 'tools') {
-              setFrozenInitial(updated); // keep frozen copy in sync
-            }
-          }
-        }
+        // Skip processing streaming citations - we'll get them from backend with rects
+        console.log('Received streaming citation, will wait for backend citation with rects');
         break;
 
       case 'content_update':
@@ -534,48 +502,6 @@ export function useStreamingChatWithCitations({
           return;
         }
         
-        // Collect all citations from both pending and event
-        const allCitations: Citation[] = [];
-        
-        // First, get citations from pending (collected during streaming)
-        pendingCitations.forEach(citations => {
-          allCitations.push(...citations);
-        });
-        
-        // Then, add any citations from the event itself (if backend provides them)
-        if (event.citations && Array.isArray(event.citations)) {
-          console.log(`Message complete event includes ${event.citations.length} citations from backend`);
-          event.citations.forEach((citation: any) => {
-            // Avoid duplicates by checking if we already have this citation
-            const exists = allCitations.some(c => 
-              c.startPageNumber === citation.start_page_number && 
-              c.citedText === citation.cited_text
-            );
-            if (!exists) {
-              allCitations.push({
-                id: citation.id || `citation-${Date.now()}-${Math.random()}`,
-                messageId: streamingMessageId || '',
-                documentId: citation.document_id || '',
-                documentTitle: citation.document_title || '',
-                citedText: citation.cited_text || '',
-                analysisId: citation.analysis_id || null,
-                startPageNumber: citation.start_page_number,
-                endPageNumber: citation.end_page_number,
-                startCharIndex: citation.start_char_index,
-                endCharIndex: citation.end_char_index,
-                highlightId: `hl-${Date.now()}-${Math.random()}`,
-                type: 'page_location',
-                rects: []
-              });
-            }
-          });
-        }
-        
-        if (allCitations.length > 0) {
-          console.log(`Adding ${allCitations.length} total citations to context`);
-          addCitations(allCitations);
-        }
-        
         // Build the complete message from streaming data
         // We already have everything we need from streaming, including citation markers
         if (onMessageUpdate && streamingMessageId) {
@@ -601,27 +527,7 @@ export function useStreamingChatWithCitations({
             }
           }
           
-          // If we somehow still lack citation markers but have citation data, attempt to inject
-          // them heuristically. We append markers immediately after the first occurrence of
-          // each citedText snippet (case-insensitive) and fall back to appending at the end if
-          // not found. This guarantees the superscript links appear in the UI even when the
-          // backend omits the marker tokens.
-          if (!/\[\d+\]/.test(finalContent) && allCitations.length > 0) {
-            let workingContent = finalContent;
-            allCitations.forEach((cit, idx) => {
-              const marker = `[${idx + 1}]`;
-              // Escape RegExp special chars in citedText
-              const escaped = cit.citedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              const regex = new RegExp(escaped, 'i');
-              if (regex.test(workingContent) && !workingContent.includes(marker)) {
-                workingContent = workingContent.replace(regex, (match) => `${match}${marker}`);
-              } else if (!workingContent.includes(marker)) {
-                // Fallback: append marker at the end
-                workingContent += ` ${marker}`;
-              }
-            });
-            finalContent = workingContent;
-          }
+          // Citation markers will be included in the streamed content from backend
           
           // -------- De-duplicate trailing unformatted restatement --------
           const deduplicate = (content: string): string => {
@@ -658,7 +564,7 @@ export function useStreamingChatWithCitations({
             content: finalContent,
             referencedDocuments: [],
             referencedAnalyses: [],
-            citations: allCitations,
+            citations: [],  // Citations will be fetched from backend API
             content_blocks: event.content_blocks || [],
             analysis_blocks: event.analysis_blocks || []  // Get from streaming event if available
           };
@@ -711,75 +617,48 @@ export function useStreamingChatWithCitations({
             }, 500); // Small delay to ensure backend has finished processing
           }
           
-          // Also fetch enhanced citations with rects from the API if we have streaming citations
-          if (allCitations.length > 0) {
-            console.log('Fetching enhanced citations with rects for', allCitations.length, 'citations...');
-            
-            // Get unique document IDs from citations
-            const documentIds = [...new Set(allCitations.map(c => c.documentId).filter(Boolean))];
-            
-            // Fetch enhanced citations for each document
-            Promise.all(
-              documentIds.map(documentId => 
-                import('@/lib/api/documents').then(({ documentsApi }) => 
-                  documentsApi.getDocumentCitations(documentId).catch(error => {
-                    console.error(`Error fetching citations for document ${documentId}:`, error);
-                    return [];
-                  })
-                )
-              )
-            ).then(citationArrays => {
-              const enhancedCitations = citationArrays.flat();
-              
-              if (enhancedCitations.length > 0) {
-                console.log(`Fetched ${enhancedCitations.length} enhanced citations with rects`);
-
-                // Merge enhanced citations with existing ones by signature,
-                // preferring entries that contain rects.
-                const bySignature = new Map<string, Citation>();
-
-                // Helper to build unique key (reuse function from citationService)
-                const { getCitationSignature } = require('@/lib/pdf/citationService');
-
-                const mergeCitation = (cit: Citation) => {
-                  const sig = getCitationSignature(cit);
-                  const existing = bySignature.get(sig);
-                  if (!existing) {
-                    bySignature.set(sig, cit);
+          // After message is complete, fetch citations with rects from backend
+          console.log('Fetching citations from backend API...');
+          
+          // Slight delay to ensure backend has processed citations
+          setTimeout(() => {
+            import('@/lib/api/conversations').then(({ conversationsApi }) => {
+              conversationsApi.getConversationHistory(conversationId, 10)
+                .then(messages => {
+                  // Find our message by ID
+                  const updatedMessage = messages.find(msg => msg.id === streamingMessageId);
+                  if (updatedMessage && updatedMessage.citations && updatedMessage.citations.length > 0) {
+                    console.log(`Found ${updatedMessage.citations.length} citations from backend`);
+                    
+                    // Filter to only include citations with valid rects
+                    const validCitations = updatedMessage.citations.filter(c => c.rects && c.rects.length > 0);
+                    
+                    console.log('[useStreaming] Valid citations with rects:', validCitations.map(c => ({ 
+                      id: c.id, 
+                      documentId: c.documentId,
+                      rectCount: c.rects?.length || 0,
+                      text: c.citedText?.substring(0, 50)
+                    })));
+                    
+                    // Update global citation cache with only valid citations
+                    addCitations(validCitations);
+                    
+                    // Update message with citations
+                    const enhancedMessage: Message = {
+                      ...message,
+                      citations: validCitations
+                    };
+                    
+                    onMessageUpdate(enhancedMessage);
                   } else {
-                    // Prefer the one with rects
-                    const existingHasRects = existing.rects && existing.rects.length > 0;
-                    const newHasRects = cit.rects && cit.rects.length > 0;
-                    if (!existingHasRects && newHasRects) {
-                      bySignature.set(sig, cit);
-                    }
+                    console.log('No citations found in backend message');
                   }
-                };
-
-                // First add current (streaming) citations
-                allCitations.forEach(mergeCitation);
-                // Then overlay enhanced citations (these will replace where rects exist)
-                enhancedCitations.forEach(mergeCitation);
-
-                const mergedCitations = Array.from(bySignature.values());
-
-                const enhancedMessage: Message = {
-                  ...message,
-                  citations: mergedCitations
-                };
-
-                // Log merged rect counts for debugging
-                console.log('[useStreaming] merged citations', mergedCitations.map(c => ({ id: c.id, rectCount: c.rects?.length || 0 })));
-
-                // Update global citation cache with merged set
-                addCitations(mergedCitations);
-
-                onMessageUpdate(enhancedMessage);
-                }
-            }).catch(error => {
-              console.error('Error fetching enhanced citations:', error);
+                })
+                .catch(error => {
+                  console.error('Error fetching citations from backend:', error);
+                });
             });
-          }
+          }, 1000); // Wait 1 second for backend processing
         }
         
         // Reset state
@@ -802,7 +681,7 @@ export function useStreamingChatWithCitations({
         break;
     }
   }, [messagePhase, toolsStarted, streamingText, frozenInitialText, activeMessageId, 
-      streamingMessageId, postToolMessageId, conversationId, onMessageUpdate, pendingCitations, 
+      streamingMessageId, postToolMessageId, conversationId, onMessageUpdate, 
       documentMap, addCitations, awaitingPostVisualization]);
 
   // ... (rest of the hook implementation remains the same)
@@ -1134,8 +1013,8 @@ export function useStreamingChatWithCitations({
     toolsInProgress: Array.from(toolsInProgress.entries()).map(([id, name]) => ({ id, name })),
     completedVisualizations,
     
-    // Citations
-    streamingCitations: Array.from(pendingCitations.values()).flat(),
+    // Citations (will be fetched from backend after message complete)
+    streamingCitations: [],
     
     // Clean streaming state (for debugging)
     toolsStarted,

@@ -163,6 +163,8 @@ class Citation(Base):
     text = Column(Text, nullable=False)
     section = Column(String)
     cited_text = Column(Text)
+    display_text = Column(Text)  # Processed text for display (e.g., "Interest Income: $900.0M")
+    searchable_text = Column(Text)  # Text that exists in PDF for rect finding (e.g., "900.0")
     document_title = Column(String(255))
     start_page_number = Column(Integer)
     end_page_number = Column(Integer)

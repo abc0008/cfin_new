@@ -48,6 +48,10 @@ export function StreamingChatInterface({
     activeDocuments.forEach((docId, index) => {
       map.set(index, docId);
     });
+    console.log('[StreamingChatInterface] documentMap:', {
+      activeDocuments,
+      map: Array.from(map.entries())
+    });
     return map;
   }, [activeDocuments]);
 
@@ -240,7 +244,14 @@ export function StreamingChatInterface({
             <MessageRenderer 
               message={message} 
               onCitationClick={(citation) => {
-                console.log('[StreamingChatInterface] Citation marker clicked, opening via CitationContext:', citation.id);
+                console.log('[StreamingChatInterface] Citation marker clicked:', {
+                  citationId: citation.id,
+                  highlightId: citation.highlightId,
+                  isTempId: citation.id.startsWith('cite-'),
+                  hasRects: citation.rects?.length > 0,
+                  documentId: citation.documentId,
+                  page: citation.startPageNumber
+                });
                 // Delegate to CitationContext which loads/merges rects (if missing)
                 // and dispatches the "citation-navigation" event when ready.
                 openCitation(citation.id).catch((err) => {

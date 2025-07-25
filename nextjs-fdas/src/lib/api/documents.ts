@@ -50,6 +50,7 @@ interface FinancialDataVerifyResponse {
 interface ApiCitation {
   id?: string;
   text: string;
+  display_text?: string;  // Processed text for display (e.g., "Interest Income: $900.0M")
   document_id: string;
   highlight_id?: string;
   page: number;
@@ -376,7 +377,8 @@ export const documentsApi = {
         // Validate each citation
         return response.map(citation => ({
           id: citation.id || '',
-          citedText: citation.text,
+          citedText: citation.citedText || citation.cited_text || citation.text, // Handle both camelCase and snake_case
+          displayText: citation.displayText || citation.display_text, // Handle both camelCase and snake_case
           documentId: citation.document_id,
           documentTitle: 'Document', // This should ideally come from the backend
           type: 'page_location' as const,

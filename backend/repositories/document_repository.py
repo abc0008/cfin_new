@@ -525,6 +525,8 @@ class DocumentRepository:
             document_id=document_id,
             text=citation_data.get("text", ""),
             cited_text=citation_data.get("cited_text", citation_data.get("text", "")),
+            display_text=citation_data.get("display_text"),  # Processed text for display
+            searchable_text=citation_data.get("searchable_text"),  # Text for PDF rect finding
             document_title=citation_data.get("document_title", ""),
             type=citation_data.get("type", "page_location"),
             highlight_id=citation_data.get("highlight_id", citation_id),
@@ -742,20 +744,157 @@ class DocumentRepository:
                 # separated tokens if the original text is longer than 120 chars.
                 from pdf_processing.rect_finder import _normalise_whitespace
 
-                raw_search_text = str(citation.cited_text or "")
-                if len(raw_search_text) > 120:
+                # Check if citation has a searchable_text field set by the citation processor
+                if hasattr(citation, 'searchable_text') and citation.searchable_text:
+                    raw_search_text = str(citation.searchable_text)
+                    logger.info("🔍 Using searchable_text from citation processor: '%s'", raw_search_text)
+                else:
+                    raw_search_text = str(citation.cited_text or "")
+                
+                # For citations that look like processed financial values (e.g., "Cash & Due: $4000M"),
+                # try to extract just the value part for better rect finding
+                # More robust check: ensure it's likely a financial metric with colon separator
+                if ":" in raw_search_text:
+                    parts = raw_search_text.split(":", 1)
+                    if len(parts) == 2:
+                        label_part = parts[0].strip()
+                        value_part = parts[1].strip()
+                        
+                        # Check if this looks like a financial citation
+                        # Common patterns: contains $, %, ends with M/B/K/x, contains numbers, or is a ratio
+                        financial_indicators = [
+                            "$" in value_part,
+                            "%" in value_part,
+                            any(value_part.endswith(suffix) for suffix in ["M", "B", "K", "k", "m", "b", "x", "×"]),
+                            any(char.isdigit() for char in value_part),
+                            "/" in label_part  # Common in ratios like "Debt/Equity"
+                        ]
+                        
+                        if any(financial_indicators):
+                            # Try finding just the value first
+                            logger.info("🔍 Detected financial metric - searching for value part: '%s' from citation '%s'", value_part, raw_search_text)
+                            search_text = value_part
+                        else:
+                            search_text = raw_search_text
+                    else:
+                        search_text = raw_search_text
+                elif len(raw_search_text) > 120:
                     search_text = " ".join(_normalise_whitespace(raw_search_text).split(" ")[:4])
                 else:
                     search_text = raw_search_text
 
+                rects_found = []  # Initialize rects_found
+                
+                # Try multiple search strategies for financial values
+                search_strategies = [search_text]
+                
+                # If searching for a financial value like "$4000M", also try variants
+                if "$" in search_text:
+                    # Try without dollar sign
+                    no_dollar = search_text.replace("$", "").strip()
+                    search_strategies.append(no_dollar)
+                    
+                    # Try without suffix (M, B, K)
+                    if no_dollar and no_dollar[-1] in "MBK":
+                        no_suffix = no_dollar[:-1].strip()
+                        search_strategies.append(no_suffix)
+                        
+                    # Also try with spaces around the number (e.g., "4000 M" or "4,000")
+                    if no_dollar and no_dollar[-1] in "MBK":
+                        with_space = no_dollar[:-1].strip() + " " + no_dollar[-1]
+                        search_strategies.append(with_space)
+                
+                # Handle percentages (e.g., "15.2%")
+                if "%" in search_text:
+                    # Try without percentage sign
+                    no_percent = search_text.replace("%", "").strip()
+                    search_strategies.append(no_percent)
+                    
+                    # Try with space before percentage
+                    with_space_percent = search_text.replace("%", " %")
+                    if with_space_percent != search_text:
+                        search_strategies.append(with_space_percent)
+                
+                # Handle comma-separated numbers (e.g., "$4,000M" or "1,234,567")
+                if "," in search_text:
+                    # Try without commas
+                    no_commas = search_text.replace(",", "")
+                    search_strategies.append(no_commas)
+                    
+                    # For dollar amounts with commas, also try variants without dollar sign
+                    if "$" in no_commas:
+                        no_dollar_no_commas = no_commas.replace("$", "").strip()
+                        search_strategies.append(no_dollar_no_commas)
+                
+                # Handle negative values (e.g., "-$30M", "($30M)", "−$30M")
+                if search_text.startswith("-") or search_text.startswith("−") or (search_text.startswith("(") and search_text.endswith(")")):
+                    # Try without negative sign
+                    positive_value = search_text.lstrip("-−").strip()
+                    search_strategies.append(positive_value)
+                    
+                    # Try parentheses format for negatives
+                    if search_text.startswith("-") and "$" in search_text:
+                        parentheses_format = "(" + search_text.lstrip("-").strip() + ")"
+                        search_strategies.append(parentheses_format)
+                    
+                    # Try removing parentheses if present
+                    if search_text.startswith("(") and search_text.endswith(")"):
+                        no_parens = search_text[1:-1].strip()
+                        search_strategies.append(no_parens)
+                        # Also try with minus sign
+                        with_minus = "-" + no_parens
+                        search_strategies.append(with_minus)
+                
+                # Handle ratios and multipliers (e.g., "2.5x", "3.2×")
+                if search_text.endswith("x") or search_text.endswith("×"):
+                    # Try without the x suffix
+                    no_x = search_text.rstrip("x×").strip()
+                    search_strategies.append(no_x)
+                    
+                    # Try with space before x
+                    with_space_x = no_x + " x"
+                    search_strategies.append(with_space_x)
+                    
+                    # Try with multiplication symbol
+                    with_mult_symbol = no_x + "×"
+                    search_strategies.append(with_mult_symbol)
+                
+                # Final fallback: extract just the numeric value
+                # This helps with edge cases where formatting is inconsistent
+                import re
+                numeric_match = re.search(r'[\d,]+\.?\d*', search_text)
+                if numeric_match and numeric_match.group() not in search_strategies:
+                    pure_number = numeric_match.group()
+                    search_strategies.append(pure_number)
+                    # Also try without commas if present
+                    if "," in pure_number:
+                        search_strategies.append(pure_number.replace(",", ""))
+                
+                # Remove duplicates while preserving order
+                seen = set()
+                unique_strategies = []
+                for strategy in search_strategies:
+                    if strategy not in seen:
+                        seen.add(strategy)
+                        unique_strategies.append(strategy)
+                search_strategies = unique_strategies
+                
+                logger.info("🔍 Search strategies for citation '%s': %s", citation.id[:8], search_strategies)
+                logger.debug("📍 Citation details - Page: %s-%s, Original text: '%s'", 
+                            citation.start_page_number, citation.end_page_number, raw_search_text)
+                
                 for pg in pages_to_try:
-                    rects_data_page = find_rects_for_text(
-                        pdf_path=pdf_path,
-                        page_number=pg,
-                        cited_text=search_text,
-                    )
-                    if rects_data_page:
-                        rects_found = rects_data_page
+                    for search_str in search_strategies:
+                        rects_data_page = find_rects_for_text(
+                            pdf_path=pdf_path,
+                            page_number=pg,
+                            cited_text=search_str,
+                        )
+                        if rects_data_page:
+                            rects_found = rects_data_page
+                            logger.info("✅ Found rects using search strategy: '%s'", search_str)
+                            break
+                    if rects_found:
                         break  # Stop at the first page that yields a hit
 
                 # 🛡️  Fallback: scan the rest of the document if nothing matched in
@@ -767,41 +906,55 @@ class DocumentRepository:
                     logger.info("✅ Auto-bbox found %d rect(s) for citation %s on page %s", len(rects), citation.id, pg)
                 elif not rects_found:
                     try:
-                        from pdf_processing.rect_finder import _normalise_whitespace
-
-                        # small heuristic: if the cited text starts with a year like
-                        # "2024Q1" we keep that prefix for faster matches.
-                        prefix = " ".join(_normalise_whitespace(citation.cited_text).split(" ")[:4])
-
                         import fitz
                         doc_tmp = fitz.open(pdf_path)
+                        
+                        # Try all search strategies on other pages
                         for pg in range(1, doc_tmp.page_count + 1):
                             if pg in pages_to_try:
                                 continue  # already examined
-                            rects_data_page = find_rects_for_text(
-                                pdf_path=pdf_path,
-                                page_number=pg,
-                                cited_text=prefix,
-                            )
-                            if rects_data_page:
-                                rects_found = rects_data_page
+                            
+                            for search_str in search_strategies:
+                                rects_data_page = find_rects_for_text(
+                                    pdf_path=pdf_path,
+                                    page_number=pg,
+                                    cited_text=search_str,
+                                )
+                                if rects_data_page:
+                                    rects_found = rects_data_page
+                                    logger.info("✅ Found rects on page %d using fallback search: '%s'", pg, search_str)
+                                    break
+                            
+                            if rects_found:
                                 break
                         doc_tmp.close()
-                    except Exception:
-                        pass
+                        
+                        # Convert found rects to CitationRect models
+                        if rects_found:
+                            rects = [CitationRect(**r) if not isinstance(r, CitationRect) else r for r in rects_found]
+                            logger.info("✅ Fallback auto-bbox found %d rect(s) for citation %s", len(rects), citation.id)
+                    except Exception as e:
+                        logger.debug(f"Fallback search error for citation {citation.id}: {e}")
+                        
+                # Log if no rects found after all attempts
+                if not rects_found:
+                    logger.warning("❌ No rects found for citation %s after trying %d strategies: %s", 
+                                 citation.id[:8], len(search_strategies), search_strategies[:3])
             except Exception as e:
                 logger.warning(f"Auto-bbox failed for citation {citation.id}: {e}")
         
         # Build the CitationPayload
-        # Use cited_text if available, otherwise fall back to text field
-        citation_text = citation.cited_text or citation.text
+        # For cited_text field: use display_text if available (processed specific value),
+        # otherwise fall back to original cited_text
+        primary_citation_text = citation.display_text if citation.display_text else (citation.cited_text or citation.text)
         
         payload = CitationPayload(
             id=str(citation.id),
             document_id=str(citation.document_id),
             type=CitationType(citation.type) if citation.type else CitationType.PAGE_LOCATION,
-            text=citation_text,  # Frontend expects 'text' field
-            cited_text=citation_text,  # Keep for backward compatibility
+            cited_text=primary_citation_text,  # Primary field for frontend display
+            display_text=citation.display_text,  # Optional processed text (e.g., "Interest Income: $900.0M")
+            searchable_text=citation.searchable_text,  # Optional text for PDF search (e.g., "900.0")
             document_title=citation.document_title or "",
             highlight_id=citation.highlight_id or str(citation.id),
             rects=rects,
