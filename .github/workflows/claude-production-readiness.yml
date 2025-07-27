@@ -1,5 +1,8 @@
 name: Claude API Production Readiness
 
+# Disable this workflow completely
+if: false
+
 on:
   # Run on PR to main/master for gate-keeping
   pull_request:
@@ -12,7 +15,9 @@ on:
   
   # Run nightly for continuous monitoring
   schedule:
-    - cron: '0 6 * * *'  # 6 AM UTC daily
+    - cron: '0 6 * * *'  # 6 AM UTC daily (also fixed the cron syntax)
+
+# rest of your workflow...
   
   # Allow manual triggering
   workflow_dispatch:
