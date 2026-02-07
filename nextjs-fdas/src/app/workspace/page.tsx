@@ -6,20 +6,29 @@ import { FileText, BarChart2, Upload, FileUp, Zap, ChevronRight, FileSearch } fr
 import { StreamingChatInterface } from '../../components/chat/StreamingChatInterface'
 import { UploadForm } from '../../components/document/UploadForm'
 import dynamic from 'next/dynamic'
-import { ProcessedDocument, AnalysisResult, Message } from '@/types'
+import { ProcessedDocument, AnalysisResult, Message, Citation } from '@/types'
 import { conversationApi } from '@/lib/api/conversation'
 import { analysisApi } from '@/lib/api/analysis'
 import Canvas from '@/components/visualization/Canvas'
 import { AnalysisControls } from '@/components/analysis/AnalysisControls'
 import { AnalysisResultSchema } from '@/validation/schemas'
+import { useCitation } from '@/context/CitationContext'
 
-// Import PDFViewer component with dynamic import to avoid SSR issues
+// Import CitationEnabledPDFViewer component with dynamic import to avoid SSR issues
 const PDFViewer = dynamic(
-  () => import('../../components/document/PDFViewer').then(mod => mod.PDFViewer),
-  { ssr: false }
+  () => import('../../components/document/CitationEnabledPDFViewer').then(mod => mod.CitationEnabledPDFViewer),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-muted-foreground">Loading PDF viewer...</div>
+      </div>
+    )
+  }
 )
 
 export default function Workspace() {
+  const { citations } = useCitation();
   const [activeTab, setActiveTab] = useState<'document' | 'analysis'>('document')
   // Store messages as a normalized object with ID as key for better deduplication
   const [messagesMap, setMessagesMap] = useState<Record<string, Message>>({});
@@ -603,8 +612,17 @@ export default function Workspace() {
         };
       }
       
-      // For regular streaming messages, only update if content changed
-      if (!existingMessage || existingMessage.content !== message.content) {
+      // For regular streaming messages, only update if content changed or citations added
+      if (!existingMessage || 
+          existingMessage.content !== message.content ||
+          (message.citations && message.citations.length > 0 && !existingMessage.citations?.length)) {
+        console.log('[handleMessageUpdate] Updating message:', {
+          messageId: message.id,
+          hadCitations: !!existingMessage?.citations?.length,
+          nowHasCitations: !!message.citations?.length,
+          citationCount: message.citations?.length || 0,
+          contentChanged: existingMessage?.content !== message.content
+        });
         return {
           ...prev,
           [message.id]: message
@@ -612,6 +630,22 @@ export default function Workspace() {
       }
       return prev; // No change needed
     });
+  }, []);
+
+  // Handle clicking a citation marker in the chat – switch to the document tab and
+  // scroll to the related highlight (if we have its ID)
+  const handleNavigateToHighlight = useCallback((citation: Citation) => {
+    if (citation) {
+      // Use the citation ID (which might be a temp ID)
+      // The PDFViewer has been updated to handle both temp IDs and UUIDs
+      console.log('[WorkspacePage] handleNavigateToHighlight:', {
+        citationId: citation.id,
+        highlightId: citation.highlightId,
+        page: citation.startPageNumber
+      });
+      setHighlightId(citation.id);
+      setActiveTab('document');
+    }
   }, []);
 
   return (
@@ -642,6 +676,7 @@ export default function Workspace() {
               isLoading={isLoading}
               conversationId={sessionId || undefined}
               onMessageUpdate={handleMessageUpdate}
+              onNavigateToHighlight={handleNavigateToHighlight}
             />
           </div>
         </div>
@@ -689,6 +724,28 @@ export default function Workspace() {
                     <PDFViewer 
                       document={selectedDocument}
                       highlightId={highlightId}
+                      extraCitations={(() => {
+                        const allCitations = Array.from(citations.values());
+                        const filtered = allCitations.filter(c => 
+                          c.documentId === selectedDocument?.metadata.id
+                        );
+                        console.log('[workspace] PDFViewer extraCitations:', {
+                          selectedDocId: selectedDocument?.metadata.id,
+                          allCitations: allCitations.map(c => ({
+                            id: c.id,
+                            documentId: c.documentId,
+                            hasRects: c.rects?.length > 0,
+                            text: c.citedText?.substring(0, 50)
+                          })),
+                          filtered: filtered.map(c => ({
+                            id: c.id,
+                            documentId: c.documentId,
+                            hasRects: c.rects?.length > 0,
+                            text: c.citedText?.substring(0, 50)
+                          }))
+                        });
+                        return filtered;
+                      })()}
                       onCitationCreate={(citation) => {
                         console.log('Citation created:', citation);
                         // You can add citation handling logic here

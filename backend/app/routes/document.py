@@ -4,7 +4,8 @@ from typing import List, Dict, Any
 import logging
 import os
 
-from models.document import DocumentUploadResponse, ProcessedDocument, DocumentMetadata, Citation
+from models.document import DocumentUploadResponse, ProcessedDocument, DocumentMetadata
+from models.citation import CitationPayload
 from models.api_models import RetryExtractionRequest
 from models.database_models import ProcessingStatusEnum
 from repositories.document_repository import DocumentRepository
@@ -97,7 +98,7 @@ async def get_document(
     
     return document_repository.document_to_api_schema(document)
 
-@router.get("/{document_id}/citations", response_model=List[Citation], response_model_by_alias=True)
+@router.get("/{document_id}/citations", response_model=List[CitationPayload], response_model_by_alias=True)
 async def get_document_citations(
     document_id: str,
     document_repository: DocumentRepository = Depends(get_document_repository)
@@ -114,7 +115,7 @@ async def get_document_citations(
     # Convert to API schema
     return [document_repository.citation_to_api_schema(citation) for citation in citations]
 
-@router.get("/{document_id}/citations/{citation_id}", response_model=Citation, response_model_by_alias=True)
+@router.get("/{document_id}/citations/{citation_id}", response_model=CitationPayload, response_model_by_alias=True)
 async def get_citation(
     document_id: str,
     citation_id: str,

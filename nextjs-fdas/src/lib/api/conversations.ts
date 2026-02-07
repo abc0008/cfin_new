@@ -112,8 +112,13 @@ export const conversationsApi = {
   async getConversationHistory(sessionId: string, limit: number = 50): Promise<Message[]> {
     try {
       const response = await apiService.get<any[]>(
-        `/conversation/${sessionId}/history?limit=${limit}`
+        `/api/conversation/${sessionId}/history?limit=${limit}`
       );
+      
+      
+      // Import citation transform
+      const { transformCitations } = await import('@/lib/pdf/citationTransform');
+      
       // Convert backend format to frontend format if necessary
       return response.map(msg => ({
         id: msg.id,
@@ -123,9 +128,10 @@ export const conversationsApi = {
         content: msg.content,
         referencedDocuments: msg.referencedDocuments || msg.referenced_documents || [],
         referencedAnalyses: msg.referencedAnalyses || msg.referenced_analyses || [],
-        citations: msg.citations || [],
-        content_blocks: msg.content_blocks || [],
-        analysis_blocks: msg.analysis_blocks || []
+        citationLinks: msg.citationLinks || msg.citation_links || [],
+        citations: transformCitations(msg.citations || msg.citation_list || []),
+        content_blocks: msg.content_blocks || msg.contentBlocks || [],
+        analysis_blocks: msg.analysis_blocks || msg.analysisBlocks || []
       }));
     } catch (error) {
       console.error('Error getting conversation history:', error);
@@ -176,7 +182,7 @@ export const conversationsApi = {
       
       // Send request 
       const response = await apiService.post<any>(
-        `/conversation/${sessionId}/message`,
+        `/api/conversation/${sessionId}/message`,
         data
       );
       
@@ -265,7 +271,7 @@ export const conversationsApi = {
       
       // Use the streaming API
       await apiService.stream<any>(
-        `/conversation/${sessionId}/message/stream`,
+        `/api/conversation/${sessionId}/message/stream`,
         data,
         // Handle each chunk
         (chunk) => {

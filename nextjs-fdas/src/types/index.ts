@@ -1,4 +1,6 @@
 import { ChartData, TableData } from './visualization';
+import { Citation } from './citation';
+export * from './citation';
 
 export interface DocumentMetadata {
   id: string;
@@ -31,23 +33,7 @@ export interface DocumentUploadResponse {
   fileSize: number;
 }
 
-export interface Citation {
-  id: string;
-  text: string;
-  documentId: string;
-  highlightId: string;
-  page: number;
-  rects: Array<{
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-    width: number;
-    height: number;
-  }>;
-  messageId?: string;
-  analysisId?: string;
-}
+// Citation interface moved to citation.ts
 
 export interface FinancialRatio {
   name: string;
@@ -101,17 +87,7 @@ export interface AnalysisResult {
   query?: string;
 }
 
-export interface ClaudeCitation {
-  type: string;
-  cited_text: string;
-  document_title: string;
-  start_page_number?: number;
-  end_page_number?: number;
-  start_char_index?: number;
-  end_char_index?: number;
-  start_block_index?: number;
-  end_block_index?: number;
-}
+// ClaudeCitation interface moved to citation.ts
 
 export interface ConversationMetadata {
   id: string;

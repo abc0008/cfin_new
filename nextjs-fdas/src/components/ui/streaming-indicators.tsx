@@ -58,20 +58,41 @@ export function ToolProgressIndicator({ toolName, toolId }: ToolProgressIndicato
 
 interface StreamingMessageProps {
   text: string;
-  toolsInProgress: string[];
+  toolsInProgress: { id: string; name: string }[];
   showTypingIndicator?: boolean;
+  citations?: any[];
+  onCitationClick?: (citation: any) => void;
 }
 
 export function StreamingMessage({ 
   text, 
   toolsInProgress, 
-  showTypingIndicator = true 
+  showTypingIndicator = true,
+  citations = [],
+  onCitationClick
 }: StreamingMessageProps) {
+  // Import TextWithCitations dynamically to avoid circular dependency
+  const [TextWithCitations, setTextWithCitations] = React.useState<any>(null);
+  
+  React.useEffect(() => {
+    import('../chat/TextWithCitations').then(module => {
+      setTextWithCitations(() => module.TextWithCitations);
+    });
+  }, []);
+  
   return (
     <div className="flex justify-start mb-4">
       <div className="max-w-[80%] rounded-lg px-4 py-3 bg-card border border-border text-foreground shadow-sm font-avenir-pro text-sm">
         <div className="whitespace-pre-wrap">
-          {text}
+          {TextWithCitations && citations.length > 0 ? (
+            <TextWithCitations 
+              text={text} 
+              citations={citations} 
+              onCitationClick={onCitationClick} 
+            />
+          ) : (
+            text
+          )}
           {showTypingIndicator && text && (
             <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />
           )}
@@ -80,11 +101,11 @@ export function StreamingMessage({
         {/* Show tools in progress */}
         {toolsInProgress.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
-            {toolsInProgress.map(toolId => (
+            {toolsInProgress.map(tool => (
               <ToolProgressIndicator 
-                key={toolId} 
-                toolName="unknown" 
-                toolId={toolId} 
+                key={tool.id} 
+                toolName={tool.name} 
+                toolId={tool.id} 
               />
             ))}
           </div>

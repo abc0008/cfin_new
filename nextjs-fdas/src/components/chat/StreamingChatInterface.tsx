@@ -5,13 +5,14 @@ import { Message, Citation } from '@/types';
 import { Loader2, Send, FileText, Zap } from 'lucide-react';
 import { MessageRenderer } from './MessageRenderer';
 import { FollowUpQuestions } from './FollowUpQuestions';
-import { useStreamingChat } from '@/hooks/useStreamingChat';
+import { useStreamingChatWithCitations } from '@/hooks/useStreamingChatWithCitations';
 import { 
   StreamingMessage, 
   ConnectionStatus, 
   VisualizationReadyIndicator 
 } from '@/components/ui/streaming-indicators';
 import { formatTimestamp } from '@/utils/formatters';
+import { useCitation } from '@/context/CitationContext';
 
 interface StreamingChatInterfaceProps {
   messages: Message[];
@@ -34,13 +35,23 @@ export function StreamingChatInterface({
   conversationId,
   onMessageUpdate
 }: StreamingChatInterfaceProps) {
+  const { openCitation } = useCitation();
   const [inputValue, setInputValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [useStreaming, setUseStreaming] = useState(true); // Toggle for streaming mode
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Streaming chat hook
+  // Build document map from active documents
+  const documentMap = useCallback(() => {
+    const map = new Map<number, string>();
+    activeDocuments.forEach((docId, index) => {
+      map.set(index, docId);
+    });
+    return map;
+  }, [activeDocuments]);
+
+  // Streaming chat hook with citations
   const {
     isConnected,
     isStreaming,
@@ -48,10 +59,12 @@ export function StreamingChatInterface({
     streamingMessageId,
     toolsInProgress,
     completedVisualizations,
+    streamingCitations,
     sendStreamingMessage,
     sendStreamingMessageHTTP,
-  } = useStreamingChat({
+  } = useStreamingChatWithCitations({
     conversationId: conversationId || '',
+    documentMap: documentMap(),
     onMessageUpdate: (message) => {
       // Pass the streaming message to the parent component
       onMessageUpdate?.(message);
@@ -61,6 +74,20 @@ export function StreamingChatInterface({
     },
     onError: (error) => {
       console.error('Streaming error:', error);
+      // Display error as a system message in the chat
+      const errorMessage = {
+        id: `error_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+        sessionId: conversationId || '',
+        timestamp: new Date().toISOString(),
+        role: 'system' as const,
+        content: `Error: ${error}. Please try again or contact support if the issue persists.`,
+        referencedDocuments: [],
+        referencedAnalyses: [],
+        citations: [],
+        content_blocks: null,
+        analysis_blocks: []
+      };
+      onMessageUpdate?.(errorMessage);
     }
   });
 
@@ -142,8 +169,8 @@ export function StreamingChatInterface({
   const handleCitationClick = useCallback((citation: Citation) => {
     if (!activeDocuments) return;
     
-    // Navigate to the citation in the document
-    if (onNavigateToHighlight && citation.rects && citation.rects.length > 0) {
+    // Always forward the citation; the viewer can decide how to handle missing rects
+    if (onNavigateToHighlight) {
       onNavigateToHighlight(citation);
     }
   }, [activeDocuments, onNavigateToHighlight]);
@@ -162,9 +189,34 @@ export function StreamingChatInterface({
       );
     }
 
+    // Only show follow-up questions after the FINAL message in a sequence
+    // In our 3-message architecture:
+    // 1. Initial message with citations
+    // 2. Tools/visualization message (no content)
+    // 3. Post-visualization message <- only show follow-ups after this
     const isLastAssistantMessage = message.role === 'assistant' && 
       index === messages.length - 1 && 
       !isLoading && !isStreaming;
+    
+    // Check if this is a post-visualization message by looking at previous messages
+    const isPostVisualizationMessage = () => {
+      if (index < 2) return false; // Need at least 3 messages
+      
+      // Check if the previous message (index - 1) is a tools message (empty content)
+      const prevMessage = messages[index - 1];
+      if (prevMessage && prevMessage.role === 'assistant' && 
+          (!prevMessage.content || prevMessage.content.trim() === '') &&
+          prevMessage.analysis_blocks && prevMessage.analysis_blocks.length > 0) {
+        return true;
+      }
+      
+      return false;
+    };
+    
+    const shouldShowFollowUps = isLastAssistantMessage && 
+      (isPostVisualizationMessage() || 
+       // Fallback: if there are no analysis blocks in any message, show after last message
+       !messages.some(m => m.analysis_blocks && m.analysis_blocks.length > 0));
 
     // If message has no textual content, skip rendering (e.g., synthetic visualization carriers)
     if (!message.content || message.content.trim() === '') {
@@ -187,7 +239,22 @@ export function StreamingChatInterface({
           >
             <MessageRenderer 
               message={message} 
-              onCitationClick={handleCitationClick}
+              onCitationClick={(citation) => {
+                console.log('[StreamingChatInterface] Citation marker clicked:', {
+                  citationId: citation.id,
+                  highlightId: citation.highlightId,
+                  isTempId: citation.id.startsWith('cite-'),
+                  hasRects: citation.rects?.length > 0,
+                  documentId: citation.documentId,
+                  page: citation.startPageNumber
+                });
+                // Delegate to CitationContext which loads/merges rects (if missing)
+                // and dispatches the "citation-navigation" event when ready.
+                openCitation(citation.id).catch((err) => {
+                  console.error('openCitation failed, fallback dispatch:', err);
+                  window.dispatchEvent(new CustomEvent('citation-navigation', { detail: { citation } }));
+                });
+              }}
             />
             {/* Timestamp footnote */}
             <div className="text-xs opacity-50 mt-2 text-right">
@@ -195,18 +262,19 @@ export function StreamingChatInterface({
             </div>
           </div>
         </div>
-        {/* Show follow-up questions after the last assistant message */}
-        {isLastAssistantMessage && conversationId && (
+        {/* Show follow-up questions only after the post-visualization message */}
+        {shouldShowFollowUps && conversationId && (
           <FollowUpQuestions
-            key={`followup-${message.id}`} // Force remount for each new message
+            key={`followup-${message.id}-${index}`} // Force remount for each new message
             conversationId={conversationId}
+            seedKey={message.id}
             onQuestionClick={(question) => setInputValue(question)}
             disabled={isSubmitting || isLoading || isStreaming}
           />
         )}
       </div>
     );
-  }, [handleCitationClick, messages.length, isLoading, isStreaming, conversationId, isSubmitting]);
+  }, [handleCitationClick, messages.length, isLoading, isStreaming, conversationId, isSubmitting, openCitation]);
 
   // Render streaming message if we have streaming text (even if streaming has completed)
   const renderStreamingMessage = useCallback(() => {
@@ -219,9 +287,11 @@ export function StreamingChatInterface({
         text={streamingText} 
         toolsInProgress={toolsInProgress} 
         showTypingIndicator={isStreaming} // Only show typing indicator if actively streaming
+        citations={streamingCitations}
+        onCitationClick={handleCitationClick}
       />
     );
-  }, [streamingText, toolsInProgress, isStreaming]);
+  }, [streamingText, toolsInProgress, isStreaming, streamingCitations, handleCitationClick]);
 
   return (
     <div className="flex flex-col h-full bg-background">

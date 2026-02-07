@@ -29,7 +29,7 @@ fi
 # Start the server in the background
 echo -e "${BLUE}Starting server...${NC}"
 cd "$(dirname "$0")"
-nohup python -m app.main > server.log 2>&1 &
+nohup python3 -m app.main > server.log 2>&1 &
 NEW_PID=$!
 
 echo -e "${GREEN}Server started with PID $NEW_PID${NC}"

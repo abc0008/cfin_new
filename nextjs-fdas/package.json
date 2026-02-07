@@ -33,7 +33,6 @@
     "mdast-util-to-markdown": "^2.1.2",
     "motion": "^12.16.0",
     "next": "14.2.4",
-    "pdfjs-dist": "^4.3.136",
     "react": "^18",
     "react-dom": "^18",
     "react-hook-form": "^7.51.1",

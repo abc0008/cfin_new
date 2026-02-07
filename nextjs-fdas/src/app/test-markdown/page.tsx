@@ -135,10 +135,11 @@ Below are various chart types showing financial data:
   const citations: Citation[] = [
     {
       id: '1',
-      text: "The Great Barrier Reef is the world's largest coral reef system",
+      citedText: "The Great Barrier Reef is the world's largest coral reef system",
       documentId: 'doc1',
+      documentTitle: 'Test Document',
+      type: 'page_location' as const,
       highlightId: 'highlight1',
-      page: 1,
       rects: [
         {
           x1: 150,
@@ -146,7 +147,8 @@ Below are various chart types showing financial data:
           x2: 450,
           y2: 170,
           width: 300,
-          height: 20
+          height: 20,
+          pageNumber: 1
         }
       ]
     }
@@ -199,8 +201,9 @@ As temperatures rise, mass coral bleaching events and infectious disease outbrea
       id: `${highlightId}-id`,
       highlightId,
       documentId,
-      text,
-      page,
+      documentTitle: 'Financial Report',
+      type: 'page_location' as const,
+      citedText: text,
       rects: [
         {
           x1: 100,
@@ -208,9 +211,12 @@ As temperatures rise, mass coral bleaching events and infectious disease outbrea
           x2: 300,
           y2: 120,
           width: 200,
-          height: 20
+          height: 20,
+          pageNumber: page
         }
-      ]
+      ],
+      startPageNumber: page,
+      endPageNumber: page
     };
   };
 
@@ -280,7 +286,11 @@ As temperatures rise, mass coral bleaching events and infectious disease outbrea
       values: [120000, 150000, 170000, 190000, 210000],
       trendDirection: 'up',
       growthRate: 0.15,
-      citations: [createCitation('highlight10', 'doc1', 'Revenue Growth Trend', 6)]
+      citations: [{
+        highlightId: 'highlight10',
+        documentId: 'doc1',
+        text: 'Revenue Growth Trend'
+      }]
     },
     {
       metric: 'Expense Growth',
@@ -288,7 +298,11 @@ As temperatures rise, mass coral bleaching events and infectious disease outbrea
       values: [85000, 95000, 100000, 110000, 120000],
       trendDirection: 'up',
       growthRate: 0.09,
-      citations: [createCitation('highlight11', 'doc1', 'Expense Growth Trend', 6)]
+      citations: [{
+        highlightId: 'highlight11',
+        documentId: 'doc1',
+        text: 'Expense Growth Trend'
+      }]
     },
     {
       metric: 'Profit Growth',
@@ -296,7 +310,11 @@ As temperatures rise, mass coral bleaching events and infectious disease outbrea
       values: [35000, 55000, 70000, 80000, 90000],
       trendDirection: 'up',
       growthRate: 0.26,
-      citations: [createCitation('highlight12', 'doc1', 'Profit Growth Trend', 7)]
+      citations: [{
+        highlightId: 'highlight12',
+        documentId: 'doc1',
+        text: 'Profit Growth Trend'
+      }]
     }
   ];
 
@@ -309,7 +327,11 @@ As temperatures rise, mass coral bleaching events and infectious disease outbrea
       description: 'Revenue has shown consistent growth over the past 5 quarters, with an average quarterly growth rate of 15%.',
       importance: 'high',
       sentiment: 'positive',
-      citations: [createCitation('highlight13', 'doc1', 'Revenue Growth Analysis', 8)]
+      citations: [{
+        highlightId: 'highlight13',
+        documentId: 'doc1',
+        text: 'Revenue Growth Analysis'
+      }]
     },
     {
       id: '2',
@@ -318,13 +340,17 @@ As temperatures rise, mass coral bleaching events and infectious disease outbrea
       description: 'Expenses have increased at a slower rate than revenue, indicating good cost management.',
       importance: 'medium',
       sentiment: 'positive',
-      citations: [createCitation('highlight14', 'doc1', 'Expense Management', 8)]
+      citations: [{
+        highlightId: 'highlight14',
+        documentId: 'doc1',
+        text: 'Expense Management'
+      }]
     }
   ];
 
   const handleCitationClick = (citation: Citation) => {
     setSelectedCitation(citation);
-    setNavigationTarget(`Would navigate to: /pdf-viewer/${citation.documentId}?highlightId=${citation.highlightId}&page=${citation.page}`);
+    setNavigationTarget(`Would navigate to: /pdf-viewer/${citation.documentId}?highlightId=${citation.highlightId}&page=${citation.startPageNumber || 1}`);
   };
 
   const handleChartDataPointClick = (dataPoint: any) => {
@@ -432,10 +458,10 @@ As temperatures rise, mass coral bleaching events and infectious disease outbrea
       {selectedCitation && (
         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <h2 className="text-lg font-semibold">Selected Citation</h2>
-          <p><strong>Text:</strong> {selectedCitation.text}</p>
+          <p><strong>Text:</strong> {selectedCitation.citedText}</p>
           <p><strong>Document ID:</strong> {selectedCitation.documentId}</p>
           <p><strong>Highlight ID:</strong> {selectedCitation.highlightId}</p>
-          <p><strong>Page:</strong> {selectedCitation.page}</p>
+          <p><strong>Page:</strong> {selectedCitation.startPageNumber || 'N/A'}</p>
           <p><strong>Rectangle:</strong> ({selectedCitation.rects[0]?.x1}, {selectedCitation.rects[0]?.y1}) to ({selectedCitation.rects[0]?.x2}, {selectedCitation.rects[0]?.y2})</p>
         </div>
       )}

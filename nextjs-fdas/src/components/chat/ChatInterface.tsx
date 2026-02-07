@@ -78,8 +78,7 @@ export function ChatInterface({
   const handleCitationClick = useCallback((citation: Citation) => {
     if (!activeDocuments) return;
     
-    // Navigate to the citation in the document
-    if (onNavigateToHighlight && citation.rects && citation.rects.length > 0) {
+    if (onNavigateToHighlight) {
       onNavigateToHighlight(citation);
     }
   }, [activeDocuments, onNavigateToHighlight]);

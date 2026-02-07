@@ -2,6 +2,8 @@ import httpx
 import settings
 import asyncio
 import os
+import json
+from typing import Dict, List, Optional, Any
 from utils.file_cache import get_cached_file_id, cache_file_id
 from utils.secure_logging import audit_pdf_access, PrivacyAwareLogger
 
@@ -91,4 +93,70 @@ async def upload_pdf(filename: str, data: bytes, max_retries: int = 3) -> str:
             else:
                 log.error("Upload failed permanently after %d attempts: %s (headers: %s)", 
                          max_retries + 1, str(e), _get_masked_headers())
-                raise 
+                raise
+
+
+def prepare_document_blocks(documents: List[Dict[str, Any]], enable_citations: bool = True) -> List[Dict[str, Any]]:
+    """
+    Prepare document blocks for Claude API messages with citations enabled.
+    
+    Args:
+        documents: List of document dictionaries with file_id, filename, and metadata
+        enable_citations: Whether to enable citations for these documents
+        
+    Returns:
+        List of document blocks formatted for Claude API
+    """
+    blocks = []
+    
+    for idx, doc in enumerate(documents):
+        # Build document block with Files API reference
+        block = {
+            "type": "document",
+            "source": {
+                "type": "file",
+                "file_id": doc.get("claude_file_id") or doc.get("file_id")
+            }
+        }
+        
+        # Add optional fields
+        if doc.get("filename"):
+            block["title"] = doc["filename"]
+            
+        # Add context with document metadata
+        context_data = {
+            "doc_id": doc.get("id"),
+            "doc_index": idx,  # For mapping citations back to documents
+        }
+        
+        # Include any additional metadata
+        if doc.get("metadata"):
+            context_data["metadata"] = doc["metadata"]
+            
+        block["context"] = json.dumps(context_data)
+        
+        # Enable citations if requested
+        if enable_citations:
+            block["citations"] = {"enabled": True}
+            
+        blocks.append(block)
+        
+    return blocks
+
+
+async def upload_pdf_with_retry(file_path: str, max_retries: int = 3) -> str:
+    """
+    Upload PDF to Files API with retry logic, reading from file path.
+    
+    Args:
+        file_path: Path to the PDF file
+        max_retries: Maximum retry attempts
+        
+    Returns:
+        File ID string
+    """
+    with open(file_path, 'rb') as f:
+        data = f.read()
+        
+    filename = os.path.basename(file_path)
+    return await upload_pdf(filename, data, max_retries) 

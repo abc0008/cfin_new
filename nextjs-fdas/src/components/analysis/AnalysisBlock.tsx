@@ -293,7 +293,7 @@ export const AnalysisBlock: React.FC<AnalysisBlockProps> = ({
                       onClick={() => onCitationClick && onCitationClick(citation.highlightId)}
                     >
                       <ExternalLink className="h-3 w-3 mr-1" />
-                      View source: {citation.text.substring(0, 30)}...
+                      View source: {citation.citedText.substring(0, 30)}...
                     </button>
                   ))}
                 </div>

@@ -370,6 +370,7 @@ class ConversationRepository:
             select(Citation)
             .join(MessageCitation, MessageCitation.citation_id == Citation.id)
             .where(MessageCitation.message_id == message_id)
+            .order_by(Citation.created_at.asc(), Citation.id.asc())
         )
         return result.scalars().all()
     

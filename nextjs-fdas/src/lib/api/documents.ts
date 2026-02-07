@@ -50,6 +50,7 @@ interface FinancialDataVerifyResponse {
 interface ApiCitation {
   id?: string;
   text: string;
+  display_text?: string;  // Processed text for display (e.g., "Interest Income: $900.0M")
   document_id: string;
   highlight_id?: string;
   page: number;
@@ -375,14 +376,19 @@ export const documentsApi = {
       if (Array.isArray(response)) {
         // Validate each citation
         return response.map(citation => ({
-          id: citation.id || '',
-          text: citation.text,
-          documentId: citation.document_id,
-          highlightId: citation.highlight_id,
-          page: citation.page,
-          rects: citation.rects,
-          messageId: citation.message_id,
-          analysisId: citation.analysis_id
+          id: (citation as any).id || (citation as any).citation_id || '',
+          citedText: (citation as any).citedText || (citation as any).cited_text || (citation as any).text, // Handle both camelCase and snake_case
+          displayText: (citation as any).displayText || (citation as any).display_text, // Handle both camelCase and snake_case
+          searchableText: (citation as any).searchableText || (citation as any).searchable_text,
+          documentId: (citation as any).document_id || (citation as any).documentId,
+          documentTitle: (citation as any).documentTitle || 'Document', // Prefer backend title when available
+          type: 'page_location' as const,
+          highlightId: (citation as any).highlight_id || (citation as any).highlightId || '',
+          rects: (citation as any).rects || [],
+          startPageNumber: (citation as any).page || (citation as any).startPageNumber,
+          endPageNumber: (citation as any).page || (citation as any).endPageNumber,
+          messageId: (citation as any).message_id || (citation as any).messageId,
+          analysisId: (citation as any).analysis_id || (citation as any).analysisId
         }));
       }
       
@@ -400,10 +406,10 @@ export const documentsApi = {
     try {
       // Convert to snake_case for the API
       const apiCitation: ApiCitation = {
-        text: citation.text,
+        text: citation.citedText,
         document_id: documentId,
         highlight_id: citation.highlightId,
-        page: citation.page,
+        page: citation.startPageNumber || 1,
         rects: citation.rects,
         message_id: citation.messageId,
         analysis_id: citation.analysisId
@@ -414,11 +420,14 @@ export const documentsApi = {
       // Convert response back to camelCase
       return {
         id: response.id || '',
-        text: response.text,
+        citedText: response.text,
         documentId: response.document_id,
-        highlightId: response.highlight_id,
-        page: response.page,
-        rects: response.rects,
+        documentTitle: citation.documentTitle,
+        type: citation.type,
+        highlightId: response.highlight_id || '',
+        rects: response.rects || [],
+        startPageNumber: response.page,
+        endPageNumber: response.page,
         messageId: response.message_id,
         analysisId: response.analysis_id
       };
