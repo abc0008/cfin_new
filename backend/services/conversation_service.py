@@ -58,6 +58,7 @@ import uuid
 import json
 import logging
 import asyncio
+import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple, Union, cast
 
@@ -1382,7 +1383,49 @@ class ConversationService:
         
         # Store citations if any were found
         if accumulated_citations:
-            logger.info(f"Storing {len(accumulated_citations)} citations for message {assistant_message.id}")
+            marker_matches = [int(m) for m in re.findall(r"\[(\d+)\]", final_content or "")]
+            expected_marker_count = max(marker_matches) if marker_matches else 0
+
+            # Normalize and trim citations so marker order remains stable.
+            # During long tool runs Claude can emit repeated citation deltas; keeping
+            # only the first citation per marker index avoids ambiguous [n] mapping.
+            deduped_citations: List[Dict[str, Any]] = []
+            seen_marker_indexes: set[int] = set()
+            for citation_data in accumulated_citations:
+                marker_index = citation_data.get("citation_index")
+                try:
+                    marker_index = int(marker_index) if marker_index is not None else None
+                except Exception:
+                    marker_index = None
+
+                if marker_index is not None and marker_index > 0:
+                    if marker_index in seen_marker_indexes:
+                        continue
+                    seen_marker_indexes.add(marker_index)
+
+                deduped_citations.append(citation_data)
+
+            if expected_marker_count > 0:
+                deduped_citations = [
+                    c for c in deduped_citations
+                    if (int(c.get("citation_index")) if c.get("citation_index") is not None else 0) <= expected_marker_count
+                    or c.get("citation_index") is None
+                ]
+
+            if deduped_citations:
+                deduped_citations.sort(
+                    key=lambda c: (
+                        int(c.get("citation_index")) if c.get("citation_index") is not None else 10_000,
+                    )
+                )
+
+            logger.info(
+                "Storing %s citations for message %s (raw=%s, markers=%s)",
+                len(deduped_citations),
+                assistant_message.id,
+                len(accumulated_citations),
+                expected_marker_count,
+            )
             
             # We need to save citations through the document repository
             # Map document_index to actual document IDs
@@ -1391,7 +1434,7 @@ class ConversationService:
                 doc_id_map[idx] = doc.get("id")
             
             # Create and save citations
-            for citation_data in accumulated_citations:
+            for citation_data in deduped_citations:
                 try:
                     # Get the actual document ID from the index
                     doc_index = citation_data.get("document_index", 0)
@@ -1435,6 +1478,13 @@ class ConversationService:
                         "end_char_index": citation_data.get("end_char_index"),
                         "start_block_index": citation_data.get("start_block_index"),
                         "end_block_index": citation_data.get("end_block_index"),
+                        # Persist marker index in section so downstream rect selection can
+                        # resolve marker-specific answer context (for [1], [2], ...).
+                        "section": (
+                            str(citation_data.get("citation_index"))
+                            if citation_data.get("citation_index") is not None
+                            else None
+                        ),
                         "highlight_id": str(uuid.uuid4()),
                         "rects": json.dumps([]),  # Empty array as JSON string
                         "message_id": assistant_message.id,

@@ -14,6 +14,7 @@ export const convertCitationToHighlight = (citation: Citation, viewport?: any): 
   // Use real viewport dimensions
   const PAGE_WIDTH = viewport?.width || 612;
   const PAGE_HEIGHT = viewport?.height || 792;
+  const fallbackPageNumber = citation.startPageNumber || 1;
 
   const toScaledRect = (rect: CitationRect) => {
     // Some backend citations only give width/height + pageNumber. Default missing
@@ -24,19 +25,18 @@ export const convertCitationToHighlight = (citation: Citation, viewport?: any): 
     const x2Abs = rect.x2 ?? (hasCoords ? x1Abs + (rect.width ?? 0) : 0);
     const y2Abs = rect.y2 ?? (hasCoords ? y1Abs + (rect.height ?? 0) : 0);
 
-    // React-pdf-highlighter expects viewport coordinates (in PDF points) not
-    // values normalised to 0-1.  Pass through the absolute values so the
-    // overlay is the correct size on the rendered page.
+    // react-pdf-highlighter stores "scaled" positions. When `usePdfCoordinates`
+    // is set on the position, it interprets x/y values as PDF coordinates
+    // (via convertToViewportRectangle). In this mode width/height should still
+    // represent page dimensions.
     return {
       x1: x1Abs,
       y1: y1Abs,
       x2: x2Abs,
       y2: y2Abs,
-      left: x1Abs,
-      top: y1Abs,
-      width: x2Abs - x1Abs,
-      height: y2Abs - y1Abs,
-      pageNumber: rect.pageNumber,
+      width: PAGE_WIDTH,
+      height: PAGE_HEIGHT,
+      pageNumber: rect.pageNumber || fallbackPageNumber,
     };
   };
 
@@ -48,22 +48,20 @@ export const convertCitationToHighlight = (citation: Citation, viewport?: any): 
 
   // Use first rect or fall back to a small placeholder
   // For citations without rects, create a minimal highlight that won't cover the whole page
-  const boundingRect = citation.rects.length > 0
-    ? toScaledRect(citation.rects[0])
-    : {
+  const scaledRects = citation.rects.length > 0
+    ? citation.rects.map(toScaledRect)
+    : [{
         x1: 0,
         y1: 0,
-        x2: 1,  // Minimal width to avoid full-page highlight
-        y2: 1,  // Minimal height
-        left: 0,
-        top: 0,
-        width: 1,
-        height: 1,
-        pageNumber: citation.startPageNumber || 1,
-      };
+        x2: 1, // Tiny anchor rect to support page jump even without true boxes
+        y2: 1,
+        width: PAGE_WIDTH,
+        height: PAGE_HEIGHT,
+        pageNumber: fallbackPageNumber,
+      }];
 
-  // Convert all rects (or placeholder) for React component
-  const convertRect = (rect: CitationRect) => toScaledRect(rect);
+  const boundingRect = scaledRects[0];
+  const citationAny = citation as any;
 
   return {
     // Always use the stable citation UUID as the main highlight id so the
@@ -74,8 +72,9 @@ export const convertCitationToHighlight = (citation: Citation, viewport?: any): 
     },
     position: {
       boundingRect: boundingRect,
-      rects: citation.rects.length > 0 ? citation.rects.map(toScaledRect) : [boundingRect],
-      pageNumber: citation.startPageNumber || 1
+      rects: scaledRects,
+      pageNumber: boundingRect.pageNumber || fallbackPageNumber,
+      usePdfCoordinates: true
     },
     comment: {
       text: citation.displayText || citation.citedText,
@@ -96,7 +95,8 @@ export const convertCitationToHighlight = (citation: Citation, viewport?: any): 
       highlightId: citation.highlightId,
       id: citation.id,  // Preserve original citation ID for temp ID lookup
       // Store any temp ID that might have been associated with this citation
-      tempId: citation.id.startsWith('cite-') ? citation.id : undefined
+      tempId: citation.id.startsWith('cite-') ? citation.id : citationAny.tempId,
+      tempHighlightId: citationAny.tempHighlightId
     } as any
   };
 };

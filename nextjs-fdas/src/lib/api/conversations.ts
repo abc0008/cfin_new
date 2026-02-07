@@ -128,7 +128,8 @@ export const conversationsApi = {
         content: msg.content,
         referencedDocuments: msg.referencedDocuments || msg.referenced_documents || [],
         referencedAnalyses: msg.referencedAnalyses || msg.referenced_analyses || [],
-        citations: transformCitations(msg.citations || []),
+        citationLinks: msg.citationLinks || msg.citation_links || [],
+        citations: transformCitations(msg.citations || msg.citation_list || []),
         content_blocks: msg.content_blocks || msg.contentBlocks || [],
         analysis_blocks: msg.analysis_blocks || msg.analysisBlocks || []
       }));

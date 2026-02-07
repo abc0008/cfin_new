@@ -1,4 +1,5 @@
 # backend/settings.py
+import os
 
 # Combine all active beta flags in ONE header value
 ANTHROPIC_BETA = ",".join([
@@ -7,14 +8,14 @@ ANTHROPIC_BETA = ",".join([
     "fine-grained-tool-streaming-2025-05-14",  # fine-grained tool parameter streaming
 ])
 
-# Claude model IDs  
-MODEL_HAIKU = "claude-3-5-haiku-20241022"  # Fast and cheap for basic extraction WITH PDF support
-MODEL_SONNET = "claude-3-5-sonnet-20241022" # Was claude-3-5-sonnet-20241022 Higher token limit: 80K vs 40K input tokens/min
+# Claude model IDs
+# Keep overridable via environment so model rotations don't break local/dev runs.
+MODEL_HAIKU = os.getenv("MODEL_HAIKU", "claude-3-5-haiku-20241022")
+MODEL_SONNET = os.getenv("MODEL_SONNET", "claude-3-7-sonnet-20250219")
 
 # Processing mode: 'fast' uses Haiku, 'detailed' uses Sonnet
 # Can be overridden by CLAUDE_PROCESSING_MODE environment variable
 # Set CLAUDE_PROCESSING_MODE=detailed for highest quality but slower processing
-import os
 PROCESSING_MODE = os.getenv("CLAUDE_PROCESSING_MODE", "fast")  # Default to fast for better user experience
 
 # Model selection based on processing mode

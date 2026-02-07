@@ -74,8 +74,113 @@ export function PDFViewer({
   const [currentPdfDocument, setCurrentPdfDocument] = useState<any>(null);
   const scrollViewerRef = useRef<((highlight: IHighlight) => void) | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
-  
-  const [scrollState, setScrollState] = useState<'IDLE' | 'WAIT_HIGHLIGHT' | 'WAIT_READY' | 'SCROLL'>('IDLE');
+  const pendingScrollHighlightIdRef = useRef<string | null>(null);
+  const lastScrolledHighlightIdRef = useRef<string | null>(null);
+  const lastScrollRefKickTargetRef = useRef<string | null>(null);
+  const scrollSessionRef = useRef<{
+    targetId: string;
+    pageNumber: number;
+    pageKickDone: boolean;
+    helperKickDone: boolean;
+    centerKickDone: boolean;
+    sawHighlightElement: boolean;
+  } | null>(null);
+
+  const escapeForAttributeSelector = useCallback((value: string) => {
+    return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  }, []);
+
+  const getHighlightElement = useCallback(
+    (highlightId: string, pageNumber?: number): HTMLElement | null => {
+      const safeId = escapeForAttributeSelector(highlightId);
+      const wrappers = Array.from(
+        globalThis.document?.querySelectorAll(`.PdfHighlighter [data-highlight-id="${safeId}"]`) || []
+      ) as HTMLElement[];
+
+      if (wrappers.length === 0) {
+        return null;
+      }
+
+      const candidates: HTMLElement[] = [];
+      wrappers.forEach((wrapper) => {
+        // react-pdf-highlighter renders the painted rectangle in child nodes.
+        // The wrapper itself can be zero-sized, so prefer concrete painted parts.
+        const parts = wrapper.querySelectorAll('.Highlight__part, .AreaHighlight__part');
+        if (parts.length > 0) {
+          parts.forEach((part) => candidates.push(part as HTMLElement));
+          return;
+        }
+        candidates.push(wrapper);
+      });
+
+      const paintedCandidates = candidates.filter((el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+
+      const pageScopedCandidates =
+        typeof pageNumber === 'number'
+          ? paintedCandidates.filter((el) => {
+              const pageEl = el.closest('.page[data-page-number]') as HTMLElement | null;
+              const pageAttr = pageEl?.getAttribute('data-page-number');
+              return pageAttr ? Number(pageAttr) === pageNumber : false;
+            })
+          : [];
+
+      const searchPool =
+        pageScopedCandidates.length > 0
+          ? pageScopedCandidates
+          : paintedCandidates.length > 0
+            ? paintedCandidates
+            : candidates;
+
+      // Prefer a currently visible candidate when duplicates exist.
+      const viewportHeight =
+        globalThis.window?.innerHeight ?? globalThis.document?.documentElement?.clientHeight ?? 0;
+      const viewportWidth =
+        globalThis.window?.innerWidth ?? globalThis.document?.documentElement?.clientWidth ?? 0;
+
+      const visibleCandidate = searchPool.find((el) => {
+        const rect = el.getBoundingClientRect();
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          rect.bottom > 0 &&
+          rect.top < viewportHeight &&
+          rect.right > 0 &&
+          rect.left < viewportWidth
+        );
+      });
+      if (visibleCandidate) {
+        return visibleCandidate;
+      }
+
+      const mountedCandidate = searchPool.find(
+        (el) => el.isConnected && (el.offsetParent !== null || el.getClientRects().length > 0)
+      );
+      return mountedCandidate || searchPool[0] || null;
+    },
+    [escapeForAttributeSelector]
+  );
+
+  const isElementVisibleInViewport = useCallback((element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const viewportHeight = globalThis.window?.innerHeight ?? globalThis.document?.documentElement?.clientHeight ?? 0;
+    const viewportWidth = globalThis.window?.innerWidth ?? globalThis.document?.documentElement?.clientWidth ?? 0;
+    const verticallyVisible = rect.bottom > 0 && rect.top < viewportHeight;
+    const horizontallyVisible = rect.right > 0 && rect.left < viewportWidth;
+
+    return (
+      rect.height > 0 &&
+      rect.width > 0 &&
+      verticallyVisible &&
+      horizontallyVisible
+    );
+  }, []);
+
+  const centerElementInView = useCallback((element: HTMLElement) => {
+    element.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+  }, []);
 
   // Use pdf.js 2.16.x which matches react-pdf-highlighter's internal version.
   // Provide local worker first, with CDN fallback **of the same version**.
@@ -84,10 +189,31 @@ export function PDFViewer({
   // Merge backend citations with any extra ones from props
   const combinedCitations = React.useMemo(() => {
     const byId = new Map<string, Citation>();
-    [...extraCitations, ...documentCitations].forEach(c => {
-      if (!byId.has(c.id)) {
-        byId.set(c.id, c);
+    [...documentCitations, ...extraCitations].forEach((citation) => {
+      const existing = byId.get(citation.id);
+      if (!existing) {
+        byId.set(citation.id, citation);
+        return;
       }
+
+      // Prefer whichever version has rect boxes. This avoids stale placeholder
+      // citations (no rects) overriding rect-backed citations from backend.
+      const existingHasRects = (existing.rects?.length || 0) > 0;
+      const incomingHasRects = (citation.rects?.length || 0) > 0;
+      if (!existingHasRects && incomingHasRects) {
+        byId.set(citation.id, citation);
+        return;
+      }
+
+      if (existingHasRects && !incomingHasRects) {
+        return;
+      }
+
+      byId.set(citation.id, {
+        ...existing,
+        ...citation,
+        rects: incomingHasRects ? citation.rects : existing.rects,
+      });
     });
     return Array.from(byId.values());
   }, [extraCitations, documentCitations]);
@@ -110,20 +236,34 @@ export function PDFViewer({
 
   // Combine AI-generated highlights with user highlights and citation highlights
   const allHighlights = [...userHighlights, ...aiHighlights, ...citationHighlights];
+
+  // Keep latest arrays in refs so scroll retry logic can read fresh data without
+  // re-starting the retry effect on every highlight/citation state churn.
+  const allHighlightsRef = useRef<IHighlight[]>(allHighlights);
+  const combinedCitationsRef = useRef<Citation[]>(combinedCitations);
+
+  useEffect(() => {
+    allHighlightsRef.current = allHighlights;
+  }, [allHighlights]);
+
+  useEffect(() => {
+    combinedCitationsRef.current = combinedCitations;
+  }, [combinedCitations]);
   
   // Memory management: Page visibility tracking
-  const onVisiblePagesChanged = useCallback((pages: number[]) => {
-    setVisiblePages(pages);
+  const onVisiblePagesChanged = useCallback((pages?: number[]) => {
+    const safePages = Array.isArray(pages) ? pages : [];
+    setVisiblePages(safePages);
     
     // Only keep a buffer of pages in memory
     const pagesToKeep = new Set<number>();
     
     // Add currently visible pages
-    pages.forEach(page => pagesToKeep.add(page));
+    safePages.forEach(page => pagesToKeep.add(page));
     
     // Add buffer pages (before and after visible pages)
     const halfBuffer = Math.floor(pageBufferSize / 2);
-    pages.forEach(page => {
+    safePages.forEach(page => {
       for (let i = 1; i <= halfBuffer; i++) {
         if (page - i > 0) pagesToKeep.add(page - i);
         if (page + i <= totalPages) pagesToKeep.add(page + i);
@@ -203,7 +343,13 @@ export function PDFViewer({
   }, []);
   
   // Define scrollToHighlight callback - IMPORTANT: must be defined before useEffect that uses it
-  const scrollToHighlight = useCallback((highlightId: string) => {
+  const scrollToHighlight = useCallback((incomingHighlightId: string | null | undefined) => {
+    if (!incomingHighlightId) {
+      return false;
+    }
+
+    let highlightId = incomingHighlightId;
+
     // Check temp-to-backend mapping first
     const tempToBackendMap = (window as any).citationTempToBackendMap as Map<string, string>;
     if (tempToBackendMap && tempToBackendMap.has(highlightId)) {
@@ -218,7 +364,7 @@ export function PDFViewer({
     }
 
     // First try direct match
-    let highlight = allHighlights.find(h => {
+    let highlight = allHighlightsRef.current.find(h => {
       // Check multiple ID fields to handle temp ID vs UUID mismatch
       const matches = h.id === highlightId || 
         (h.rawClaudeCitation && (h.rawClaudeCitation as any).id === highlightId) ||
@@ -245,7 +391,7 @@ export function PDFViewer({
       // Try to match by page and text content
       const searchForSimilar = () => {
         // Extract page number from existing highlights to narrow search
-        for (const h of allHighlights) {
+        for (const h of allHighlightsRef.current) {
           // Check if this might be a match based on content
           if (h.position.rects.length > 0 && h.content.text) {
             // If we have raw citation data with temp IDs, check those
@@ -271,9 +417,9 @@ export function PDFViewer({
     }
     
     if (!highlight) {
-      console.warn('[PDFViewer] scrollToHighlight failed to find:', {
+        console.warn('[PDFViewer] scrollToHighlight failed to find:', {
         searchId: highlightId,
-        availableHighlights: allHighlights.map(h => ({
+        availableHighlights: allHighlightsRef.current.map(h => ({
           id: h.id,
           rawId: (h.rawClaudeCitation as any)?.id,
           rawHighlightId: (h.rawClaudeCitation as any)?.highlightId,
@@ -288,33 +434,140 @@ export function PDFViewer({
       });
     }
     if (highlight) {
-      console.log('[PDFViewer] Executing scroll to page', highlight.position.pageNumber);
-      // Set current page (state) so page number indicator etc updates
-      setCurrentPage(highlight.position.pageNumber);
+      const targetPageNumber = highlight.position?.pageNumber;
+      if (!targetPageNumber || Number.isNaN(targetPageNumber)) {
+        console.warn('[PDFViewer] Highlight missing valid pageNumber', { highlightId: highlight.id });
+      } else {
+        const existingSession = scrollSessionRef.current;
+        const session =
+          existingSession &&
+          existingSession.targetId === highlight.id &&
+          existingSession.pageNumber === targetPageNumber
+            ? existingSession
+            : {
+                targetId: highlight.id,
+                pageNumber: targetPageNumber,
+                pageKickDone: false,
+                helperKickDone: false,
+                centerKickDone: false,
+                sawHighlightElement: false,
+              };
+        scrollSessionRef.current = session;
 
-      // Prefer library helper if available
-      if (scrollViewerRef.current) {
-        scrollViewerRef.current(highlight);
-        console.log('[PDFViewer] scrollToHighlight success via helper');
-        return true;
-      }
-
-      // Fallback: manually scroll the .page element into view
-      try {
-        const pageSelector = `.PdfHighlighter .page[data-page-number='${highlight.position.pageNumber}']`;
-        const pageEl = globalThis.document?.querySelector(pageSelector);
-        if (pageEl) {
-          (pageEl as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
-          console.log('[PDFViewer] scrollToHighlight success via DOM scroll');
-          return true;
+        const pageSelector = `.PdfHighlighter .page[data-page-number='${targetPageNumber}']`;
+        const pageEl = globalThis.document?.querySelector(pageSelector) as HTMLElement | null;
+        const hasScrollTarget = !!pageEl;
+        if (!session.pageKickDone) {
+          console.log('[PDFViewer] Executing citation page kick', {
+            targetPageNumber,
+            highlightId: highlight.id,
+          });
+          // Set current page (state) so page number indicator etc updates
+          setCurrentPage((prev) => (prev === targetPageNumber ? prev : targetPageNumber));
+          session.pageKickDone = true;
+          if (pageEl) {
+            try {
+              pageEl.scrollIntoView({ behavior: 'auto', block: 'start', inline: 'nearest' });
+            } catch (err) {
+              console.warn('[PDFViewer] Page kick scroll failed', err);
+            }
+          }
         }
-      } catch (err) {
-        console.warn('[PDFViewer] Fallback DOM scroll failed', err);
+        const helperSafeToUse =
+          !!scrollViewerRef.current &&
+          hasScrollTarget &&
+          pageEl.offsetParent !== null &&
+          !!highlight.position?.boundingRect &&
+          Array.isArray(highlight.position?.rects);
+
+        // Prefer library helper only once per target when page container is mounted and visible.
+        if (helperSafeToUse && !session.helperKickDone) {
+          session.helperKickDone = true;
+          try {
+            scrollViewerRef.current(highlight);
+            console.log('[PDFViewer] scroll helper invoked');
+          } catch (err) {
+            console.warn('[PDFViewer] Helper scroll failed', err);
+          }
+        }
+
+        const highlightEl = getHighlightElement(highlight.id, targetPageNumber);
+        if (highlightEl) {
+          session.sawHighlightElement = true;
+          if (!session.centerKickDone) {
+            session.centerKickDone = true;
+            try {
+              centerElementInView(highlightEl);
+            } catch (err) {
+              console.warn('[PDFViewer] Failed to center highlight element', err);
+            }
+          }
+
+          if (isElementVisibleInViewport(highlightEl)) {
+            console.log('[PDFViewer] scrollToHighlight success via highlight element');
+            return true;
+          }
+
+          // The target highlight is mounted and we attempted to center it.
+          // Treat this as success to avoid repeated page-jump churn while the
+          // browser settles layout/paint in virtualized PDF pages.
+          const highlightPageAttr = (highlightEl.closest('.page[data-page-number]') as HTMLElement | null)
+            ?.getAttribute('data-page-number');
+          const onTargetPage = highlightPageAttr
+            ? Number(highlightPageAttr) === targetPageNumber
+            : false;
+          if (highlightEl.isConnected && onTargetPage) {
+            console.log('[PDFViewer] scrollToHighlight settled with mounted highlight element');
+            return true;
+          }
+
+          // Highlight exists but has not settled into viewport yet.
+          // Do not immediately snap back to page start; allow retry to re-check.
+          return false;
+        }
+
+        // Wait for highlight layer paint after we already kicked page/helper once.
+        return false;
       }
     }
+
+    // No highlight yet: fall back to page-level scroll if we can resolve a citation.
+    // If we already saw the target highlight element, avoid regressing to page-only
+    // fallback while virtualized pages are re-rendering.
+    const activeSession = scrollSessionRef.current;
+    if (
+      activeSession?.sawHighlightElement &&
+      (activeSession.targetId === highlightId ||
+        (tempToBackendMap && tempToBackendMap.get(highlightId) === activeSession.targetId))
+    ) {
+      return false;
+    }
+
+    const pageOnlyCitation = combinedCitationsRef.current.find(
+      (c) =>
+        c.id === highlightId ||
+        c.highlightId === highlightId ||
+        (tempToBackendMap && tempToBackendMap.get(c.id) === highlightId)
+    );
+    if (pageOnlyCitation?.startPageNumber) {
+      const pageNumber = pageOnlyCitation.startPageNumber;
+      setCurrentPage((prev) => (prev === pageNumber ? prev : pageNumber));
+      const pageSelector = `.PdfHighlighter .page[data-page-number='${pageNumber}']`;
+      const pageEl = globalThis.document?.querySelector(pageSelector);
+      if (pageEl) {
+        (pageEl as HTMLElement).scrollIntoView({ behavior: 'auto', block: 'start', inline: 'nearest' });
+        console.log('[PDFViewer] Scrolled to page via citation fallback', { highlightId, pageNumber });
+        return true;
+      }
+    }
+
     // No highlight found or scroll target not ready yet
     return false;
-  }, [allHighlights, userHighlights]);
+  }, [
+    centerElementInView,
+    getHighlightElement,
+    isElementVisibleInViewport
+  ]);
   
   // Handler for adding highlights
   const addHighlight = useCallback((highlight: IHighlight) => {
@@ -432,8 +685,14 @@ export function PDFViewer({
             }
           });
 
-          // Store the mapping for later use
-          (window as any).citationTempToBackendMap = tempToBackend;
+          // Store mapping for later use without wiping existing mappings that
+          // may still be needed for in-flight citation clicks.
+          const existingMap = (window as any).citationTempToBackendMap as Map<string, string> | undefined;
+          const mergedMap = new Map<string, string>(existingMap || []);
+          tempToBackend.forEach((backendId, tempId) => {
+            mergedMap.set(tempId, backendId);
+          });
+          (window as any).citationTempToBackendMap = mergedMap;
 
           return Array.from(bySig.values());
         };
@@ -457,77 +716,67 @@ export function PDFViewer({
     };
     
     fetchCitations();
-  }, [document, onCitationsLoaded, isBrowser, highlightId]);
+  }, [document, onCitationsLoaded, isBrowser]);
   
   // After setting allHighlights in useEffect([citations, extraCitations]):
   useEffect(() => {
     console.log('[PDFViewer] Merged highlights:', allHighlights.map(h => ({ id: h.id, text: h.content.text, page: h.position.pageNumber, hasRects: h.position.rects.length > 0 })));
   }, [allHighlights]);
 
-  // Replace the scrolling useEffect with state machine
+  // Keep one pending target and retry briefly until both highlight + viewer are ready.
+  // This matches the upstream scroll flow and avoids state-machine races.
   useEffect(() => {
-    if (highlightId && scrollState === 'IDLE') {
-      console.log('[PDFViewer] highlightId prop changed to:', highlightId, 'triggering scroll');
-      setScrollState('WAIT_HIGHLIGHT');
+    if (!highlightId) {
+      pendingScrollHighlightIdRef.current = null;
+      lastScrolledHighlightIdRef.current = null;
+      lastScrollRefKickTargetRef.current = null;
+      scrollSessionRef.current = null;
+      return;
     }
-  }, [highlightId]);
 
-  // Fix type error by checking if rawClaudeCitation exists and has id
-  useEffect(() => {
-    if (scrollState === 'WAIT_HIGHLIGHT') {
-      const highlight = allHighlights.find(h => 
-        h.id === highlightId || 
-        (h.rawClaudeCitation && 'id' in h.rawClaudeCitation && h.rawClaudeCitation.id === highlightId) ||
-        (h.rawClaudeCitation && 'highlightId' in h.rawClaudeCitation && (h.rawClaudeCitation as any).highlightId === highlightId)
-      );
-      
-      if (highlight) {
-        console.log('[PDFViewer] Found highlight in WAIT_HIGHLIGHT state:', {
-          searchId: highlightId,
-          foundId: highlight.id,
-          page: highlight.position.pageNumber,
-          hasRects: highlight.position.rects.length > 0
-        });
-        setScrollState('WAIT_READY');
-      } else if (highlightId) {
-        // If highlight not found, check if we have a citation in extraCitations
-        const tempCitation = extraCitations.find(c => 
-          c.id === highlightId || 
-          c.highlightId === highlightId
-        );
-        
-        if (tempCitation && tempCitation.startPageNumber) {
-          console.log('[PDFViewer] Citation not in highlights, but found in extraCitations. Navigating to page:', tempCitation.startPageNumber);
-          // Navigate directly to the page
-          setCurrentPage(tempCitation.startPageNumber);
-          setScrollState('IDLE');
-          
-          // Manually scroll to the page
-          setTimeout(() => {
-            const pageSelector = `.PdfHighlighter .page[data-page-number='${tempCitation.startPageNumber}']`;
-            const pageEl = globalThis.document?.querySelector(pageSelector);
-            if (pageEl) {
-              (pageEl as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
-              console.log('[PDFViewer] Scrolled to page via extraCitations fallback');
-            }
-          }, 100);
-        }
+    // Prevent retry loops from repeatedly re-scrolling the same target on highlight/state churn.
+    if (lastScrolledHighlightIdRef.current === highlightId) {
+      return;
+    }
+
+    if (pendingScrollHighlightIdRef.current !== highlightId) {
+      lastScrollRefKickTargetRef.current = null;
+      scrollSessionRef.current = null;
+    }
+
+    pendingScrollHighlightIdRef.current = highlightId;
+    let attempts = 0;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const tryScroll = () => {
+      const target = pendingScrollHighlightIdRef.current;
+      if (!target) {
+        return;
       }
-    }
-  }, [allHighlights, scrollState, highlightId, extraCitations]);
 
-  useEffect(() => {
-    if (scrollState === 'WAIT_READY' && scrollViewerRef.current) {
-      setScrollState('SCROLL');
-      const success = scrollToHighlight(highlightId);
+      const success = scrollToHighlight(target);
       if (success) {
-        setScrollState('IDLE');
-      } else {
-        // Retry logic if needed
-        setTimeout(() => setScrollState('WAIT_HIGHLIGHT'), 500);
+        pendingScrollHighlightIdRef.current = null;
+        lastScrolledHighlightIdRef.current = target;
+        lastScrollRefKickTargetRef.current = null;
+        scrollSessionRef.current = null;
+        return;
       }
-    }
-  }, [scrollState, scrollViewerRef, highlightId, allHighlights]);
+
+      attempts += 1;
+      if (attempts < 45) {
+        timeoutId = setTimeout(tryScroll, 120);
+      }
+    };
+
+    tryScroll();
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [highlightId, scrollToHighlight]);
   
   // Update render scale when renderingQuality changes
   useEffect(() => {
@@ -571,52 +820,6 @@ export function PDFViewer({
     }
   }, [currentPdfDocument, handleDocumentLoadSuccess]);
 
-  useEffect(() => {
-    const handleCitationNavigation = (e: CustomEvent<{ citation: Citation }>) => {
-      // Ensure detail exists
-      if (!e.detail || !e.detail.citation) return;
-      const newCitation = e.detail.citation;
-      console.log('[PDFViewer] Received citation-navigation event:', {
-        citationId: newCitation.id,
-        highlightId: newCitation.highlightId,
-        hasRects: newCitation.rects?.length > 0,
-        page: newCitation.startPageNumber
-      });
-      
-      if (newCitation) {
-        // Convert to highlight format
-        const dummyViewport = { width: 612, height: 792 };
-        const newHighlight = convertCitationToHighlight(newCitation, dummyViewport);
-        
-        // Check if already exists (by any of its IDs)
-        const exists = allHighlights.some(h => 
-          h.id === newHighlight.id ||
-          h.id === newCitation.id ||
-          h.id === newCitation.highlightId ||
-          (h.rawClaudeCitation && (h.rawClaudeCitation as any).id === newCitation.id)
-        );
-        
-        console.log('[PDFViewer] Citation exists in highlights:', exists);
-        
-        if (!exists) {
-          console.warn('[PDFViewer] Citation not found in highlights, cannot add dynamically to prop-based array');
-        }
-        
-        // Try to scroll using the original citation ID (which might be temp ID)
-        // The scrollToHighlight function will handle ID matching
-        scrollToHighlight(newCitation.id);
-        
-        // Also try with highlightId if different from id
-        if (newCitation.highlightId && newCitation.highlightId !== newCitation.id) {
-          console.log('[PDFViewer] Also trying to scroll with highlightId:', newCitation.highlightId);
-          scrollToHighlight(newCitation.highlightId);
-        }
-      }
-    };
-    window.addEventListener('citation-navigation', handleCitationNavigation as EventListener);
-    return () => window.removeEventListener('citation-navigation', handleCitationNavigation as EventListener);
-  }, [allHighlights, scrollToHighlight]); // Dependencies needed to avoid stale closures
-  
   // Skip rendering until we're in the browser
   if (!isBrowser) {
     return (
@@ -789,6 +992,17 @@ export function PDFViewer({
                   onScrollChange={onVisiblePagesChanged as any}
                   scrollRef={(scrollTo: any) => {
                     scrollViewerRef.current = scrollTo;
+                    const target = pendingScrollHighlightIdRef.current;
+                    if (target && lastScrollRefKickTargetRef.current !== target) {
+                      lastScrollRefKickTargetRef.current = target;
+                      const success = scrollToHighlight(target);
+                      if (success) {
+                        pendingScrollHighlightIdRef.current = null;
+                        lastScrolledHighlightIdRef.current = target;
+                        lastScrollRefKickTargetRef.current = null;
+                        scrollSessionRef.current = null;
+                      }
+                    }
                   }}
                   onSelectionFinished={(
                     position,

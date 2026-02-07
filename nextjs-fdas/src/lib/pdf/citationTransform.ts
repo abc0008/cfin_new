@@ -10,19 +10,20 @@ export const transformClaudeCitation = (
 ): Citation => {
   // Get document ID from map or use the provided one
   // CRITICAL FIX: Always use the first/only document if document_index is 0 or undefined
-  let documentId = (claudeCitation as any).documentId;
+  let documentId = (claudeCitation as any).documentId || (claudeCitation as any).document_id;
   
   if (!documentId) {
-    // If document_index is provided, try to get from map
-    if (claudeCitation.document_index !== undefined) {
-      documentId = documentMap.get(claudeCitation.document_index);
+    // If document index is provided, support both snake_case and camelCase
+    const idx = (claudeCitation as any).document_index ?? (claudeCitation as any).documentIndex;
+    if (idx !== undefined) {
+      documentId = documentMap.get(idx);
     }
     
     // If still no documentId and we have any documents, use the first one
     // This handles the common case where there's only one document
     if (!documentId && documentMap.size > 0) {
-      // For single document case or when document_index is 0
-      if (documentMap.size === 1 || claudeCitation.document_index === 0) {
+      // For single document case or when document_index/documentIndex is 0
+      if (documentMap.size === 1 || idx === 0) {
         documentId = Array.from(documentMap.values())[0];
       }
     }
@@ -32,23 +33,25 @@ export const transformClaudeCitation = (
 
   console.log('[citationTransform] transformClaudeCitation:', {
     claudeCitation,
-    document_index: claudeCitation.document_index,
+    document_index: (claudeCitation as any).document_index ?? (claudeCitation as any).documentIndex,
     documentMap: Array.from(documentMap.entries()),
     resolvedDocumentId: documentId,
     mapSize: documentMap.size
   });
 
-  // Use IDs from backend, don't generate temporary ones
-  const id = (claudeCitation as any).id || '';
-  const highlightId = (claudeCitation as any).highlightId || '';
+  // Use IDs from backend, don't generate temporary ones; fallback to highlightId for clickability
+  const highlightId = (claudeCitation as any).highlightId || (claudeCitation as any).highlight_id || '';
+  const id = (claudeCitation as any).id || (claudeCitation as any).citation_id || highlightId || `cite-${citationIndex ?? 0}`;
 
   return {
     id,
     highlightId,
     documentId,
-    documentTitle: claudeCitation.document_title || '',
+    documentTitle: claudeCitation.document_title || (claudeCitation as any).documentTitle || '',
     type: (claudeCitation.type || 'page_location') as Citation['type'],
-    citedText: claudeCitation.cited_text || (claudeCitation as any).citedText || '',
+    citedText: claudeCitation.cited_text || (claudeCitation as any).citedText || (claudeCitation as any).text || '',
+    displayText: (claudeCitation as any).display_text || (claudeCitation as any).displayText,
+    searchableText: (claudeCitation as any).searchable_text || (claudeCitation as any).searchableText,
     rects: (claudeCitation as any).rects || [],  // Use rects from backend if available
     // Handle both snake_case and camelCase field names
     startPageNumber: claudeCitation.start_page_number || 
@@ -69,6 +72,8 @@ export const transformClaudeCitation = (
     endBlockIndex: claudeCitation.end_block_index || 
       (claudeCitation as any).endBlockIndex || 
       undefined,
+    messageId: (claudeCitation as any).message_id || (claudeCitation as any).messageId,
+    analysisId: (claudeCitation as any).analysis_id || (claudeCitation as any).analysisId,
   };
 };
 

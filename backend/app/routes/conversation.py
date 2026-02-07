@@ -4,6 +4,7 @@ from typing import List, Dict, Any
 import logging
 import json
 import asyncio
+import re
 from sqlalchemy.ext.asyncio import AsyncSession
 from enum import Enum
 
@@ -20,6 +21,74 @@ from utils.database import get_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/conversation", tags=["conversation"])
+
+
+def _citation_marker_index(citation: Any) -> int:
+    """
+    Return marker index persisted in citation.section when available.
+    """
+    raw_value = getattr(citation, "section", None)
+    if raw_value is None:
+        return 0
+    try:
+        value = int(str(raw_value).strip())
+        return value if value > 0 else 0
+    except Exception:
+        return 0
+
+
+def _normalize_message_citations_for_markers(citations: List[Any], content: str) -> List[Any]:
+    """
+    Keep citation ordering deterministic and align list length with inline markers.
+
+    The frontend maps [1], [2], ... to citations by array index. If citations come back in
+    non-deterministic order (or with duplicates), the marker can jump to the wrong source.
+    """
+    unique_citations: List[Any] = []
+    seen = set()
+
+    for citation in citations:
+        cited_text = getattr(citation, "cited_text", None) or getattr(citation, "text", "") or ""
+        normalized_text = " ".join(str(cited_text).split()).lower()
+        marker_index = _citation_marker_index(citation)
+        signature = (
+            str(getattr(citation, "document_id", "")),
+            marker_index if marker_index > 0 else int(getattr(citation, "start_page_number", 0) or getattr(citation, "page", 0) or 0),
+            marker_index if marker_index > 0 else normalized_text[:300],
+        )
+        if signature in seen:
+            continue
+        seen.add(signature)
+        unique_citations.append(citation)
+
+    markers = [int(m) for m in re.findall(r"\[(\d+)\]", content or "")]
+    if markers:
+        highest_marker = max(markers)
+        if highest_marker > 0:
+            marker_citations = [
+                citation for citation in unique_citations
+                if 0 < _citation_marker_index(citation) <= highest_marker
+            ]
+            if marker_citations:
+                marker_citations.sort(key=_citation_marker_index)
+                if len(marker_citations) > highest_marker:
+                    marker_citations = marker_citations[:highest_marker]
+                logger.info(
+                    "Normalized citations by marker index: markers=%s, marker_citations=%s, citations_before=%s",
+                    highest_marker,
+                    len(marker_citations),
+                    len(unique_citations),
+                )
+                unique_citations = marker_citations
+            elif len(unique_citations) > highest_marker:
+                logger.info(
+                    "Trimming citations to match markers: markers=%s, citations_before=%s",
+                    highest_marker,
+                    len(unique_citations),
+                )
+                unique_citations = unique_citations[:highest_marker]
+
+    return unique_citations
 
 
 # Dependencies
@@ -218,6 +287,7 @@ async def get_conversation_history(
     for msg in messages:
         # Get citations for this message
         citations = await conversation_service.conversation_repository.get_message_citations(msg.id)
+        citations = _normalize_message_citations_for_markers(citations, msg.content or "")
         
         # Debug logging for citations
         logger.info(f"Message {msg.id} has {len(citations)} citations from database")

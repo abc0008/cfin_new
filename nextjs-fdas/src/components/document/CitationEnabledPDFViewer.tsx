@@ -45,9 +45,20 @@ export function CitationEnabledPDFViewer(props: React.ComponentProps<typeof PDFV
         startTimer(`nav_${citation.id}`);
 
         // Ensure placeholder is known to the viewer so scroll works immediately
-        setLocalCitations([citation]);
+        setLocalCitations((prev) => {
+          const byId = new Map(prev.map((c) => [c.id, c]));
+          const existing = byId.get(citation.id);
+          const existingRectCount = existing?.rects?.length || 0;
+          const incomingRectCount = citation.rects?.length || 0;
+          if (!existing || incomingRectCount >= existingRectCount) {
+            byId.set(citation.id, citation);
+          }
+          return Array.from(byId.values());
+        });
         console.log('[CitationEnabledPDFViewer] Navigating to citation in this viewer:', citation.id);
-        setNavigatingToCitation(citation.id);
+        // Force prop change even when clicking the same citation repeatedly.
+        setNavigatingToCitation(null);
+        requestAnimationFrame(() => setNavigatingToCitation(citation.id));
         
         // Record navigation performance
         setTimeout(() => {

@@ -8,12 +8,17 @@ interface FollowUpQuestionsProps {
   conversationId: string;
   onQuestionClick: (question: string) => void;
   disabled?: boolean;
+  seedKey?: string;
 }
+
+const inFlightFollowUpRequests = new Map<string, Promise<string[]>>();
+const resolvedFollowUpResults = new Map<string, string[]>();
 
 export function FollowUpQuestions({ 
   conversationId, 
   onQuestionClick, 
-  disabled = false 
+  disabled = false,
+  seedKey = 'default'
 }: FollowUpQuestionsProps) {
   const [questions, setQuestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -23,17 +28,42 @@ export function FollowUpQuestions({
     if (conversationId && !hasGenerated && !disabled) {
       generateQuestions();
     }
-  }, [conversationId, hasGenerated, disabled]);
+  }, [conversationId, hasGenerated, disabled, seedKey]);
 
   const generateQuestions = async () => {
     if (!conversationId || isLoading) return;
 
+    const cacheKey = `${conversationId}:${seedKey}:3`;
+
     try {
       setIsLoading(true);
-      const generatedQuestions = await conversationApi.generateFollowUpQuestions(conversationId, 3);
+
+      const cached = resolvedFollowUpResults.get(cacheKey);
+      if (cached && cached.length > 0) {
+        setQuestions(cached);
+        setHasGenerated(true);
+        return;
+      }
+
+      let request = inFlightFollowUpRequests.get(cacheKey);
+      if (!request) {
+        request = conversationApi.generateFollowUpQuestions(conversationId, 3);
+        inFlightFollowUpRequests.set(cacheKey, request);
+      }
+
+      const generatedQuestions = await request;
+      inFlightFollowUpRequests.delete(cacheKey);
+      resolvedFollowUpResults.set(cacheKey, generatedQuestions);
+      if (resolvedFollowUpResults.size > 100) {
+        const first = resolvedFollowUpResults.keys().next().value as string | undefined;
+        if (first) {
+          resolvedFollowUpResults.delete(first);
+        }
+      }
       setQuestions(generatedQuestions);
       setHasGenerated(true);
     } catch (error) {
+      inFlightFollowUpRequests.delete(cacheKey);
       console.error('Failed to generate follow-up questions:', error);
       // Set default questions as fallback
       setQuestions([

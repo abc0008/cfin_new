@@ -48,10 +48,6 @@ export function StreamingChatInterface({
     activeDocuments.forEach((docId, index) => {
       map.set(index, docId);
     });
-    console.log('[StreamingChatInterface] documentMap:', {
-      activeDocuments,
-      map: Array.from(map.entries())
-    });
     return map;
   }, [activeDocuments]);
 
@@ -271,6 +267,7 @@ export function StreamingChatInterface({
           <FollowUpQuestions
             key={`followup-${message.id}-${index}`} // Force remount for each new message
             conversationId={conversationId}
+            seedKey={message.id}
             onQuestionClick={(question) => setInputValue(question)}
             disabled={isSubmitting || isLoading || isStreaming}
           />

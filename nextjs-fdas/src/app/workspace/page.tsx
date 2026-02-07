@@ -612,8 +612,17 @@ export default function Workspace() {
         };
       }
       
-      // For regular streaming messages, only update if content changed
-      if (!existingMessage || existingMessage.content !== message.content) {
+      // For regular streaming messages, only update if content changed or citations added
+      if (!existingMessage || 
+          existingMessage.content !== message.content ||
+          (message.citations && message.citations.length > 0 && !existingMessage.citations?.length)) {
+        console.log('[handleMessageUpdate] Updating message:', {
+          messageId: message.id,
+          hadCitations: !!existingMessage?.citations?.length,
+          nowHasCitations: !!message.citations?.length,
+          citationCount: message.citations?.length || 0,
+          contentChanged: existingMessage?.content !== message.content
+        });
         return {
           ...prev,
           [message.id]: message

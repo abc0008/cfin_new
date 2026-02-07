@@ -376,18 +376,19 @@ export const documentsApi = {
       if (Array.isArray(response)) {
         // Validate each citation
         return response.map(citation => ({
-          id: citation.id || '',
-          citedText: citation.citedText || citation.cited_text || citation.text, // Handle both camelCase and snake_case
-          displayText: citation.displayText || citation.display_text, // Handle both camelCase and snake_case
-          documentId: citation.document_id,
-          documentTitle: 'Document', // This should ideally come from the backend
+          id: (citation as any).id || (citation as any).citation_id || '',
+          citedText: (citation as any).citedText || (citation as any).cited_text || (citation as any).text, // Handle both camelCase and snake_case
+          displayText: (citation as any).displayText || (citation as any).display_text, // Handle both camelCase and snake_case
+          searchableText: (citation as any).searchableText || (citation as any).searchable_text,
+          documentId: (citation as any).document_id || (citation as any).documentId,
+          documentTitle: (citation as any).documentTitle || 'Document', // Prefer backend title when available
           type: 'page_location' as const,
-          highlightId: citation.highlight_id || '',
-          rects: citation.rects || [],
-          startPageNumber: citation.page,
-          endPageNumber: citation.page,
-          messageId: citation.message_id,
-          analysisId: citation.analysis_id
+          highlightId: (citation as any).highlight_id || (citation as any).highlightId || '',
+          rects: (citation as any).rects || [],
+          startPageNumber: (citation as any).page || (citation as any).startPageNumber,
+          endPageNumber: (citation as any).page || (citation as any).endPageNumber,
+          messageId: (citation as any).message_id || (citation as any).messageId,
+          analysisId: (citation as any).analysis_id || (citation as any).analysisId
         }));
       }
       

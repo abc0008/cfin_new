@@ -5,6 +5,7 @@ import { Message, Citation } from '@/types';
 import { ClaudeCitation } from '@/types/citation';
 import { conversationApi } from '@/lib/api/conversation';
 import { useCitation } from '@/context/CitationContext';
+// (no placeholder imports)
 
 export interface StreamingEvent {
   type: 'message_start' | 'new_message_start' | 'text_delta' | 'tool_start' | 'tool_complete' | 
@@ -104,10 +105,13 @@ export function useStreamingChatWithCitations({
   const vizCreatedRef = useRef(false);
   const postVizCreatedRef = useRef(false);
   const lastCompletedMessageIdRef = useRef<string | null>(null);
-  const dbFetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const processedCompletionMessageIdsRef = useRef<Set<string>>(new Set());
+  const pendingFetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchCancellationRef = useRef<{ current: boolean } | null>(null);
 
   const streamingTextRef = useRef('');
   const frozenInitialTextRef = useRef('');
+  // No placeholder citation buffering
 
   const handleStreamingEvent = useCallback((event: StreamingEvent) => {
     switch (event.type) {
@@ -119,6 +123,14 @@ export function useStreamingChatWithCitations({
           return;
         }
         
+        // Do not cancel any pending backend citation fetch for the previous message.
+        // We want the initial assistant message to still receive its citations
+        // even if a tools or post-visualization message starts streaming now.
+        
+        if (newMessageId) {
+          // Allow a new lifecycle for this message id.
+          processedCompletionMessageIdsRef.current.delete(newMessageId);
+        }
         setActiveMessageId(newMessageId || null);
         setMessagePhase('initial');
         setPhaseTransitions(['initial']);
@@ -336,8 +348,8 @@ export function useStreamingChatWithCitations({
         break;
 
       case 'citations_delta':
-        // Skip processing streaming citations - we'll get them from backend with rects
-        console.log('Received streaming citation, will wait for backend citation with rects');
+        // No placeholders: do not buffer; rely on backend fetch after completion
+        console.log('Received citations_delta event');
         break;
 
       case 'content_update':
@@ -468,6 +480,28 @@ export function useStreamingChatWithCitations({
 
       case 'message_complete':
         console.log('Message complete - processing citations');
+
+        const completionMessageId = event.message_id || streamingMessageId || null;
+        if (
+          completionMessageId &&
+          processedCompletionMessageIdsRef.current.has(completionMessageId)
+        ) {
+          console.log(
+            `[useStreaming] Skipping duplicate message_complete for ${completionMessageId}`
+          );
+          return;
+        }
+        if (completionMessageId) {
+          processedCompletionMessageIdsRef.current.add(completionMessageId);
+          // Keep this bounded during long sessions.
+          if (processedCompletionMessageIdsRef.current.size > 200) {
+            const first = processedCompletionMessageIdsRef.current.values().next()
+              .value as string | undefined;
+            if (first) {
+              processedCompletionMessageIdsRef.current.delete(first);
+            }
+          }
+        }
         
         // Check if this is a tools message completion
         if (event.is_tools_message) {
@@ -557,14 +591,14 @@ export function useStreamingChatWithCitations({
           });
           
           const message: Message = {
-            id: streamingMessageId,
+            id: (event.message_id || streamingMessageId)!,
             sessionId: conversationId,
             timestamp: new Date().toISOString(),
             role: 'assistant',
             content: finalContent,
             referencedDocuments: [],
             referencedAnalyses: [],
-            citations: [],  // Citations will be fetched from backend API
+            citations: [],  // Attach real citations only after backend fetch
             content_blocks: event.content_blocks || [],
             analysis_blocks: event.analysis_blocks || []  // Get from streaming event if available
           };
@@ -572,93 +606,281 @@ export function useStreamingChatWithCitations({
           // First, send the streamed message immediately
           onMessageUpdate(message);
           
-          // Then, only fetch from database if we have tools but no analysis_blocks
-          // This ensures we get the analysis blocks that were stored after streaming
-          // The backend now sends analysis_blocks in the message_complete event
-          if (toolsStarted && (!event.analysis_blocks || event.analysis_blocks.length === 0)) {
-            console.log('Tools were used but no analysis blocks in event, fetching from database...');
-            
-            // Cancel any existing fetch timeout to debounce
-            if (dbFetchTimeoutRef.current) {
-              clearTimeout(dbFetchTimeoutRef.current);
+          // Store the message ID and current state for the async fetch
+          // This ensures we're updating the correct message even if streaming restarts
+          const messageIdToUpdate = (event.message_id || streamingMessageId)!;
+          const originalContent = finalContent;
+          const messageTimestamp = message.timestamp;
+          const hadTools = toolsStarted;
+          
+          // Create a cancellation token to prevent stale updates
+          const fetchCancelled = { current: false };
+          fetchCancellationRef.current = fetchCancelled;
+          
+          // Then, fetch additional data (analysis blocks and citations) from backend
+          // We'll batch these updates to avoid multiple onMessageUpdate calls
+          
+          const expectedCitationCount = (() => {
+            const markerMatches = Array.from((originalContent || '').matchAll(/\[(\d+)\]/g));
+            if (markerMatches.length === 0) return 0;
+            return markerMatches.reduce((max, match) => {
+              const marker = Number(match[1] || 0);
+              return Number.isFinite(marker) ? Math.max(max, marker) : max;
+            }, 0);
+          })();
+
+          const fetchAnalysisBlocksAndCitations = async () => {
+            try {
+              // Check if this fetch was cancelled (new message started streaming)
+              if (fetchCancelled.current) {
+                console.log('Fetch cancelled - new message started streaming');
+                return;
+              }
+              
+              // Import the API modules
+              const { conversationsApi } = await import('@/lib/api/conversations');
+              const { documentsApi } = await import('@/lib/api/documents');
+              
+              const normalize = (s: string) => (s || '').replace(/\s+/g, ' ').trim();
+              const tryFetchBackendMessage = async (): Promise<import('@/types').Message | undefined> => {
+                const messages = await conversationsApi.getConversationHistory(conversationId, 10);
+                let backendMessage = messages.find(msg => msg.id === messageIdToUpdate);
+                if (!backendMessage) {
+                  backendMessage = messages.find(msg => msg.role === 'assistant' && normalize(msg.content) === normalize(originalContent));
+                }
+                if (!backendMessage) {
+                  for (let i = messages.length - 1; i >= 0; i--) {
+                    const m = messages[i];
+                    if (m.role === 'assistant' && Array.isArray(m.citations) && m.citations.length > 0) {
+                      backendMessage = m;
+                      break;
+                    }
+                  }
+                }
+                return backendMessage;
+              };
+              
+              const citationCount = (msg?: Message): number =>
+                Array.isArray(msg?.citations) ? msg.citations.length : 0;
+
+              const hasEnoughCitations = (msg?: Message): boolean => {
+                const count = citationCount(msg);
+                if (expectedCitationCount > 0) {
+                  return count >= expectedCitationCount;
+                }
+                // If there are no citation markers in the message, there's nothing to poll for.
+                return true;
+              };
+
+              // Poll only when citations are expected from visible [n] markers.
+              let backendMessage = await tryFetchBackendMessage();
+              let attempts = 0;
+              const maxAttempts = 20;
+              const delayMs = 1000;
+              while (
+                expectedCitationCount > 0 &&
+                !fetchCancelled.current &&
+                attempts < maxAttempts &&
+                (!backendMessage || !hasEnoughCitations(backendMessage))
+              ) {
+                attempts++;
+                await new Promise(res => setTimeout(res, delayMs));
+                backendMessage = await tryFetchBackendMessage();
+              }
+
+              if (
+                backendMessage &&
+                expectedCitationCount > 0 &&
+                citationCount(backendMessage) > 0 &&
+                citationCount(backendMessage) < expectedCitationCount
+              ) {
+                console.warn(
+                  `[useStreaming] Citation polling ended with partial citations: got ${citationCount(backendMessage)}/${expectedCitationCount} markers for message ${messageIdToUpdate}`
+                );
+              }
+               
+              if (!backendMessage) {
+                console.log(`Message ${messageIdToUpdate} not found in backend`);
+                return;
+              }
+              
+              // Proceed to update the specific message even if newer messages completed
+              // We guard only by fetch cancellation token to avoid stale writes
+              if (fetchCancelled.current) {
+                console.log(`Fetch cancelled for message ${messageIdToUpdate}`);
+                return;
+              }
+              
+              let needsUpdate = false;
+              let updatedMessage: Message = {
+                id: messageIdToUpdate,
+                sessionId: conversationId,
+                timestamp: messageTimestamp, // Preserve original timestamp
+                role: 'assistant',
+                content: originalContent, // Preserve exact original content
+                referencedDocuments: [],
+                referencedAnalyses: [],
+                citations: [],
+                content_blocks: message.content_blocks || [],
+                analysis_blocks: message.analysis_blocks || []
+              };
+              
+              // Check for analysis blocks
+              if (hadTools && backendMessage.analysis_blocks && backendMessage.analysis_blocks.length > 0) {
+                console.log(`Found ${backendMessage.analysis_blocks.length} analysis blocks from backend`);
+                updatedMessage.analysis_blocks = backendMessage.analysis_blocks;
+                needsUpdate = true;
+              }
+              
+              // Check for citations
+              if (backendMessage.citations && backendMessage.citations.length > 0) {
+                console.log(`Found ${backendMessage.citations.length} citations from backend`);
+                
+                // Preserve full ordered list on the message so [1], [2], ... map correctly
+                const allCitations = backendMessage.citations;
+
+                // Add only rect-backed citations to the global cache for immediate highlighting
+                const citationsWithRects = allCitations.filter(c => c.rects && c.rects.length > 0);
+                console.log('[useStreaming] Citations with rects (for cache):', citationsWithRects.map(c => ({ 
+                  id: c.id, 
+                  documentId: c.documentId,
+                  rectCount: c.rects?.length || 0,
+                  text: c.citedText?.substring(0, 50)
+                })));
+                addCitations(citationsWithRects);
+                
+                // Attach all citations to the message so markers become clickable immediately
+                updatedMessage.citations = allCitations;
+                needsUpdate = true;
+
+                // If backend content includes injected [n] markers and our displayed content does not, prefer backend content
+                const backendContent: string | undefined = (backendMessage as any).content;
+                const backendHasMarkers = !!backendContent && /\[(\d+)\]/.test(backendContent);
+                const currentHasMarkers = /\[(\d+)\]/.test(updatedMessage.content || '');
+                if (backendContent && backendHasMarkers && !currentHasMarkers) {
+                  updatedMessage.content = backendContent;
+                  needsUpdate = true;
+                }
+              } else if (expectedCitationCount > 0) {
+                // Fallback: poll document-level citations and then attach to the message
+                try {
+                  const docIds = Array.from(documentMap.values());
+                  const fetchAllDocCitations = async (): Promise<Citation[]> => {
+                    const acc: Citation[] = [];
+                    for (const docId of docIds) {
+                      const docCites = await documentsApi.getDocumentCitations(docId);
+                      acc.push(...docCites);
+                    }
+                    return acc;
+                  };
+
+                  let allDocCitations: Citation[] = [];
+                  let attempts = 0;
+                  const maxAttempts = 12; // up to ~9s with 750ms delay
+                  const delayMs = 750;
+                  while (!fetchCancelled.current && attempts < maxAttempts) {
+                    allDocCitations = await fetchAllDocCitations();
+                    if (allDocCitations.length > 0) break;
+                    attempts++;
+                    await new Promise(res => setTimeout(res, delayMs));
+                  }
+
+                  if (fetchCancelled.current) {
+                    console.log('Doc-level citations poll cancelled');
+                    return;
+                  }
+
+                  // First try strict message_id filter
+                  const targetMessageId = backendMessage?.id || messageIdToUpdate;
+                  let messageCitations: Citation[] = allDocCitations.filter(c => c.messageId === targetMessageId);
+
+                  // If none, try to map by content occurrence order
+                  if ((!messageCitations || messageCitations.length === 0)) {
+                    const s = streamingTextRef.current || '';
+                    const f = frozenInitialTextRef.current || '';
+                    const hasMarkers = (t: string) => /\[(\d+)\]/.test(t);
+                    const content = hasMarkers(s) ? s : hasMarkers(f) ? f : (s.length >= f.length ? s : f) || originalContent;
+                    const scored = allDocCitations.map(c => {
+                      const needleA = (c.displayText || '').trim();
+                      const needleB = (c.citedText || '').trim();
+                      let idx = -1;
+                      if (needleA && content.includes(needleA)) idx = content.indexOf(needleA);
+                      else if (needleB && content.includes(needleB)) idx = content.indexOf(needleB);
+                      if (idx < 0 && c.searchableText && c.searchableText.length >= 2) {
+                        const n = c.searchableText.trim();
+                        if (n && content.includes(n)) idx = content.indexOf(n);
+                      }
+                      return { c, idx };
+                    }).filter(x => x.idx >= 0);
+
+                    if (scored.length > 0) {
+                      scored.sort((a, b) => a.idx - b.idx);
+                      const markerCount = (content.match(/\[(\d+)\]/g) || []).length;
+                      messageCitations = scored.slice(0, Math.max(markerCount, 1)).map(x => x.c);
+                    }
+                  }
+
+                  if (messageCitations && messageCitations.length > 0) {
+                    console.log(`[useStreaming] Fallback mapped ${messageCitations.length} citations from document-level to message content (after polling)`);
+                    const citationsWithRects = messageCitations.filter(c => c.rects && c.rects.length > 0);
+                    addCitations(citationsWithRects);
+                    updatedMessage.citations = messageCitations;
+                    needsUpdate = true;
+                  } else {
+                    // As a last resort, attach the first N rect-backed citations to match marker count
+                    const markerCount = (originalContent.match(/\[(\d+)\]/g) || []).length;
+                    const rectBacked = allDocCitations.filter(c => c.rects && c.rects.length > 0);
+                    if (markerCount > 0 && rectBacked.length > 0) {
+                      const pick = rectBacked.slice(0, markerCount);
+                      console.log(`[useStreaming] Last-resort attaching ${pick.length}/${markerCount} rect-backed doc citations to enable clickable markers (after polling)`);
+                      addCitations(pick);
+                      updatedMessage.citations = pick;
+                      needsUpdate = true;
+                    } else {
+                      console.log('[useStreaming] No citations found in history or doc-level polling fallback');
+                    }
+                  }
+                } catch (e) {
+                  console.warn('Fallback document citations/content mapping failed:', e);
+                }
+              } else {
+                console.log('[useStreaming] No citation markers in message; skipping citation fallback polling');
+              }
+              
+              // Only call onMessageUpdate once if we have updates
+              if (needsUpdate && !fetchCancelled.current) {
+                console.log('[useStreamingChat] Updating message with backend data:', {
+                  messageId: messageIdToUpdate,
+                  hasAnalysisBlocks: !!updatedMessage.analysis_blocks?.length,
+                  hasCitations: !!updatedMessage.citations?.length,
+                  citationCount: updatedMessage.citations?.length || 0,
+                  contentLength: updatedMessage.content.length,
+                  contentPreview: updatedMessage.content.substring(0, 100)
+                });
+                onMessageUpdate(updatedMessage);
+              }
+            } catch (error) {
+              console.error('Error fetching backend data:', error);
+            }
+          };
+          
+          // Only fetch backend data if we need it
+          const shouldFetchBackendData = hadTools || expectedCitationCount > 0;
+          if (shouldFetchBackendData) {
+            // Clear any existing timeout
+            if (pendingFetchTimeoutRef.current) {
+              clearTimeout(pendingFetchTimeoutRef.current);
             }
             
-            // Add a small delay to ensure backend has finished storing analysis blocks
-            dbFetchTimeoutRef.current = setTimeout(() => {
-              import('@/lib/api/conversations').then(({ conversationsApi }) => {
-                conversationsApi.getConversationHistory(conversationId, 10)
-                  .then(messages => {
-                    // Find our message by ID
-                    const updatedMessage = messages.find(msg => msg.id === streamingMessageId);
-                    if (updatedMessage && updatedMessage.analysis_blocks && updatedMessage.analysis_blocks.length > 0) {
-                      console.log(`Fetched ${updatedMessage.analysis_blocks.length} analysis blocks from database`);
-                      
-                      // Only update the analysis blocks, keep the streamed content with citation markers
-                      const enhancedMessage: Message = {
-                        ...message,  // Keep all streamed data including content with citation markers
-                        analysis_blocks: updatedMessage.analysis_blocks
-                      };
-                      
-                      onMessageUpdate(enhancedMessage);
-                    } else {
-                      console.log('No analysis blocks found in database message');
-                    }
-                  })
-                  .catch(error => {
-                    console.error('Error fetching analysis blocks:', error);
-                    // Keep using the streamed message with citations on error
-                    // Citations were already collected during streaming and are preserved
-                    console.log('Keeping streamed message with', message.citations?.length || 0, 'citations');
-                  })
-                  .finally(() => {
-                    dbFetchTimeoutRef.current = null;
-                  });
-              });
-            }, 500); // Small delay to ensure backend has finished processing
+            // Add a delay to ensure backend has finished processing
+            pendingFetchTimeoutRef.current = setTimeout(() => {
+              // Clear the timeout ref since we're executing
+              pendingFetchTimeoutRef.current = null;
+              fetchAnalysisBlocksAndCitations();
+            }, 1500);
+          } else {
+            console.log('[useStreaming] Skipping backend poll: no tools and no citation markers');
           }
-          
-          // After message is complete, fetch citations with rects from backend
-          console.log('Fetching citations from backend API...');
-          
-          // Slight delay to ensure backend has processed citations
-          setTimeout(() => {
-            import('@/lib/api/conversations').then(({ conversationsApi }) => {
-              conversationsApi.getConversationHistory(conversationId, 10)
-                .then(messages => {
-                  // Find our message by ID
-                  const updatedMessage = messages.find(msg => msg.id === streamingMessageId);
-                  if (updatedMessage && updatedMessage.citations && updatedMessage.citations.length > 0) {
-                    console.log(`Found ${updatedMessage.citations.length} citations from backend`);
-                    
-                    // Filter to only include citations with valid rects
-                    const validCitations = updatedMessage.citations.filter(c => c.rects && c.rects.length > 0);
-                    
-                    console.log('[useStreaming] Valid citations with rects:', validCitations.map(c => ({ 
-                      id: c.id, 
-                      documentId: c.documentId,
-                      rectCount: c.rects?.length || 0,
-                      text: c.citedText?.substring(0, 50)
-                    })));
-                    
-                    // Update global citation cache with only valid citations
-                    addCitations(validCitations);
-                    
-                    // Update message with citations
-                    const enhancedMessage: Message = {
-                      ...message,
-                      citations: validCitations
-                    };
-                    
-                    onMessageUpdate(enhancedMessage);
-                  } else {
-                    console.log('No citations found in backend message');
-                  }
-                })
-                .catch(error => {
-                  console.error('Error fetching citations from backend:', error);
-                });
-            });
-          }, 1000); // Wait 1 second for backend processing
         }
         
         // Reset state
@@ -925,10 +1147,14 @@ export function useStreamingChatWithCitations({
       // Clear any pending reconnection
       clearReconnectTimeout();
       
-      // Clear database fetch timeout
-      if (dbFetchTimeoutRef.current) {
-        clearTimeout(dbFetchTimeoutRef.current);
-        dbFetchTimeoutRef.current = null;
+      // Clear any pending fetch
+      if (pendingFetchTimeoutRef.current) {
+        clearTimeout(pendingFetchTimeoutRef.current);
+        pendingFetchTimeoutRef.current = null;
+      }
+      if (fetchCancellationRef.current) {
+        fetchCancellationRef.current.current = true;
+        fetchCancellationRef.current = null;
       }
       
       // Clear connecting flag
