@@ -34,6 +34,37 @@ const nextConfig = {
   // For PDF Highlighter compatibility
   transpilePackages: ["react-pdf-highlighter"],
 
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.aceanalytics.dev" }],
+        destination: "https://aceanalytics.dev/:path*",
+        permanent: true,
+      },
+      {
+        source: "/text2sql",
+        destination: "https://text2sql.aceanalytics.dev",
+        permanent: false,
+      },
+      {
+        source: "/text2sql/:path*",
+        destination: "https://text2sql.aceanalytics.dev/:path*",
+        permanent: false,
+      },
+      {
+        source: "/text2SQL",
+        destination: "https://text2sql.aceanalytics.dev",
+        permanent: false,
+      },
+      {
+        source: "/text2SQL/:path*",
+        destination: "https://text2sql.aceanalytics.dev/:path*",
+        permanent: false,
+      },
+    ];
+  },
+
   async rewrites() {
     return [
       {

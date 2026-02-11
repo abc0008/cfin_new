@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Financial Document Analysis System | FDAS',
-  description: 'Professional AI-powered financial document analysis and insights platform',
+  title: 'ACEAnalytics | AI Project Hub',
+  description: 'Launch and manage ACEAnalytics applications for financial analysis and automation.',
 }
 
 export default function RootLayout({
