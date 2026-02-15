@@ -645,24 +645,29 @@ export default function Home() {
                 </div>
               </article>
 
-              <article className="relative p-7 rounded-2xl bg-gradient-to-br from-card to-card/50 border-2 border-brand-pigeon shadow-lg opacity-90">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-accent/10 to-accent/5 border border-brand-pigeon flex items-center justify-center mb-4">
-                  <TrendingUp className="h-7 w-7 text-accent" />
+              <Link
+                href="https://bankanalysis.aceanalytics.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open Bank Analysis"
+                className="group relative block p-7 rounded-2xl bg-gradient-to-br from-card to-card/50 border-2 border-brand-pigeon shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-accent/30"
+              >
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-accent/10 to-accent/5 border border-brand-pigeon flex items-center justify-center mb-4">
+                    <TrendingUp className="h-7 w-7 text-accent" />
+                  </div>
+                  <h2 className="text-2xl font-avenir-pro-demi text-foreground mb-2">Bank Analysis</h2>
+                  <p className="text-brand-mt-rushmore font-avenir-pro mb-5">
+                    Modeling suite for banking levers, including RM Pro Forma workflows for individual hires
+                    and team lift-outs, plus Python-backed loan-level cash flowing and forecasting.
+                  </p>
+                  <span className="inline-flex items-center px-5 py-3 rounded-xl bg-gradient-to-r from-accent to-accent/90 text-white font-avenir-pro-demi shadow-md">
+                    Open Bank Analysis
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </span>
                 </div>
-                <h2 className="text-2xl font-avenir-pro-demi text-foreground mb-2">Bank Analysis</h2>
-                <p className="text-brand-mt-rushmore font-avenir-pro mb-5">
-                  Modeling suite for banking levers, including RM Pro Forma workflows for individual hires
-                  and team lift-outs, plus Python-backed loan-level cash flowing and forecasting.
-                </p>
-                <button
-                  type="button"
-                  disabled
-                  className="inline-flex items-center px-5 py-3 rounded-xl border-2 border-brand-pigeon bg-card text-brand-mt-rushmore font-avenir-pro-demi cursor-not-allowed"
-                >
-                  <Clock className="h-4 w-4 mr-2" />
-                  Coming Soon
-                </button>
-              </article>
+              </Link>
 
               <article className="relative p-7 rounded-2xl bg-gradient-to-br from-card to-card/50 border-2 border-brand-pigeon shadow-lg opacity-90">
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-brand-lust/10 to-brand-lust/5 border border-brand-pigeon flex items-center justify-center mb-4">
