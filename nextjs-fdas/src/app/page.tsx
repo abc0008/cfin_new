@@ -1,10 +1,13 @@
 import Link from 'next/link'
-import { BarChart3, FileUp, FileSearch, Zap, TrendingUp, Shield, Users, ArrowRight, CheckCircle, Star, Play, HelpCircle, Mail, ChevronDown, AlertTriangle, Award, Clock } from 'lucide-react'
+import { BarChart3, FileUp, FileSearch, Zap, TrendingUp, Shield, Users, ArrowRight, CheckCircle, Play, HelpCircle, Mail, ChevronDown, AlertTriangle, Award, Clock } from 'lucide-react'
 import { Modal, ModalBody, ModalContent, ModalTrigger } from '@/components/ui/animated-modal';
 import { AppleCardsCarousel } from '@/components/ui/apple-cards-carousel';
+import { HeroParallax } from '@/components/ui/hero-parallax';
 import TestimonialCard from '@/components/testimonials/TestimonialCard';
 import { Skeleton } from '@/components/ui/skeleton'
 import AnimatedBeamSection from '@/components/sections/AnimatedBeamSection'
+import AboutAlexTimeline from '@/components/sections/AboutAlexTimeline'
+import AppShowcaseScroll from '@/components/sections/AppShowcaseScroll'
 
 export function CfinHeroPage() {
   const testimonialsData = [
@@ -169,7 +172,7 @@ export function CfinHeroPage() {
               </Link>
               
               <Link
-                href="/text2sql"
+                href="/text2sql/guided-mode"
                 className="group relative inline-flex items-center px-8 py-4 rounded-xl border-2 border-brand-pigeon bg-card/50 backdrop-blur-sm text-foreground font-avenir-pro-demi text-lg hover:bg-card transition-all duration-300 transform hover:-translate-y-1"
               >
                 <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
@@ -562,135 +565,61 @@ export function CfinHeroPage() {
 }
 
 export default function Home() {
+  const parallaxProducts = [
+    { title: "Agentic PDF Financial Analysis", link: "/cfin", thumbnail: "/assets/finance-pdf-analysis-logo.png" },
+    { title: "Text2SQL", link: "/text2sql", thumbnail: "/assets/text2sql-logo.png" },
+    { title: "Bank Analysis – RM Pro Forma", link: "https://bankanalysis.aceanalytics.dev/rm-pro-forma", thumbnail: "/assets/bank-analysis-logo.png" },
+    { title: "Social Ketchup", link: "https://socialketchup.vercel.app", thumbnail: "/assets/social-ketchup-best.png" },
+    { title: "CFIN Workspace", link: "/workspace", thumbnail: "/assets/finance-pdf-analysis-logo.png" },
+    { title: "Text2SQL – Guided Mode", link: "/text2sql", thumbnail: "/assets/text2sql-logo.png" },
+    { title: "Bank Analysis – Pipeline Kanban", link: "https://bankanalysis.aceanalytics.dev/rm-pro-forma", thumbnail: "/assets/bank-analysis-logo.png" },
+    { title: "Social Ketchup – Feed", link: "https://socialketchup.vercel.app", thumbnail: "/assets/social-ketchup-best.png" },
+    { title: "Financial Document Analysis", link: "/cfin", thumbnail: "/assets/finance-pdf-analysis-logo.png" },
+    { title: "SQL + Visuals", link: "/text2sql", thumbnail: "/assets/text2sql-logo.png" },
+    { title: "RM Pro Forma Modeling", link: "https://bankanalysis.aceanalytics.dev/rm-pro-forma", thumbnail: "/assets/bank-analysis-logo.png" },
+    { title: "AI Social Signals", link: "https://socialketchup.vercel.app", thumbnail: "/assets/social-ketchup-best.png" },
+    { title: "Citation-Linked Insights", link: "/cfin", thumbnail: "/assets/finance-pdf-analysis-logo.png" },
+    { title: "Natural Language to SQL", link: "/text2sql", thumbnail: "/assets/text2sql-logo.png" },
+    { title: "Cash Flow Forecasting", link: "https://bankanalysis.aceanalytics.dev/rm-pro-forma", thumbnail: "/assets/bank-analysis-logo.png" },
+  ];
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-background via-background to-brand-white-smoke">
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5"></div>
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-primary/10 to-transparent rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-gradient-to-tr from-secondary/10 to-transparent rounded-full blur-3xl"></div>
-
-        <div className="relative container mx-auto px-4 py-20">
-          <div className="max-w-5xl mx-auto text-center">
-            <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 border-2 border-brand-lust/20 mb-8">
-              <span className="text-sm font-avenir-pro-demi text-brand-lust">ACEAnalytics Project Hub</span>
+      <HeroParallax products={parallaxProducts}>
+        <div className="max-w-7xl relative mx-auto py-20 md:py-40 px-4 w-full left-0 top-0">
+          <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 border-2 border-brand-lust/20 mb-8">
+            <span className="text-sm font-avenir-pro-demi text-brand-lust">ACEAnalytics Project Hub</span>
+          </div>
+          <h1 className="text-4xl md:text-7xl font-avenir-pro-demi text-foreground tracking-tight">
+            AI Tools for
+            <span className="bg-gradient-to-r from-primary via-brand-lust to-secondary bg-clip-text text-transparent">
+              {' '}Finance & Analytics
+            </span>
+          </h1>
+          <p className="max-w-2xl text-base md:text-xl mt-8 font-avenir-pro text-brand-mt-rushmore leading-relaxed">
+            One place to launch your core ACEAnalytics apps. CFIN and Text2SQL are live now;
+            Bank Analysis and Social Ketchup are framed and ready for rollout.
+          </p>
+          <div className="flex flex-wrap items-center gap-8 text-sm text-brand-mt-rushmore font-avenir-pro mt-8">
+            <div className="flex items-center">
+              <Zap className="h-4 w-4 mr-2 text-accent" />
+              Multi-app AI platform
             </div>
-
-            <h1 className="text-5xl md:text-7xl font-avenir-pro-demi text-foreground mb-6 tracking-tight">
-              AI Tools for
-              <span className="bg-gradient-to-r from-primary via-brand-lust to-secondary bg-clip-text text-transparent">
-                {' '}Finance & Analytics
-              </span>
-            </h1>
-
-            <p className="text-xl md:text-2xl font-avenir-pro text-brand-mt-rushmore max-w-3xl mx-auto mb-12 leading-relaxed">
-              One place to launch your core ACEAnalytics apps. CFIN and Text2SQL are live now;
-              Bank Analysis and Social Ketchup are framed and ready for rollout.
-            </p>
-
-            <div className="flex flex-wrap justify-center items-center gap-8 text-sm text-brand-mt-rushmore font-avenir-pro mb-14">
-              <div className="flex items-center">
-                <Zap className="h-4 w-4 mr-2 text-accent" />
-                Multi-app AI platform
-              </div>
-              <div className="flex items-center">
-                <Shield className="h-4 w-4 mr-2 text-secondary" />
-                Shared domain routing
-              </div>
-              <div className="flex items-center">
-                <Clock className="h-4 w-4 mr-2 text-brand-lust" />
-                2 active, 2 coming soon
-              </div>
+            <div className="flex items-center">
+              <Shield className="h-4 w-4 mr-2 text-secondary" />
+              Shared domain routing
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-              <article className="group relative p-7 rounded-2xl bg-gradient-to-br from-card to-card/50 border-2 border-brand-pigeon shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-primary/30">
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-brand-pigeon flex items-center justify-center mb-4">
-                    <BarChart3 className="h-7 w-7 text-primary" />
-                  </div>
-                  <h2 className="text-2xl font-avenir-pro-demi text-foreground mb-2">Agentic PDF Financial Analysis</h2>
-                  <p className="text-brand-mt-rushmore font-avenir-pro mb-5">
-                    Your full financial document analysis system: upload documents, chat with citations,
-                    and move from analysis to dashboard-ready insights.
-                  </p>
-                  <Link
-                    href="/cfin"
-                    className="inline-flex items-center px-5 py-3 rounded-xl bg-gradient-to-r from-primary to-primary/90 text-white font-avenir-pro-demi shadow-md hover:shadow-lg transition-all"
-                  >
-                    Open CFIN
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </div>
-              </article>
-
-              <article className="group relative p-7 rounded-2xl bg-gradient-to-br from-card to-card/50 border-2 border-brand-pigeon shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-secondary/30">
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-secondary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-secondary/10 to-secondary/5 border border-brand-pigeon flex items-center justify-center mb-4">
-                    <FileSearch className="h-7 w-7 text-secondary" />
-                  </div>
-                  <h2 className="text-2xl font-avenir-pro-demi text-foreground mb-2">Text2SQL</h2>
-                  <p className="text-brand-mt-rushmore font-avenir-pro mb-5">
-                    Natural-language SQL querying for banking datasets with explainable output,
-                    guided mode refinement, and visualization support.
-                  </p>
-                  <Link
-                    href="/text2sql"
-                    className="inline-flex items-center px-5 py-3 rounded-xl bg-gradient-to-r from-secondary to-secondary/90 text-secondary-foreground font-avenir-pro-demi shadow-md hover:shadow-lg transition-all"
-                  >
-                    Open Text2SQL
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </div>
-              </article>
-
-              <Link
-                href="https://bankanalysis.aceanalytics.dev"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Open Bank Analysis"
-                className="group relative block p-7 rounded-2xl bg-gradient-to-br from-card to-card/50 border-2 border-brand-pigeon shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-accent/30"
-              >
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="relative">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-accent/10 to-accent/5 border border-brand-pigeon flex items-center justify-center mb-4">
-                    <TrendingUp className="h-7 w-7 text-accent" />
-                  </div>
-                  <h2 className="text-2xl font-avenir-pro-demi text-foreground mb-2">Bank Analysis</h2>
-                  <p className="text-brand-mt-rushmore font-avenir-pro mb-5">
-                    Modeling suite for banking levers, including RM Pro Forma workflows for individual hires
-                    and team lift-outs, plus Python-backed loan-level cash flowing and forecasting.
-                  </p>
-                  <span className="inline-flex items-center px-5 py-3 rounded-xl bg-gradient-to-r from-accent to-accent/90 text-white font-avenir-pro-demi shadow-md">
-                    Open Bank Analysis
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </span>
-                </div>
-              </Link>
-
-              <article className="relative p-7 rounded-2xl bg-gradient-to-br from-card to-card/50 border-2 border-brand-pigeon shadow-lg opacity-90">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-brand-lust/10 to-brand-lust/5 border border-brand-pigeon flex items-center justify-center mb-4">
-                  <Users className="h-7 w-7 text-brand-lust" />
-                </div>
-                <h2 className="text-2xl font-avenir-pro-demi text-foreground mb-2">Social Ketchup</h2>
-                <p className="text-brand-mt-rushmore font-avenir-pro mb-5">
-                  Twitter/X AI agent that filters and summarizes relevant posts so you can
-                  stay informed without the noise of endless social scrolling.
-                </p>
-                <button
-                  type="button"
-                  disabled
-                  className="inline-flex items-center px-5 py-3 rounded-xl border-2 border-brand-pigeon bg-card text-brand-mt-rushmore font-avenir-pro-demi cursor-not-allowed"
-                >
-                  <Clock className="h-4 w-4 mr-2" />
-                  Coming Soon
-                </button>
-              </article>
+            <div className="flex items-center">
+              <Clock className="h-4 w-4 mr-2 text-brand-lust" />
+              4 apps, 1 hub
             </div>
           </div>
         </div>
-      </section>
+      </HeroParallax>
+
+      <AppShowcaseScroll />
+
+      <AboutAlexTimeline />
     </main>
   );
 }

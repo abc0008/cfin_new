@@ -139,6 +139,8 @@ async def run_analysis_endpoint(
     except ValueError as ve:
         logger.warning(f"Value error during analysis run: {ve}")
         raise HTTPException(status_code=400, detail=str(ve))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception(f"Unhandled error during analysis run: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to run analysis: {str(e)}")

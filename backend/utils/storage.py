@@ -59,7 +59,6 @@ import os
 import io
 import aiofiles
 from typing import Optional
-import boto3
 import logging
 from abc import ABC, abstractmethod
 
@@ -161,6 +160,8 @@ class S3StorageService(StorageService):
     """Storage service for AWS S3."""
     
     def __init__(self):
+        import boto3
+
         self.bucket_name = os.getenv("S3_BUCKET_NAME")
         if not self.bucket_name:
             raise ValueError("S3_BUCKET_NAME environment variable is not set")

@@ -38,12 +38,14 @@ Design Notes:
 - Ensures all outputs are formatted for downstream API and UI consumption, including metadata, visualizations, and insights.
 """
 import logging
+import os
 import json
 import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 import asyncio
 import base64 # Added for PDF content encoding
+from threading import Lock
 from fastapi import HTTPException # Added for Story #17
 from anthropic.types import Message, TextBlock # Moved import
 
@@ -62,6 +64,9 @@ from .analysis_strategies import strategy_map # Added for Story #1
 from utils.exceptions import ToolSchemaValidationError # Corrected import
 
 logger = logging.getLogger(__name__)
+ANALYSIS_EXECUTION_TIMEOUT_SECONDS = float(
+    os.getenv("CFIN_ANALYSIS_EXECUTION_TIMEOUT_SECONDS", "180")
+)
 
 # Keyword frequency feature removed - was old mock implementation 
 
@@ -96,6 +101,9 @@ def ensure_json_serializable(obj: Any) -> Any:
 
 class AnalysisService:
     """Service for managing financial analysis."""
+    _shared_claude_service: Optional[ClaudeService] = None
+    _shared_financial_agent: Optional[FinancialAnalysisAgent] = None
+    _shared_instance_lock: Lock = Lock()
     
     SUPPORTED_ANALYSIS_TYPES = [
         {
@@ -156,8 +164,17 @@ class AnalysisService:
         """
         self.analysis_repository = analysis_repository
         self.document_repository = document_repository
-        self.claude_service = ClaudeService()
-        self.financial_agent = FinancialAnalysisAgent()
+        if self.__class__._shared_claude_service is None or self.__class__._shared_financial_agent is None:
+            with self._shared_instance_lock:
+                if self.__class__._shared_claude_service is None:
+                    logger.info("Initializing shared ClaudeService instance for AnalysisService")
+                    self.__class__._shared_claude_service = ClaudeService()
+                if self.__class__._shared_financial_agent is None:
+                    logger.info("Initializing shared FinancialAnalysisAgent instance for AnalysisService")
+                    self.__class__._shared_financial_agent = FinancialAnalysisAgent()
+
+        self.claude_service = self.__class__._shared_claude_service
+        self.financial_agent = self.__class__._shared_financial_agent
     
     async def run_analysis(
         self,
@@ -276,7 +293,10 @@ class AnalysisService:
                 }
                 
                 try: # Inner try for strategy execution
-                    result_data = await strategy.execute(**strategy_input_args)
+                    result_data = await asyncio.wait_for(
+                        strategy.execute(**strategy_input_args),
+                        timeout=ANALYSIS_EXECUTION_TIMEOUT_SECONDS,
+                    )
 
                     # Derived Visuals Logic (PlanPlanPlan.md item 3)
                     # Ensure 'visualizations' key exists and is a dict
@@ -308,6 +328,17 @@ class AnalysisService:
                         except Exception:
                             pass
                     raise HTTPException(status_code=422, detail=error_detail)
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "Analysis strategy %s timed out after %.1fs for analysis %s",
+                        strategy_cls.__name__,
+                        ANALYSIS_EXECUTION_TIMEOUT_SECONDS,
+                        analysis_id,
+                    )
+                    raise HTTPException(
+                        status_code=504,
+                        detail="Analysis timed out. Try narrowing scope or running a lighter analysis type.",
+                    )
                 except Exception as e: # Added general exception for strategy execution
                     logger.error(f"Error executing strategy {strategy_cls.__name__} for analysis {analysis_id}: {e}", exc_info=True)
                     raise HTTPException(status_code=500, detail=f"An unexpected error occurred while running the \'{analysis_type}\' strategy: {str(e)}")

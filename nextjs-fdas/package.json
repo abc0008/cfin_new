@@ -31,7 +31,7 @@
     "langsmith": "^0.1.25",
     "lucide-react": "^0.359.0",
     "mdast-util-to-markdown": "^2.1.2",
-    "motion": "^12.16.0",
+    "motion": "^12.34.0",
     "next": "14.2.4",
     "react": "^18",
     "react-dom": "^18",

@@ -61,7 +61,6 @@ from utils.hashlib_utils import sha256_str
 from utils.token_utils import count_tokens
 
 from models.document import ProcessedDocument, Citation as DocumentCitation, DocumentContentType, DocumentMetadata, ProcessingStatus
-from pdf_processing.langchain_service import LangChainService
 from models.tools import ALL_TOOLS_DICT, CLAUDE_API_TOOLS_LIST # Ensure this import is present
 
 import os
@@ -89,12 +88,18 @@ from utils.hashlib_utils import sha256_str
 from utils.token_utils import count_tokens
 
 from models.document import ProcessedDocument, Citation as DocumentCitation, DocumentContentType, DocumentMetadata, ProcessingStatus
-from pdf_processing.langchain_service import LangChainService
 from models.tools import ALL_TOOLS_DICT, CLAUDE_API_TOOLS_LIST # Ensure this import is present
 from utils.citation_processor import process_citations_list
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
+CLAUDE_REQUEST_TIMEOUT_SECONDS = float(os.getenv("CFIN_CLAUDE_REQUEST_TIMEOUT_SECONDS", "70"))
+CLAUDE_CONNECT_TIMEOUT_SECONDS = float(os.getenv("CFIN_CLAUDE_CONNECT_TIMEOUT_SECONDS", "5"))
+CLAUDE_MAX_RETRIES = int(os.getenv("CFIN_CLAUDE_MAX_RETRIES", "2"))
+SDK_TOKEN_COUNT_ENABLED = os.getenv("CFIN_ENABLE_SDK_TOKEN_COUNT", "0") == "1"
+SDK_TOKEN_COUNT_TIMEOUT_SECONDS = float(os.getenv("CFIN_TOKEN_COUNT_TIMEOUT_SECONDS", "2.5"))
+LAZY_LANGGRAPH_INIT = os.getenv("CFIN_LAZY_LANGGRAPH_INIT", "1") != "0"
 
 # Create a ToolSchema type reference for type checking
 if TYPE_CHECKING:
@@ -173,6 +178,10 @@ class ClaudeService:
         
         # Store the new ALL_TOOLS_DICT (Dict[str, ToolSchema]) for processor lookup
         self.tool_schemas_map = ALL_TOOLS_DICT # This maps name to ToolSchema instance
+        self._enable_sdk_token_count = SDK_TOKEN_COUNT_ENABLED
+        self._token_count_timeout_seconds = SDK_TOKEN_COUNT_TIMEOUT_SECONDS
+        self._langgraph_service = None
+        self._langgraph_initialized = False
 
         try:
             # Using Claude 3.7 Sonnet for token-efficient tool use and enhanced PDF support
@@ -181,36 +190,56 @@ class ClaudeService:
             self.temperature = 0.0  # Default temperature for deterministic outputs
             self.client = AsyncAnthropic(
                 api_key=self.api_key,
-                timeout=httpx.Timeout(90.0, connect=5.0), # Set overall timeout to 90s
-                max_retries=5 # Set max retries to 5
+                timeout=httpx.Timeout(CLAUDE_REQUEST_TIMEOUT_SECONDS, connect=CLAUDE_CONNECT_TIMEOUT_SECONDS),
+                max_retries=CLAUDE_MAX_RETRIES,
             )
             
             # Token efficiency headers for Claude API optimization
             self._extra_headers = {"anthropic-beta": ANTHROPIC_BETA}
             self._tools_for_api = CLAUDE_API_TOOLS_LIST  # existing list
             
-            logger.info(f"ClaudeService initialized with model: {self.model}, PDF support, timeout=90s, max_retries=5, headers: {self._extra_headers}")
+            logger.info(
+                "ClaudeService initialized with model=%s timeout=%.1fs connect_timeout=%.1fs max_retries=%d sdk_token_count=%s headers=%s",
+                self.model,
+                CLAUDE_REQUEST_TIMEOUT_SECONDS,
+                CLAUDE_CONNECT_TIMEOUT_SECONDS,
+                CLAUDE_MAX_RETRIES,
+                self._enable_sdk_token_count,
+                self._extra_headers,
+            )
         except Exception as e:
             logger.error(f"Failed to initialize AsyncAnthropic client: {str(e)}")
             self.client = None
         
-        # Initialize LangChain service
-        self.langchain_service = LangChainService()
-        
-        # Initialize LangGraph service if available
-        if LANGGRAPH_AVAILABLE:
-            try:
-                self.langgraph_service = LangGraphService()
-                logger.info("LangGraph service successfully initialized")
-            except ValueError as e:
-                logger.error(f"LangGraph service configuration error: {str(e)}")
-                self.langgraph_service = None
-            except Exception as e:
-                logger.error(f"Failed to initialize LangGraph service: {str(e)}")
-                self.langgraph_service = None
-        else:
+        # Defer heavy optional service initialization until actually needed.
+        self.langchain_service = None
+        if not LAZY_LANGGRAPH_INIT:
+            self._get_langgraph_service()
+
+    def _get_langgraph_service(self):
+        """Lazily initialize LangGraph to reduce cold-start overhead."""
+        if self._langgraph_initialized:
+            return self._langgraph_service
+
+        self._langgraph_initialized = True
+        if not LANGGRAPH_AVAILABLE:
             logger.warning("LangGraph service not available, skipping initialization")
-            self.langgraph_service = None
+            return None
+
+        try:
+            self._langgraph_service = LangGraphService()
+            logger.info("LangGraph service successfully initialized")
+        except ValueError as e:
+            logger.error(f"LangGraph service configuration error: {str(e)}")
+            self._langgraph_service = None
+        except Exception as e:
+            logger.error(f"Failed to initialize LangGraph service: {str(e)}")
+            self._langgraph_service = None
+        return self._langgraph_service
+
+    @property
+    def langgraph_service(self):
+        return self._get_langgraph_service()
 
     async def _claude_call(self, stream: bool = False, **kwargs):
         """
@@ -228,33 +257,48 @@ class ClaudeService:
         messages = kwargs.get("messages", [])
         tokens_in = count_tokens(messages) # Custom estimator
 
-        # --- BEGIN SDK TOKEN COUNTING (AWAITED AND ALIGNED V4) ---
-        sdk_actual_tokens = None # Initialize to ensure it's defined
-        try:
-            actual_messages_for_count = messages if isinstance(messages, list) else []
-            if not actual_messages_for_count and isinstance(messages, dict):
-                actual_messages_for_count = [messages]
+        # Optional SDK token counting (disabled by default for latency).
+        sdk_actual_tokens = None
+        if self._enable_sdk_token_count:
+            try:
+                actual_messages_for_count = messages if isinstance(messages, list) else []
+                if not actual_messages_for_count and isinstance(messages, dict):
+                    actual_messages_for_count = [messages]
 
-            # Sanitize messages so the count_tokens endpoint accepts them
-            sanitized_messages_for_count = self._sanitize_messages_for_token_count(actual_messages_for_count)
+                sanitized_messages_for_count = self._sanitize_messages_for_token_count(actual_messages_for_count)
+                params_for_count = {
+                    "model": kwargs.get("model", self.model),
+                    "messages": sanitized_messages_for_count,
+                }
 
-            params_for_count = {
-                "model": kwargs.get("model", self.model),
-                "messages": sanitized_messages_for_count  # use sanitized copy
-            }
+                if "tools" in kwargs and kwargs.get("tools"):
+                    params_for_count["tools"] = kwargs.get("tools")
+                if "system" in kwargs and kwargs.get("system"):
+                    params_for_count["system"] = kwargs.get("system")
 
-            if "tools" in kwargs and kwargs.get("tools"):
-                params_for_count["tools"] = kwargs.get("tools")
-            
-            if "system" in kwargs and kwargs.get("system"):
-                params_for_count["system"] = kwargs.get("system")
-            
-            sdk_token_count_result = await self.client.messages.count_tokens(**params_for_count)
-            sdk_actual_tokens = sdk_token_count_result.input_tokens
-            logger.info(f"Anthropic SDK estimated input tokens ({'streaming' if stream else 'non-streaming'}): {sdk_actual_tokens} (Custom estimate: {tokens_in})")
-        except Exception as e:
-            logger.error(f"Error during SDK token counting ({'streaming' if stream else 'non-streaming'}): {e}", exc_info=True)
-        # --- END SDK TOKEN COUNTING (AWAITED AND ALIGNED V4) ---
+                sdk_token_count_result = await asyncio.wait_for(
+                    self.client.messages.count_tokens(**params_for_count),
+                    timeout=self._token_count_timeout_seconds,
+                )
+                sdk_actual_tokens = sdk_token_count_result.input_tokens
+                logger.info(
+                    "Anthropic SDK estimated input tokens (%s): %s (custom estimate: %s)",
+                    "streaming" if stream else "non-streaming",
+                    sdk_actual_tokens,
+                    tokens_in,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "SDK token counting timed out after %.1fs; using custom estimator",
+                    self._token_count_timeout_seconds,
+                )
+            except Exception as e:
+                logger.error(
+                    "Error during SDK token counting (%s): %s",
+                    "streaming" if stream else "non-streaming",
+                    e,
+                    exc_info=True,
+                )
 
         # Apply rate limiting based on current token bucket state
         # Use SDK token count if available for more accurate throttling, otherwise fall back to custom estimate
@@ -1054,23 +1098,7 @@ class ClaudeService:
 
             # Use provided model or default to instance model
             used_model = model or self.model
-            
-            # --- BEGIN SDK TOKEN COUNTING (AWAITED AND ALIGNED V4) ---
-            try:
-                params_for_count_native = {
-                    "model": used_model,
-                    "messages": self._sanitize_messages_for_token_count(list(formatted_messages))
-                }
-
-                if system_prompt and isinstance(system_prompt, str):
-                    params_for_count_native["system"] = system_prompt
-                
-                sdk_token_count_result_native = await self.client.messages.count_tokens(**params_for_count_native)
-                sdk_actual_tokens_native = sdk_token_count_result_native.input_tokens
-                logger.info(f"Anthropic SDK estimated input tokens (generate_response {'streaming' if stream else 'non-streaming'}): {sdk_actual_tokens_native}")
-            except Exception as e:
-                logger.error(f"Error during SDK token counting (generate_response {'streaming' if stream else 'non-streaming'}): {e}", exc_info=True)
-            # --- END SDK TOKEN COUNTING (AWAITED AND ALIGNED V4) ---
+            # _claude_call already performs optional token counting; avoid duplicate work here.
             
             # Call Claude API
             response = await self._claude_call(
@@ -2098,42 +2126,49 @@ Follow these guidelines:
                         # Create a filtering callback for subsequent turns
                         async def filtered_emit_callback(event: Dict[str, Any]):
                             nonlocal streaming_citations, post_tool_buffer
-                            
+
                             # Capture citations from streaming events (for ALL turns, not just subsequent ones)
                             if event.get('type') == 'citations_delta' and event.get('citation'):
                                 citation = event.get('citation')
                                 streaming_citations.append(citation)
                                 logger.info(f"📚 Captured citation from streaming (turn {turn + 1}): pages {citation.get('start_page_number')}-{citation.get('end_page_number')}")
-                            
+
+                            # Block post-tool content_update events for ALL turns.
+                            # Claude's post-tool text is often confused ("I cannot see any
+                            # visualizations...") because it doesn't have access to rendered
+                            # artifacts. The tools message already carries analysis_blocks
+                            # with the actual chart/table/metric data. Capture the text in
+                            # post_tool_buffer for logging only.
+                            event_type = event.get('type')
+                            if event_type == 'content_update' and event.get('is_post_tools') and event.get('post_tool_text'):
+                                post_tool_text = event.get('post_tool_text', '')
+                                post_tool_buffer = (post_tool_buffer + "\n\n" + post_tool_text).strip() if post_tool_buffer else post_tool_text
+                                logger.info(
+                                    f"Turn {turn + 1}: Blocking post-tool content_update ({len(post_tool_text)} chars) – "
+                                    f"analysis_blocks provide visualization data instead"
+                                )
+                                return
+
                             # For turns after the first, we need to be more selective
                             if turn > 0:
-                                event_type = event.get('type')
-                                
                                 # Always allow tool-related events, citation events, and final events
                                 allowed_types = {
                                     'tool_start', 'tool_complete', 'chart_ready', 'table_ready',
                                     'metric_ready', 'message_stop', 'citation_marker', 'citations_delta'
                                 }
-                                
-                                # Allow post-tool content updates (these contain new insights)
-                                if event_type == 'content_update' and event.get('is_post_tools') and event.get('post_tool_text'):
-                                    logger.info(f"Turn {turn + 1}: Allowing post-tool content_update")
-                                    if emit_callback:
-                                        await emit_callback(event)
-                                    return
-                                
+
                                 # Allow specific event types
                                 if event_type in allowed_types:
                                     if emit_callback:
                                         await emit_callback(event)
                                     return
-                                
+
                                 # Block other events to prevent duplicates
                                 logger.info(
                                     f"Turn {turn + 1}: Blocking {event_type} event to prevent duplicate content"
                                 )
                                 return
-                            
+
                             # First turn - pass through all events
                             if emit_callback:
                                 await emit_callback(event)
@@ -2361,95 +2396,115 @@ Follow these guidelines:
             # Post-tool content is sent as a separate message via events
             # Including accumulated_text would cause duplication when conversation_service compares content
             
-            # --- NEW LOGIC: if no post-tool narrative was streamed, generate one now and emit it ---
-            if (accumulated_text.strip() == initial_text_only.strip()) and emit_callback:
+            # Auto-generated post-tool narrative with ACTUAL visualization data
+            has_any_artifacts = accumulated_charts or accumulated_tables or accumulated_metrics
+            if has_any_artifacts and (accumulated_text.strip() == initial_text_only.strip()) and emit_callback:
                 try:
                     import uuid
 
-                    # Build a lightweight prompt that gives Claude the titles of generated artefacts
-                    chart_titles = ", ".join([c.get("title", "Unnamed Chart") for c in accumulated_charts])
-                    table_titles = ", ".join([t.get("title", "Unnamed Table") for t in accumulated_tables])
-                    metric_names = ", ".join([m.get("name", "metric") for m in accumulated_metrics])
+                    # Build rich data descriptions instead of just titles
+                    artifact_sections = []
+
+                    # Charts — include data points
+                    for i, chart in enumerate(accumulated_charts, 1):
+                        title = chart.get("config", {}).get("title", f"Chart {i}")
+                        chart_type = chart.get("chartType", "unknown")
+                        data_points = chart.get("data", [])
+                        # Serialize up to 20 data points to keep prompt reasonable
+                        data_lines = []
+                        for dp in data_points[:20]:
+                            if isinstance(dp, dict):
+                                parts = [f"{k}: {v}" for k, v in dp.items()]
+                                data_lines.append(", ".join(parts))
+                        data_str = "\n    ".join(data_lines) if data_lines else "No data"
+                        if len(data_points) > 20:
+                            data_str += f"\n    ... and {len(data_points) - 20} more rows"
+                        artifact_sections.append(
+                            f"Chart {i}: \"{title}\" (type: {chart_type})\n"
+                            f"  Data:\n    {data_str}"
+                        )
+
+                    # Tables — include rows
+                    for i, table in enumerate(accumulated_tables, 1):
+                        title = table.get("config", {}).get("title", f"Table {i}")
+                        table_type = table.get("tableType", "unknown")
+                        rows = table.get("data", [])
+                        row_lines = []
+                        for row in rows[:15]:
+                            if isinstance(row, dict):
+                                parts = [f"{k}: {v}" for k, v in row.items()]
+                                row_lines.append(", ".join(parts))
+                        rows_str = "\n    ".join(row_lines) if row_lines else "No data"
+                        if len(rows) > 15:
+                            rows_str += f"\n    ... and {len(rows) - 15} more rows"
+                        artifact_sections.append(
+                            f"Table {i}: \"{title}\" (type: {table_type})\n"
+                            f"  Rows:\n    {rows_str}"
+                        )
+
+                    # Metrics — include actual values
+                    for i, metric in enumerate(accumulated_metrics, 1):
+                        name = metric.get("name", f"Metric {i}")
+                        value = metric.get("value", "N/A")
+                        unit = metric.get("unit", "")
+                        period = metric.get("period", "")
+                        category = metric.get("category", "")
+                        estimated = " (estimated)" if metric.get("isEstimated") else ""
+                        artifact_sections.append(
+                            f"Metric {i}: {name} = {unit}{value}{estimated}"
+                            f"{f' | Period: {period}' if period else ''}"
+                            f"{f' | Category: {category}' if category else ''}"
+                        )
+
+                    artifacts_text = "\n\n".join(artifact_sections)
 
                     summary_prompt = (
-                        "You have just produced the following visualisations for a financial-document analysis session. "
-                        "Write a concise (1-2 paragraph) narrative that explains the key takeaways from these artefacts.\n\n"
-                        f"Charts: {chart_titles or 'None'}\n"
-                        f"Tables: {table_titles or 'None'}\n"
-                        f"Metrics: {metric_names or 'None'}"
+                        "You have just produced the following visualisations and data for a financial-document analysis session. "
+                        "The actual data extracted from the documents is shown below. "
+                        "Write a concise (1-2 paragraph) narrative that explains the key takeaways, trends, and notable figures from these artefacts. "
+                        "Reference specific numbers and values from the data.\n\n"
+                        f"{artifacts_text}"
                     )
 
+                    logger.info(f"📝 Generating auto-summary with {len(accumulated_charts)} charts, "
+                                f"{len(accumulated_tables)} tables, {len(accumulated_metrics)} metrics (prompt: {len(summary_prompt)} chars)")
+
                     summary_text_raw = await self.generate_response(
-                        system_prompt=("You are a financial analyst generating a wrap-up narrative. "
-                                       "Summaries MUST be clear, precise, and reference the visuals that were just created."),
+                        system_prompt=(
+                            "You are a financial analyst generating a wrap-up narrative for visualizations just created. "
+                            "You HAVE the actual data — it is provided below. Do NOT say you cannot see the data. "
+                            "Write a clear, precise summary that references specific numbers and trends from the data provided. "
+                            "Do NOT apologize or say you lack information. The data is right here."
+                        ),
                         messages=[{"role": "user", "content": summary_prompt}],
-                        model=settings.MODEL_HAIKU,  # fast & cheap
+                        model=settings.MODEL_HAIKU,
                         max_tokens=600,
                         temperature=0.4
                     )
 
                     concluding_text = str(summary_text_raw).strip()
-                    if concluding_text:
-                        # Log the full narrative (may be long; truncate after 800 chars for readability)
-                        preview_len = 800
-                        logger.info("Post-tool narrative preview: %s%s", concluding_text[:preview_len], "…" if len(concluding_text) > preview_len else "")
-                        new_msg_id = str(uuid.uuid4())
-                        logger.info(f"✅ Generated post-tool summary ({len(concluding_text)} chars); emitting as new message {new_msg_id}")
+                    logger.info(f"📝 Auto-summary generated ({len(concluding_text)} chars): {concluding_text[:150]}...")
 
-                        await emit_callback({
-                            "type": "new_message_start",
-                            "role": "assistant",
-                            "is_post_tools": True,
-                            "is_post_visualization": True,
-                            "message_id": new_msg_id
-                        })
-                        await emit_callback({
-                            "type": "text_delta",
-                            "text": concluding_text,
-                            "is_post_tools": True,
-                            "is_post_visualization": True,
-                            "message_id": new_msg_id
-                        })
-                        await emit_callback({
-                            "type": "message_complete",
-                            "is_post_visualization": True,
-                            "message_id": new_msg_id
-                        })
+                    if concluding_text:
+                        new_msg_id = str(uuid.uuid4())
+                        await emit_callback({"type": "new_message_start", "role": "assistant", "is_post_tools": True, "is_post_visualization": True, "message_id": new_msg_id})
+                        await emit_callback({"type": "text_delta", "text": concluding_text, "is_post_tools": True, "is_post_visualization": True, "message_id": new_msg_id})
+                        await emit_callback({"type": "message_complete", "is_post_tools": True, "is_post_visualization": True, "message_id": new_msg_id})
+
                 except Exception as summary_err:
                     logger.error(f"Failed to auto-generate post-tool summary: {summary_err}", exc_info=True)
             
-            # Emit buffered post-tool narrative if any (and if not already emitted via content_update)
-            if post_tool_buffer.strip() and emit_callback:
-                try:
-                    import uuid
-                    new_msg_id = str(uuid.uuid4())
-                    logger.info(
-                        f"✅ Emitting captured post-tool narrative ({len(post_tool_buffer.strip())} chars) as NEW message {new_msg_id}"
-                    )
-                    # Start new message
-                    await emit_callback({
-                        "type": "new_message_start",
-                        "role": "assistant",
-                        "is_post_tools": True,
-                        "is_post_visualization": True,
-                        "message_id": new_msg_id
-                    })
-                    # Stream the entire text as one delta
-                    await emit_callback({
-                        "type": "text_delta",
-                        "is_post_tools": True,
-                        "is_post_visualization": True,
-                        "text": post_tool_buffer.strip(),
-                        "message_id": new_msg_id
-                    })
-                    # Complete the message
-                    await emit_callback({
-                        "type": "message_complete",
-                        "is_post_visualization": True,
-                        "message_id": new_msg_id
-                    })
-                except Exception as err:
-                    logger.error(f"Failed to emit post-tool narrative: {err}")
+            # Skip emitting post-tool buffer as a separate message.
+            # Claude's post-tool response in the multi-turn loop often produces confused text
+            # ("I cannot see any visualizations...") because it doesn't have access to rendered
+            # artifacts. The tools message already carries analysis_blocks with the actual
+            # chart/table/metric data, and the auto-generated narrative above provides a proper
+            # summary when needed. Logging for debugging only.
+            if post_tool_buffer.strip():
+                logger.info(
+                    f"ℹ️ Skipping post-tool buffer emission ({len(post_tool_buffer.strip())} chars) – "
+                    f"analysis_blocks on tools message provide visualization data instead"
+                )
 
             final_text = initial_text_only if initial_text_only else accumulated_text
             
@@ -2507,9 +2562,10 @@ Follow these guidelines:
         """
         try:
             logger.info(f"Generating LangGraph response for question: '{question[:100]}...'")
+            langgraph_service = self.langgraph_service
             
             # Check if LangGraph service is available
-            if not self.langgraph_service:
+            if not langgraph_service:
                 logger.warning("LangGraph service not available, falling back to basic response")
                 # Fall back to basic Claude response
                 system_prompt = """You are a financial document analysis assistant. 
@@ -2537,7 +2593,7 @@ Follow these guidelines:
             
             # Use LangGraph service for document Q&A
             logger.info("Using LangGraph service for document Q&A")
-            result = await self.langgraph_service.simple_document_qa(
+            result = await langgraph_service.simple_document_qa(
                 question=question,
                 documents=document_texts,
                 conversation_history=conversation_history

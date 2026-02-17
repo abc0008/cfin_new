@@ -1,4 +1,10 @@
 /** @type {import('next').NextConfig} */
+const rawBackendApiUrl =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.API_BASE_URL ||
+  "https://cfin-api.aceanalytics.dev";
+const backendApiBaseUrl = rawBackendApiUrl.replace(/\/+$/, "").replace(/\/api$/, "");
+
 const nextConfig = {
   images: {
     remotePatterns: [
@@ -69,7 +75,7 @@ const nextConfig = {
     return [
       {
         source: "/api/citations/:path*",
-        destination: "http://localhost:8000/api/citations/:path*",
+        destination: `${backendApiBaseUrl}/api/citations/:path*`,
       },
     ];
   },

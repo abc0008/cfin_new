@@ -612,10 +612,11 @@ export default function Workspace() {
         };
       }
       
-      // For regular streaming messages, only update if content changed or citations added
-      if (!existingMessage || 
+      // For regular streaming messages, only update if content changed, citations added, or analysis_blocks added
+      if (!existingMessage ||
           existingMessage.content !== message.content ||
-          (message.citations && message.citations.length > 0 && !existingMessage.citations?.length)) {
+          (message.citations && message.citations.length > 0 && !existingMessage.citations?.length) ||
+          (message.analysis_blocks && message.analysis_blocks.length > 0 && !(existingMessage as any).analysis_blocks?.length)) {
         console.log('[handleMessageUpdate] Updating message:', {
           messageId: message.id,
           hadCitations: !!existingMessage?.citations?.length,

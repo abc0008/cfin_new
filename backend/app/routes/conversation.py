@@ -205,6 +205,12 @@ async def send_message(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+    except asyncio.TimeoutError:
+        logger.warning("Message processing timed out for session %s", session_id)
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Message processing timed out. Please retry with a simpler request."
+        )
     except Exception as e:
         logger.exception(f"Error processing message: {str(e)}")
         raise HTTPException(
@@ -909,6 +915,14 @@ async def send_message_streaming(
                 "type": "error",
                 "error": "validation_error",
                 "message": str(e)
+            }
+            yield f"data: {json.dumps(error_event)}\n\n"
+        except asyncio.TimeoutError:
+            logger.warning("Streaming message processing timed out for session %s", session_id)
+            error_event = {
+                "type": "error",
+                "error": "timeout_error",
+                "message": "Streaming request timed out. Please retry with a narrower question."
             }
             yield f"data: {json.dumps(error_event)}\n\n"
             

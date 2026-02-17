@@ -59,8 +59,9 @@ import json
 import logging
 import asyncio
 import re
+from threading import Lock
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Tuple, Union, cast
+from typing import Awaitable, List, Dict, Any, Optional, Tuple, Union, cast
 
 from repositories.conversation_repository import ConversationRepository
 from repositories.document_repository import DocumentRepository
@@ -69,6 +70,11 @@ from pdf_processing.api_service import ClaudeService
 from models.database_models import Message, Conversation, Citation
 
 logger = logging.getLogger(__name__)
+
+LLM_RESPONSE_TIMEOUT_SECONDS = float(os.getenv("CFIN_LLM_RESPONSE_TIMEOUT_SECONDS", "70"))
+VISUALIZATION_RESPONSE_TIMEOUT_SECONDS = float(os.getenv("CFIN_VISUALIZATION_TIMEOUT_SECONDS", "110"))
+LANGGRAPH_RESPONSE_TIMEOUT_SECONDS = float(os.getenv("CFIN_LANGGRAPH_TIMEOUT_SECONDS", "90"))
+STREAMING_RESPONSE_TIMEOUT_SECONDS = float(os.getenv("CFIN_STREAMING_TIMEOUT_SECONDS", "180"))
 
 
 def _assess_content_quality(content: str) -> float:
@@ -177,6 +183,8 @@ def _to_str(value: Any) -> str:
 
 class ConversationService:
     """Service for managing conversations and messages."""
+    _shared_claude_service: Optional[ClaudeService] = None
+    _shared_claude_lock: Lock = Lock()
     
     def __init__(
         self, 
@@ -209,7 +217,12 @@ class ConversationService:
                 masked_key = "***masked***"
             logger.info(f"Found ANTHROPIC_API_KEY in environment variables: {masked_key}")
         
-        self.claude_service = ClaudeService(api_key=api_key)
+        if self.__class__._shared_claude_service is None:
+            with self._shared_claude_lock:
+                if self.__class__._shared_claude_service is None:
+                    logger.info("Initializing shared ClaudeService instance for ConversationService")
+                    self.__class__._shared_claude_service = ClaudeService(api_key=api_key)
+        self.claude_service = self.__class__._shared_claude_service
         self.citation_repository: Optional[Any] = None  # may be injected later
     
     async def create_conversation(
@@ -469,7 +482,10 @@ class ConversationService:
                     "document_type": doc_type,
                     "mime_type": doc.get("mime_type", "application/pdf") if isinstance(doc, dict) else getattr(doc, "mime_type", "application/pdf"),
                     "upload_timestamp": doc.get("upload_timestamp", "") if isinstance(doc, dict) else getattr(doc, "upload_timestamp", ""),
+                    "claude_file_id": doc.get("claude_file_id") if isinstance(doc, dict) else getattr(doc, "claude_file_id", None),
                 }
+                if not formatted_doc["claude_file_id"]:
+                    formatted_doc.pop("claude_file_id")
                 
                 # Add content data if available
                 if content_data is not None:
@@ -501,6 +517,90 @@ class ConversationService:
         }
         
         return context
+
+    async def _await_with_timeout(
+        self,
+        operation_name: str,
+        operation: Awaitable[Any],
+        timeout_seconds: float,
+    ) -> Any:
+        """Await an operation with a strict timeout and consistent logging."""
+        try:
+            return await asyncio.wait_for(operation, timeout=timeout_seconds)
+        except asyncio.TimeoutError:
+            logger.warning("%s timed out after %.1fs", operation_name, timeout_seconds)
+            raise
+
+    def _build_document_texts_from_context_documents(
+        self,
+        context_documents: List[Dict[str, Any]],
+        conversation_id: str,
+    ) -> List[Dict[str, Any]]:
+        """
+        Build document payloads for Claude using pre-fetched conversation context docs.
+
+        This avoids repeated repository reads in both non-streaming and streaming paths.
+        """
+        document_texts: List[Dict[str, Any]] = []
+        for doc_info in context_documents:
+            try:
+                doc_id = doc_info.get("id")
+                doc_title = doc_info.get("filename") or doc_info.get("title") or "Document"
+                mime_type = str(doc_info.get("mime_type") or "").lower()
+                extracted_data = doc_info.get("extracted_data")
+
+                doc_payload: Dict[str, Any] = {
+                    "id": doc_id,
+                    "title": doc_title,
+                    "type": "document",
+                }
+
+                claude_file_id = doc_info.get("claude_file_id")
+                if not claude_file_id and isinstance(extracted_data, dict):
+                    claude_file_id = extracted_data.get("claude_file_id") or extracted_data.get("file_id")
+
+                if claude_file_id:
+                    doc_payload["claude_file_id"] = claude_file_id
+                    doc_payload["filename"] = doc_title
+                    document_texts.append(doc_payload)
+                    logger.info(
+                        "Added document %s with Files API file_id for conversation %s",
+                        doc_id,
+                        conversation_id,
+                    )
+                    continue
+
+                raw_text = doc_info.get("raw_text")
+                if raw_text and "pdf" not in mime_type:
+                    doc_payload["raw_text"] = raw_text
+                    document_texts.append(doc_payload)
+                    logger.info(
+                        "Added non-PDF document %s with raw_text (%d chars)",
+                        doc_id,
+                        len(raw_text),
+                    )
+                    continue
+
+                content_data = doc_info.get("content")
+                if isinstance(content_data, bytes) and "pdf" not in mime_type:
+                    doc_payload["content"] = content_data
+                    document_texts.append(doc_payload)
+                    logger.info("Added non-PDF document %s with binary content", doc_id)
+                    continue
+
+                if "pdf" in mime_type:
+                    logger.warning(
+                        "PDF document %s missing claude_file_id - cannot use native PDF support",
+                        doc_id,
+                    )
+                else:
+                    logger.warning("No usable content available for document %s", doc_id)
+            except Exception as exc:
+                logger.error("Error preparing context document for Claude: %s", exc)
+                logger.exception(exc)
+                continue
+
+        return document_texts
     
     async def process_user_message(
         self,
@@ -542,63 +642,11 @@ class ConversationService:
         # Get conversation context
         context = await self.get_conversation_context(conversation_id)
         
-        # Extract document texts for system prompt
-        document_texts = []
-        if context.get("documents"):
-            # Process each document
-            for doc_info in context["documents"]:
-                try:
-                    # Get document content for citation processing
-                    content_obj = await self.document_repository.get_document_content(doc_info["id"])
-                    content_data = None
-                    raw_text = None
-                    extracted_data = None
-                    
-                    # Extract content and raw text from the dictionary returned by repository
-                    if content_obj and isinstance(content_obj, dict):
-                        content_data = content_obj.get("content")
-                        raw_text = content_obj.get("raw_text")
-                        extracted_data = content_obj.get("extracted_data")
-                        
-                        # Get the document model to check for claude_file_id
-                        document = await self.document_repository.get_document(doc_info["id"])
-                        
-                        # Create proper document dictionary
-                        doc_dict = {
-                            "id": doc_info["id"],
-                            "title": doc_info.get("filename", "Document"),
-                            "type": "document"
-                        }
-                        
-                        # Priority 1: Use claude_file_id for native PDF support (recommended approach)
-                        if document and document.claude_file_id:
-                            doc_dict["claude_file_id"] = document.claude_file_id
-                            doc_dict["filename"] = document.filename
-                            document_texts.append(doc_dict)
-                            logger.info(f"Added document {doc_info['id']} with Files API file_id: {document.claude_file_id}")
-                        
-                        # Priority 2: Fallback to raw_text for non-PDF documents only
-                        elif raw_text and not (document and document.mime_type == "application/pdf"):
-                            doc_dict["raw_text"] = raw_text
-                            document_texts.append(doc_dict)
-                            logger.info(f"Added non-PDF document {doc_info['id']} with raw_text ({len(raw_text)} chars)")
-                        
-                        # Priority 3: Binary content for non-PDF documents
-                        elif content_data and isinstance(content_data, bytes) and not (document and document.mime_type == "application/pdf"):
-                            doc_dict["content"] = content_data
-                            document_texts.append(doc_dict)
-                            logger.info(f"Added non-PDF document {doc_info['id']} with binary content")
-                        
-                        # For PDFs without file_id, log a warning (should not happen in new uploads)
-                        elif document and document.mime_type == "application/pdf":
-                            logger.warning(f"PDF document {doc_info['id']} missing claude_file_id - cannot process with native PDF support")
-                        
-                        else:
-                            logger.warning(f"No usable content available for document {doc_info['id']}")
-                except Exception as e:
-                    logger.error(f"Error processing document content for LLM: {str(e)}")
-                    logger.exception(e)
-                    continue
+        # Reuse pre-fetched context docs to avoid duplicate repository lookups.
+        document_texts = self._build_document_texts_from_context_documents(
+            context_documents=context.get("documents", []),
+            conversation_id=conversation_id,
+        )
         
         # Get conversation messages
         messages = await self.conversation_repository.get_conversation_messages(
@@ -630,11 +678,15 @@ class ConversationService:
             if hasattr(self.claude_service, "langgraph_service") and self.claude_service.langgraph_service:
                 try:
                     logger.info(f"Using LangGraph for simple QA in conversation {conversation_id}")
-                    response = await self._process_with_langgraph(
-                        conversation_id=conversation_id,
-                        content=content,
-                        document_texts=document_texts,
-                        messages=message_history
+                    response = await self._await_with_timeout(
+                        "langgraph simple QA",
+                        self._process_with_langgraph(
+                            conversation_id=conversation_id,
+                            content=content,
+                            document_texts=document_texts,
+                            messages=message_history,
+                        ),
+                        timeout_seconds=LANGGRAPH_RESPONSE_TIMEOUT_SECONDS,
                     )
                     return response
                 except Exception as e:
@@ -646,9 +698,13 @@ class ConversationService:
             system_prompt = self._build_system_prompt(document_texts, [])
             
             # Generate response
-            response_content = await self.claude_service.generate_response(
-                system_prompt=system_prompt,
-                messages=message_history + [{"role": "user", "content": content}]
+            response_content = await self._await_with_timeout(
+                "claude simple response",
+                self.claude_service.generate_response(
+                    system_prompt=system_prompt,
+                    messages=message_history + [{"role": "user", "content": content}],
+                ),
+                timeout_seconds=LLM_RESPONSE_TIMEOUT_SECONDS,
             )
             
             # Add assistant message to conversation
@@ -699,10 +755,14 @@ class ConversationService:
             logger.info(f"Calling Claude with visualization tools for query: '{content[:50]}...', file_id={file_id}")
             
             # Call Claude with visualization tools (preferring file_id if available)
-            result = await self.claude_service.analyze_with_visualization_tools(
-                document_text=combined_doc_text,
-                user_query=content,
-                file_id=file_id
+            result = await self._await_with_timeout(
+                "claude visualization analysis",
+                self.claude_service.analyze_with_visualization_tools(
+                    document_text=combined_doc_text,
+                    user_query=content,
+                    file_id=file_id,
+                ),
+                timeout_seconds=VISUALIZATION_RESPONSE_TIMEOUT_SECONDS,
             )
             
             # Extract analysis text and visualization data
@@ -784,21 +844,29 @@ class ConversationService:
         elif approach == "citations":
             # Use citation-aware processing with LangGraph
             logger.info(f"Using citation-based approach for conversation {conversation_id}")
-            return await self._process_with_langgraph(
-                conversation_id=conversation_id,
-                content=content,
-                document_texts=document_texts,
-                messages=message_history
+            return await self._await_with_timeout(
+                "langgraph citation response",
+                self._process_with_langgraph(
+                    conversation_id=conversation_id,
+                    content=content,
+                    document_texts=document_texts,
+                    messages=message_history,
+                ),
+                timeout_seconds=LANGGRAPH_RESPONSE_TIMEOUT_SECONDS,
             )
         
         elif approach == "full_graph":
             # Implement full conversation graph approach here (future)
             logger.info(f"Full graph approach not yet implemented, falling back to citation approach for conversation {conversation_id}")
-            return await self._process_with_langgraph(
-                conversation_id=conversation_id,
-                content=content,
-                document_texts=document_texts,
-                messages=message_history
+            return await self._await_with_timeout(
+                "langgraph full-graph fallback",
+                self._process_with_langgraph(
+                    conversation_id=conversation_id,
+                    content=content,
+                    document_texts=document_texts,
+                    messages=message_history,
+                ),
+                timeout_seconds=LANGGRAPH_RESPONSE_TIMEOUT_SECONDS,
             )
         
         else:
@@ -807,9 +875,13 @@ class ConversationService:
             system_prompt = self._build_system_prompt(document_texts, [])
             
             # Generate response
-            response_content = await self.claude_service.generate_response(
-                system_prompt=system_prompt,
-                messages=message_history + [{"role": "user", "content": content}]
+            response_content = await self._await_with_timeout(
+                "claude fallback response",
+                self.claude_service.generate_response(
+                    system_prompt=system_prompt,
+                    messages=message_history + [{"role": "user", "content": content}],
+                ),
+                timeout_seconds=LLM_RESPONSE_TIMEOUT_SECONDS,
             )
             
             # Add assistant message to conversation
@@ -899,13 +971,12 @@ class ConversationService:
         highest_citation_marker = 0
         # Track received citation markers
         received_citation_markers = set()
-        # Track last citation time to detect when citations are done
-        last_citation_time = None
-        # Citation completion timer
-        citation_completion_timer = None
-        
+        # Debounced citation completion task — allows multiple citation markers
+        # to arrive before emitting message_complete
+        citation_completion_task = None
+
         async def enhanced_emit_callback(event: Dict[str, Any]):
-            nonlocal has_good_content, last_good_content, tool_start_processed_in_current_stream, initial_message_completed, waiting_for_citations, pending_citation_markers, highest_citation_marker, received_citation_markers
+            nonlocal has_good_content, last_good_content, tool_start_processed_in_current_stream, initial_message_completed, waiting_for_citations, pending_citation_markers, highest_citation_marker, received_citation_markers, citation_completion_task
             
             event_type = event.get("type")
 
@@ -919,8 +990,13 @@ class ConversationService:
                 tool_start_processed_in_current_stream = True  # Mark that tool_start was seen
                 if assistant_message_placeholder.content and len(assistant_message_placeholder.content) > 100:
                     has_good_content = True
-                    last_good_content = assistant_message_placeholder.content
-                    logger.info(f"🔒 Freezing content at tool_start: {len(last_good_content)} chars")
+                    db_content = assistant_message_placeholder.content
+                    # Don't overwrite last_good_content if it's already richer (has citation markers)
+                    if last_good_content and len(last_good_content) > len(db_content):
+                        logger.info(f"🔒 Keeping enriched last_good_content ({len(last_good_content)} chars) over DB version ({len(db_content)} chars)")
+                    else:
+                        last_good_content = db_content
+                        logger.info(f"🔒 Freezing content at tool_start: {len(last_good_content)} chars")
                 
                 # Check if we have pending citations before completing the initial message
                 import re
@@ -957,47 +1033,18 @@ class ConversationService:
                     highest_citation_marker = max(highest_citation_marker, citation_index)
                     logger.info(f"📍 Received citation marker {citation_index}. Total received: {len(received_citation_markers)}/{highest_citation_marker}")
             
-            # NEW: Handle post-tool content_update events properly
+            # DISABLED: Post-tool content_update events are now blocked by filtered_emit_callback
+            # in api_service.py. If one somehow leaks through, just log and return — do NOT
+            # create a database message. Claude's post-tool text is often confused ("I cannot
+            # see any visualizations...") and the auto-generated summary in api_service.py
+            # provides a proper post-tool narrative when needed.
             if event_type == "content_update" and event.get("is_post_tools") and event.get("post_tool_text", "").strip():
-                # This is legitimate post-visualization content from api_service
                 post_tool_text = event.get("post_tool_text", "")
-                logger.info(f"✅ Received post-tool content: '{post_tool_text[:100]}...' ({len(post_tool_text)} chars)")
-                
-                # Create a NEW message for post-visualization content instead of appending
-                if post_tool_text.strip():
-                    # Create a new assistant message for post-visualization content
-                    post_viz_message = await self.conversation_repository.add_message(
-                        conversation_id=conversation_id,
-                        role="assistant",
-                        content=post_tool_text,
-                        referenced_documents=[],
-                        referenced_analyses=[]
-                    )
-                    logger.info(f"✅ Created new message for post-tool content: {post_viz_message.id}")
-                    
-                    # Emit a new_message_start event for the frontend to create a separate message
-                    if emit_callback:
-                        await emit_callback({
-                            "type": "new_message_start",
-                            "message_id": str(post_viz_message.id),
-                            "role": "assistant",
-                            "is_post_visualization": True
-                        })
-                        
-                        # Then emit the content
-                        await emit_callback({
-                            "type": "text_delta",
-                            "text": post_tool_text,
-                            "message_id": str(post_viz_message.id)
-                        })
-                        
-                        # Finally, mark it as complete
-                        await emit_callback({
-                            "type": "message_complete",
-                            "message_id": str(post_viz_message.id),
-                            "is_post_visualization": True
-                        })
-                
+                logger.warning(
+                    f"⚠️ Post-tool content_update leaked through filtered_emit_callback "
+                    f"({len(post_tool_text)} chars) — blocking database creation to prevent "
+                    f"duplicate message. Preview: '{post_tool_text[:120]}...'"
+                )
                 return
             
             # Block regular text_delta after tool_start, but not post-tool content or citations
@@ -1036,36 +1083,23 @@ class ConversationService:
                         # assume we have all citations
                         citations_in_current_batch = len(citation_numbers)
                         
-                        # Complete when we have all expected citations
-                        # For 3+ citations, wait until we have them all
-                        # For 1-2 citations, wait for a batch or a slight delay
-                        should_complete = False
-                        
-                        if all_citations_received:
-                            if highest_citation_marker >= 3:
-                                # For 3+ citations, complete as soon as we have them all
-                                should_complete = True
-                                logger.info(f"✅ All {highest_citation_marker} citations received, completing message")
-                            elif highest_citation_marker == 2 and len(received_citation_markers) == 2:
-                                # For exactly 2 citations, complete when we have both
-                                should_complete = True
-                                logger.info(f"✅ Both citations received, completing message")
-                            elif highest_citation_marker == 1 and citations_in_current_batch >= 1:
-                                # For single citation, complete when we receive it
-                                should_complete = True
-                                logger.info(f"✅ Single citation received, completing message")
-                        elif citations_in_current_batch >= 2:
-                            # If we get multiple citations in a batch, that's often a sign we have them all
-                            should_complete = True
-                            logger.info(f"✅ Received batch of {citations_in_current_batch} citations, completing message")
-                        
-                        if should_complete:
-                            # Update the database with the citation markers
+                        # Debounce citation completion — don't fire message_complete
+                        # immediately because more citation markers may still arrive.
+                        # Each new citation marker resets the 500ms timer.
+                        async def _deferred_citation_complete():
+                            """Wait 500ms then emit message_complete with all accumulated citations."""
+                            nonlocal initial_message_completed, waiting_for_citations
+                            await asyncio.sleep(0.5)
+                            if initial_message_completed:
+                                return  # Already completed via another path
+
+                            # Update DB with full content including all citation markers
                             assistant_message_placeholder.content = last_good_content
                             await self.conversation_repository.update_message(assistant_message_placeholder)
-                            
-                            # Now send the deferred message_complete
+                            logger.info(f"✅ Debounced DB update with {len(last_good_content)} chars (citations: {sorted(received_citation_markers)})")
+
                             initial_message_completed = True
+                            waiting_for_citations = False
                             completion_msg_id = message_id if message_id else (
                                 str(assistant_message_placeholder.id) if assistant_message_placeholder else "unknown"
                             )
@@ -1078,12 +1112,30 @@ class ConversationService:
                                     "is_post_visualization": False
                                 })
                                 logger.info(
-                                    f"✅ Emitted deferred message_complete after receiving {highest_citation_marker} citations (batch size: {citations_in_current_batch}) (message_id={completion_msg_id})"
+                                    f"✅ Debounced message_complete emitted with {highest_citation_marker} citation markers (message_id={completion_msg_id})"
                                 )
-                            waiting_for_citations = False
+
+                        # Cancel any pending debounce task and start a new one
+                        if citation_completion_task and not citation_completion_task.done():
+                            citation_completion_task.cancel()
+                            logger.info(f"🔄 Reset citation debounce timer — now have {len(received_citation_markers)} markers: {sorted(received_citation_markers)}")
                         else:
-                            logger.info(f"⏳ Still waiting for more citations. Have {len(received_citation_markers)} citations, highest: {highest_citation_marker}, batch size: {citations_in_current_batch}")
-                            
+                            logger.info(f"⏱️ Starting citation debounce timer — have {len(received_citation_markers)} markers: {sorted(received_citation_markers)}")
+                        citation_completion_task = asyncio.create_task(_deferred_citation_complete())
+
+                    # Forward citation text_delta to the frontend so it can track
+                    # expected citation count (the [1], [2], etc. markers must appear
+                    # in streamingTextRef for expectedCitationCount > 0).
+                    if emit_callback:
+                        fwd_event = {
+                            **event,
+                            "message_id": message_id if message_id else (
+                                str(assistant_message_placeholder.id) if assistant_message_placeholder else "unknown"
+                            ),
+                        }
+                        await emit_callback(fwd_event)
+                    return  # Handled — don't fall through to the text_delta blocker
+
                 else:
                     logger.info(f"🚫 Blocking regular text_delta after tool_start. Text: '{text_content[:50]}...'")
                     return
@@ -1167,51 +1219,11 @@ class ConversationService:
         # Get conversation context
         context = await self.get_conversation_context(conversation_id)
         
-        # Extract document texts for system prompt
-        document_texts = []
-        if context.get("documents"):
-            # Process each document (same logic as non-streaming version)
-            for doc_info in context["documents"]:
-                try:
-                    content_obj = await self.document_repository.get_document_content(doc_info["id"])
-                    content_data = None
-                    raw_text = None
-                    extracted_data = None
-                    
-                    if content_obj and isinstance(content_obj, dict):
-                        content_data = content_obj.get("content")
-                        raw_text = content_obj.get("raw_text")
-                        extracted_data = content_obj.get("extracted_data")
-                        
-                        document = await self.document_repository.get_document(doc_info["id"])
-                        
-                        doc_dict = {
-                            "id": doc_info["id"],
-                            "title": doc_info.get("filename", "Document"),
-                            "type": "document"
-                        }
-                        
-                        if document and document.claude_file_id:
-                            doc_dict["claude_file_id"] = document.claude_file_id
-                            doc_dict["filename"] = document.filename
-                            document_texts.append(doc_dict)
-                            logger.info(f"Added document {doc_info['id']} with Files API file_id: {document.claude_file_id}")
-                        elif raw_text and not (document and document.mime_type == "application/pdf"):
-                            doc_dict["raw_text"] = raw_text
-                            document_texts.append(doc_dict)
-                            logger.info(f"Added non-PDF document {doc_info['id']} with raw_text ({len(raw_text)} chars)")
-                        elif content_data and isinstance(content_data, bytes) and not (document and document.mime_type == "application/pdf"):
-                            doc_dict["content"] = content_data
-                            document_texts.append(doc_dict)
-                            logger.info(f"Added non-PDF document {doc_info['id']} with binary content")
-                        elif document and document.mime_type == "application/pdf":
-                            logger.warning(f"PDF document {doc_info['id']} missing claude_file_id - cannot process with native PDF support")
-                        else:
-                            logger.warning(f"No usable content available for document {doc_info['id']}")
-                except Exception as e:
-                    logger.error(f"Error processing document content for streaming LLM: {str(e)}")
-                    logger.exception(e)
-                    continue
+        # Reuse pre-fetched context docs to avoid duplicate repository lookups.
+        document_texts = self._build_document_texts_from_context_documents(
+            context_documents=context.get("documents", []),
+            conversation_id=conversation_id,
+        )
         
         # Get conversation messages
         messages = await self.conversation_repository.get_conversation_messages(
@@ -1254,12 +1266,16 @@ class ConversationService:
                 combined_doc_text += f"\n\n{doc['raw_text']}"
         
         # Use Claude's streaming with tools - let Claude decide whether to use visualization tools
-        result = await self.claude_service.analyze_with_visualization_tools_streaming(
-            document_text=combined_doc_text,
-            user_query=content,
-            file_id=file_id,
-            emit_callback=enhanced_emit_callback,
-            message_id=message_id
+        result = await self._await_with_timeout(
+            "claude streaming visualization analysis",
+            self.claude_service.analyze_with_visualization_tools_streaming(
+                document_text=combined_doc_text,
+                user_query=content,
+                file_id=file_id,
+                emit_callback=enhanced_emit_callback,
+                message_id=message_id,
+            ),
+            timeout_seconds=STREAMING_RESPONSE_TIMEOUT_SECONDS,
         )
         
         # Extract results
@@ -1971,12 +1987,16 @@ Generate exactly {limit} follow-up questions, each on a new line, without number
 
             # Use Haiku 3.5 for fast, cost-effective follow-up generation
             try:
-                follow_up_response_raw = await self.claude_service.generate_response(
-                    system_prompt="You are a financial analysis assistant that generates relevant follow-up questions for financial document discussions. Always provide exactly the requested number of questions, each on a separate line.",
-                    messages=[{"role": "user", "content": follow_up_prompt}],
-                    model="claude-3-5-haiku-20241022",  # Use Haiku 3.5 as specified
-                    max_tokens=500,  # Limit tokens since we only need a few questions
-                    temperature=0.7  # Slightly creative for varied questions
+                follow_up_response_raw = await self._await_with_timeout(
+                    "claude follow-up question generation",
+                    self.claude_service.generate_response(
+                        system_prompt="You are a financial analysis assistant that generates relevant follow-up questions for financial document discussions. Always provide exactly the requested number of questions, each on a separate line.",
+                        messages=[{"role": "user", "content": follow_up_prompt}],
+                        model="claude-3-5-haiku-20241022",  # Use Haiku 3.5 as specified
+                        max_tokens=500,  # Limit tokens since we only need a few questions
+                        temperature=0.7,  # Slightly creative for varied questions
+                    ),
+                    timeout_seconds=LLM_RESPONSE_TIMEOUT_SECONDS,
                 )
                 follow_up_response: str = cast(str, follow_up_response_raw)
                 
