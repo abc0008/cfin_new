@@ -32,6 +32,8 @@ interface TimelineRole {
   isEducation?: boolean;
   icon: React.ReactNode;
   accentColor: string;
+  logo?: string;
+  headerImage?: string;
 }
 
 const roles: TimelineRole[] = [
@@ -59,6 +61,8 @@ const roles: TimelineRole[] = [
     isCurrent: true,
     icon: <Sparkles className="h-5 w-5" />,
     accentColor: "from-brand-lust to-primary",
+    logo: "/assets/logos/synovus.jpeg",
+    headerImage: "/assets/logos/synovus-pinnacle.jpeg",
   },
   {
     date: "2023 – 2025",
@@ -76,6 +80,7 @@ const roles: TimelineRole[] = [
     ],
     icon: <TrendingUp className="h-5 w-5" />,
     accentColor: "from-primary to-primary/80",
+    logo: "/assets/logos/synovus.jpeg",
   },
   {
     date: "2022 – 2023",
@@ -93,6 +98,7 @@ const roles: TimelineRole[] = [
     ],
     icon: <BarChart3 className="h-5 w-5" />,
     accentColor: "from-secondary to-secondary/80",
+    logo: "/assets/logos/synovus.jpeg",
   },
   {
     date: "2014 – 2022",
@@ -111,6 +117,7 @@ const roles: TimelineRole[] = [
     ],
     icon: <Building2 className="h-5 w-5" />,
     accentColor: "from-accent to-accent/80",
+    logo: "/assets/logos/first-horizon.jpeg",
   },
   {
     date: "2013 – 2014",
@@ -127,6 +134,7 @@ const roles: TimelineRole[] = [
     ],
     icon: <LineChart className="h-5 w-5" />,
     accentColor: "from-primary/70 to-secondary/70",
+    logo: "/assets/logos/regions.jpeg",
   },
   {
     date: "2011 – 2013",
@@ -142,6 +150,7 @@ const roles: TimelineRole[] = [
     ],
     icon: <Briefcase className="h-5 w-5" />,
     accentColor: "from-brand-mt-rushmore/60 to-brand-mt-rushmore/40",
+    logo: "/assets/logos/regions.jpeg",
   },
   {
     date: "2008 – 2011",
@@ -160,6 +169,7 @@ const roles: TimelineRole[] = [
     isEducation: true,
     icon: <GraduationCap className="h-5 w-5" />,
     accentColor: "from-[#03244d] to-[#e87511]",
+    logo: "/assets/logos/auburn.png",
   },
 ];
 
@@ -198,48 +208,77 @@ function TimelineEntry({
 
       {/* Content card */}
       <div
-        className={`rounded-2xl border-2 p-6 md:p-8 transition-all duration-300 ${
+        className={`rounded-2xl border-2 overflow-hidden transition-all duration-300 ${
           role.isCurrent
             ? "border-brand-lust/30 bg-gradient-to-br from-card to-brand-lust/5 shadow-xl"
             : "border-brand-pigeon bg-gradient-to-br from-card to-card/50 shadow-lg hover:shadow-xl hover:border-primary/20"
         }`}
       >
-        {/* Date badge */}
-        <div className="flex flex-wrap items-center gap-3 mb-3">
-          <span
-            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-avenir-pro-demi ${
-              role.isCurrent
-                ? "bg-brand-lust/10 text-brand-lust border border-brand-lust/20"
-                : role.isEducation
-                ? "bg-[#03244d]/10 text-[#03244d] border border-[#03244d]/20"
-                : "bg-primary/10 text-primary border border-primary/20"
-            }`}
-          >
-            {role.date}
-          </span>
-          {role.isCurrent && (
-            <span className="inline-flex items-center rounded-full bg-brand-lust/15 px-3 py-1 text-xs font-avenir-pro-demi text-brand-lust border border-brand-lust/25">
-              <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-brand-lust animate-pulse" />
-              Current Role
-            </span>
-          )}
-        </div>
+        {/* Header image for current role (merger banner) */}
+        {role.headerImage && (
+          <div className="relative w-full h-28 md:h-36">
+            <Image
+              src={role.headerImage}
+              alt={`${role.company} banner`}
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-card" />
+          </div>
+        )}
 
-        {/* Title */}
-        <h3 className="text-xl md:text-2xl font-avenir-pro-demi text-foreground mb-1">
-          {role.title}
-        </h3>
+        <div className="p-6 md:p-8">
+          {/* Date badge + Company logo row */}
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <span
+                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-avenir-pro-demi ${
+                  role.isCurrent
+                    ? "bg-brand-lust/10 text-brand-lust border border-brand-lust/20"
+                    : role.isEducation
+                    ? "bg-[#03244d]/10 text-[#03244d] border border-[#03244d]/20"
+                    : "bg-primary/10 text-primary border border-primary/20"
+                }`}
+              >
+                {role.date}
+              </span>
+              {role.isCurrent && (
+                <span className="inline-flex items-center rounded-full bg-brand-lust/15 px-3 py-1 text-xs font-avenir-pro-demi text-brand-lust border border-brand-lust/25">
+                  <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-brand-lust animate-pulse" />
+                  Current Role
+                </span>
+              )}
+            </div>
 
-        {/* Company */}
-        <p className="font-avenir-pro-demi text-brand-mt-rushmore mb-1">
-          {role.company}
-          {role.companyDetail && (
-            <span className="font-avenir-pro text-brand-mt-rushmore/70">
-              {" "}
-              · {role.companyDetail}
-            </span>
-          )}
-        </p>
+            {/* Company logo */}
+            {role.logo && (
+              <div className="shrink-0 h-10 w-10 md:h-12 md:w-12 rounded-lg overflow-hidden border border-brand-pigeon/40 bg-white shadow-sm">
+                <Image
+                  src={role.logo}
+                  alt={`${role.company} logo`}
+                  width={48}
+                  height={48}
+                  className="h-full w-full object-contain p-1"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Title */}
+          <h3 className="text-xl md:text-2xl font-avenir-pro-demi text-foreground mb-1">
+            {role.title}
+          </h3>
+
+          {/* Company */}
+          <p className="font-avenir-pro-demi text-brand-mt-rushmore mb-1">
+            {role.company}
+            {role.companyDetail && (
+              <span className="font-avenir-pro text-brand-mt-rushmore/70">
+                {" "}
+                · {role.companyDetail}
+              </span>
+            )}
+          </p>
 
         {/* Description */}
         <p className="mt-3 font-avenir-pro text-brand-mt-rushmore leading-relaxed">
@@ -271,6 +310,7 @@ function TimelineEntry({
             ))}
           </div>
         )}
+        </div>
       </div>
     </motion.div>
   );
@@ -343,8 +383,7 @@ export default function AboutAlexTimeline() {
                 Director, Enterprise Analytics & Finance Transformation
               </p>
               <p className="font-avenir-pro text-brand-mt-rushmore leading-relaxed mb-5 max-w-xl">
-                Building one analytics operating model for the combined Synovus + Pinnacle bank.
-                End analytics litigation — one source, one team, one truth.
+                One-part Finance Manager, two-parts AI-enabled analytics product leader. Currently building a centralized enterprise analytics function for a $117B super-regional bank. Here&apos;s the journey.
               </p>
               <div className="flex flex-wrap gap-3 justify-center md:justify-start">
                 <RainbowButton
@@ -353,6 +392,7 @@ export default function AboutAlexTimeline() {
                   rel="noopener noreferrer"
                   fillColor="#0A66C2"
                   fillColorTo="#0A66C2e6"
+                  speed="1.5s"
                   className="px-5 py-2.5 shadow-md hover:shadow-lg"
                 >
                   <Linkedin className="mr-2 h-4 w-4" />
@@ -400,6 +440,7 @@ export default function AboutAlexTimeline() {
               rel="noopener noreferrer"
               fillColor="#00bed5"
               fillColorTo="#00bed5e6"
+              speed="1.5s"
               className="px-6 py-3 shadow-lg hover:shadow-xl"
             >
               <Linkedin className="mr-2 h-4 w-4" />
