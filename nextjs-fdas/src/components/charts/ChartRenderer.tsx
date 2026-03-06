@@ -1,6 +1,5 @@
 import React from 'react';
 import type { ChartData } from '@/types/visualization';
-import { EnhancedChart } from '../visualization/EnhancedChart';
 import BarChart from './BarChart';
 import LineChart from './LineChart';
 import PieChart from './PieChart';
@@ -9,9 +8,11 @@ import AreaChart from './AreaChart';
 import MultiBarChart from './MultiBarChart';
 
 interface ChartRendererProps {
-  data: ChartData;
+  data: ChartData | null;
   className?: string;
   onDataPointClick?: (dataPoint: any) => void;
+  loading?: boolean;
+  error?: Error | null;
 }
 
 /**
@@ -21,10 +22,37 @@ interface ChartRendererProps {
 const ChartRenderer: React.FC<ChartRendererProps> = ({ 
   data, 
   className = '',
-  onDataPointClick
+  onDataPointClick,
+  loading = false,
+  error = null
 }) => {
+  if (loading) {
+    return (
+      <div role="status" aria-label="Loading chart" className={`h-full flex items-center justify-center ${className}`}>
+        <span className="text-sm text-muted-foreground">Loading chart…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div role="alert" className={`h-full flex items-center justify-center ${className}`}>
+        <span className="text-sm text-red-600">{error.message}</span>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div role="status" aria-label="No chart data" className={`h-full flex items-center justify-center ${className}`}>
+        <span className="text-sm text-muted-foreground">No chart data available.</span>
+      </div>
+    );
+  }
+
   // Extract chart type from data
   const { chartType } = data;
+  const supportedChartTypes = new Set(['bar', 'multiBar', 'line', 'pie', 'area', 'stackedArea', 'scatter']);
 
   console.log('ChartRenderer - Data received:', {
     chartType,
@@ -36,86 +64,69 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     chartConfigKeys: data.chartConfig ? Object.keys(data.chartConfig) : []
   });
 
+  if (!supportedChartTypes.has(chartType)) {
+    return (
+      <div role="alert" className={`h-full flex items-center justify-center ${className}`}>
+        <span className="text-sm text-red-600">Unsupported chart type: {chartType}</span>
+      </div>
+    );
+  }
+
   // Render the appropriate chart component based on chartType
   switch (chartType) {
     case 'bar':
       return (
-        <div className={`h-full flex justify-center ${className}`}>
+        <figure aria-label={data.config?.title || 'Bar Chart'} className={`h-full flex justify-center ${className}`}>
           <div className="w-full max-w-4xl">
             <BarChart data={data} height="100%" onDataPointClick={onDataPointClick} />
           </div>
-        </div>
+        </figure>
       );
     
     case 'multiBar':
       return (
-        <div className={`h-full flex justify-center ${className}`}>
+        <figure aria-label={data.config?.title || 'Multi Bar Chart'} className={`h-full flex justify-center ${className}`}>
           <div className="w-full max-w-4xl">
             <MultiBarChart data={data} height="100%" onDataPointClick={onDataPointClick} />
           </div>
-        </div>
+        </figure>
       );
     
     case 'line':
       return (
-        <div className={`h-full flex justify-center ${className}`}>
+        <figure aria-label={data.config?.title || 'Line Chart'} className={`h-full flex justify-center ${className}`}>
           <div className="w-full max-w-4xl">
             <LineChart data={data} height="100%" onDataPointClick={onDataPointClick} />
           </div>
-        </div>
+        </figure>
       );
     
     case 'pie':
       return (
-        <div className={`h-full flex justify-center ${className}`}>
+        <figure aria-label={data.config?.title || 'Pie Chart'} className={`h-full flex justify-center ${className}`}>
           <div className="w-full max-w-3xl">
             <PieChart data={data} height="100%" onDataPointClick={onDataPointClick} />
           </div>
-        </div>
+        </figure>
       );
     
     case 'area':
     case 'stackedArea':
       return (
-        <div className={`h-full flex justify-center ${className}`}>
+        <figure aria-label={data.config?.title || 'Area Chart'} className={`h-full flex justify-center ${className}`}>
           <div className="w-full max-w-4xl">
             <AreaChart data={data} height="100%" onDataPointClick={onDataPointClick} />
           </div>
-        </div>
+        </figure>
       );
     
     case 'scatter':
       return (
-        <div className={`h-full flex justify-center ${className}`}>
+        <figure aria-label={data.config?.title || 'Scatter Chart'} className={`h-full flex justify-center ${className}`}>
           <div className="w-full max-w-4xl">
             <ScatterChart data={data} height="100%" onDataPointClick={onDataPointClick} />
           </div>
-        </div>
-      );
-    
-    default:
-      // Fallback to EnhancedChart for any other chart types
-      return (
-        <div className={`bg-white rounded-lg shadow-sm p-4 h-full flex flex-col ${className}`}>
-          {data.config?.title && (
-            <div className="mb-4 flex-shrink-0">
-              <h3 className="text-lg font-semibold text-gray-900">{data.config.title}</h3>
-              {data.config.description && (
-                <p className="text-sm text-gray-500 mt-1">{data.config.description}</p>
-              )}
-            </div>
-          )}
-          <div className="relative flex-1 min-h-[300px]">
-            <EnhancedChart 
-              data={data.data}
-              chartType={chartType}
-              onDataPointClick={onDataPointClick}
-              height="100%"
-              xAxisTitle={data.config?.xAxisLabel}
-              yAxisTitle={data.config?.yAxisLabel}
-            />
-          </div>
-        </div>
+        </figure>
       );
   }
 };
