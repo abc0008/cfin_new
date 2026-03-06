@@ -594,6 +594,36 @@ export default function Workspace() {
     // Add streaming message to the messages map
     setMessagesMap(prev => {
       const existingMessage = prev[message.id];
+
+      const normalizeCitations = (citations?: Citation[]) => {
+        if (!Array.isArray(citations)) return [];
+        return citations
+          .map((c) => ({
+            id: c.id,
+            highlightId: c.highlightId || '',
+            page: c.startPageNumber || 0,
+            rectCount: c.rects?.length || 0,
+            text: (c.citedText || '').trim().toLowerCase().slice(0, 120)
+          }))
+          .sort((a, b) => {
+            const keyA = `${a.id}|${a.highlightId}|${a.page}|${a.rectCount}|${a.text}`;
+            const keyB = `${b.id}|${b.highlightId}|${b.page}|${b.rectCount}|${b.text}`;
+            return keyA.localeCompare(keyB);
+          });
+      };
+
+      const getAnalysisBlockFingerprint = (msg?: Message) => {
+        const blocks = ((msg as any)?.analysis_blocks || (msg as any)?.analysisBlocks || []) as any[];
+        return blocks
+          .map((block, idx) => {
+            const title = (block?.title || '').trim();
+            const type = block?.visualizationType || block?.type || 'unknown';
+            const tool = block?.tool_name || block?.toolName || '';
+            const points = Array.isArray(block?.data) ? block.data.length : 0;
+            return `${idx}:${type}:${tool}:${title}:${points}`;
+          })
+          .join('|');
+      };
       
       // For post-viz messages, tool messages, and no-result messages, check if already exists
       if (message.id.startsWith('post_viz_') || message.id.startsWith('tool_') || message.id.startsWith('no_result_')) {
@@ -612,21 +642,46 @@ export default function Workspace() {
         };
       }
       
-      // For regular streaming messages, only update if content changed, citations added, or analysis_blocks added
-      if (!existingMessage ||
-          existingMessage.content !== message.content ||
-          (message.citations && message.citations.length > 0 && !existingMessage.citations?.length) ||
-          (message.analysis_blocks && message.analysis_blocks.length > 0 && !(existingMessage as any).analysis_blocks?.length)) {
+      // For regular streaming messages, update whenever meaningful payload changed.
+      // This avoids race conditions where websocket text updates can overwrite or
+      // block later citation/analysis-block enrichment from backend polling.
+      const existingCitationFingerprint = JSON.stringify(normalizeCitations(existingMessage?.citations));
+      const incomingCitationFingerprint = JSON.stringify(normalizeCitations(message.citations));
+      const existingAnalysisFingerprint = getAnalysisBlockFingerprint(existingMessage);
+      const incomingAnalysisFingerprint = getAnalysisBlockFingerprint(message);
+
+      const contentChanged = !!existingMessage && existingMessage.content !== message.content;
+      const citationsChanged = existingCitationFingerprint !== incomingCitationFingerprint;
+      const analysisChanged = existingAnalysisFingerprint !== incomingAnalysisFingerprint;
+
+      if (!existingMessage || contentChanged || citationsChanged || analysisChanged) {
+        const mergedMessage: Message = {
+          ...(existingMessage || {}),
+          ...message,
+          // Preserve richer payloads when one side is empty; keep incoming when present.
+          citations:
+            Array.isArray(message.citations) && message.citations.length > 0
+              ? message.citations
+              : existingMessage?.citations || [],
+          analysis_blocks:
+            ((message as any).analysis_blocks && (message as any).analysis_blocks.length > 0)
+              ? (message as any).analysis_blocks
+              : ((existingMessage as any)?.analysis_blocks || [])
+        };
+
         console.log('[handleMessageUpdate] Updating message:', {
           messageId: message.id,
           hadCitations: !!existingMessage?.citations?.length,
           nowHasCitations: !!message.citations?.length,
           citationCount: message.citations?.length || 0,
-          contentChanged: existingMessage?.content !== message.content
+          contentChanged,
+          citationsChanged,
+          analysisChanged,
+          analysisBlockCount: ((mergedMessage as any).analysis_blocks || []).length
         });
         return {
           ...prev,
-          [message.id]: message
+          [message.id]: mergedMessage
         };
       }
       return prev; // No change needed
@@ -639,12 +694,14 @@ export default function Workspace() {
     if (citation) {
       // Use the citation ID (which might be a temp ID)
       // The PDFViewer has been updated to handle both temp IDs and UUIDs
+      const navigationHighlightId = citation.highlightId || citation.id;
       console.log('[WorkspacePage] handleNavigateToHighlight:', {
         citationId: citation.id,
         highlightId: citation.highlightId,
+        navigationHighlightId,
         page: citation.startPageNumber
       });
-      setHighlightId(citation.id);
+      setHighlightId(navigationHighlightId);
       setActiveTab('document');
     }
   }, []);

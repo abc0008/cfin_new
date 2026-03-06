@@ -724,7 +724,8 @@ export function PDFViewer({
   }, [allHighlights]);
 
   // Keep one pending target and retry briefly until both highlight + viewer are ready.
-  // This matches the upstream scroll flow and avoids state-machine races.
+  // This mirrors the core react-pdf-highlighter jump-to-highlight pattern
+  // (scrollRef + deferred retries) to avoid race conditions between render and scroll.
   useEffect(() => {
     if (!highlightId) {
       pendingScrollHighlightIdRef.current = null;
