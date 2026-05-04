@@ -101,7 +101,7 @@ export default function BarChart({ data, height = 400, width = '100%', onDataPoi
         key={key}
         dataKey={key}
         name={metricConfig?.label || key}
-        fill={metricConfig?.color || CHART_COLORS[index % CHART_COLORS.length] || '#8884d8'}
+        fill={metricConfig?.color || CHART_COLORS[index % CHART_COLORS.length] || CHART_COLORS[0]}
         radius={[4, 4, 0, 0]}
         onClick={handleBarClick}
       />

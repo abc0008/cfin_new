@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
@@ -12,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 interface AnalysisControlsProps {
@@ -52,10 +51,10 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
   };
   
   return (
-    <div className="w-full p-4 border border-border bg-card shadow-sm">
+    <div className="workspace-summary-block w-full border p-4">
       <div className="flex flex-col space-y-4">
         <div className="flex items-center gap-4">
-          <div className="flex-shrink min-w-0 pb-2 border-b border-border">
+          <div className="min-w-0 flex-shrink border-b border-border pb-2">
             <h2 className="text-xl font-avenir-pro-demi text-foreground">Analysis Controls</h2>
           </div>
 
@@ -64,10 +63,10 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
               Analysis Type:
             </label>
             <Select value={analysisType} onValueChange={setAnalysisType} disabled={isLoading}>
-              <SelectTrigger className="flex-1 h-8 py-1 px-3 border border-border rounded-md bg-background text-foreground font-avenir-pro focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring min-w-0 text-sm">
+              <SelectTrigger className="fdas-select min-w-0 flex-1 border border-border bg-background px-3 py-1 text-sm font-avenir-pro text-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring">
                 <SelectValue placeholder="Select analysis type" />
               </SelectTrigger>
-              <SelectContent className="font-avenir-pro bg-background">
+              <SelectContent className="workspace-panel font-avenir-pro bg-background">
                 {analysisTypes.map((type) => (
                   <SelectItem key={type.value} value={type.value} className="text-sm">
                     {type.label}
@@ -83,15 +82,20 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
                 variant="outline" 
                 size="sm" 
                 className={cn(
-                  "h-8 px-3 py-1 ml-2 flex-shrink-0 flex items-center font-avenir-pro text-xs",
-                  advancedOptionsFilled && "bg-brand-caribbean-blue text-primary-foreground hover:bg-brand-caribbean-blue/90"
+                  "workspace-secondary-btn ml-2 flex h-8 flex-shrink-0 items-center px-3 py-1 text-xs font-avenir-pro",
+                  advancedOptionsFilled &&
+                    "border-accent bg-accent text-accent-foreground hover:bg-accent/90"
                 )}
               >
                 <Settings className="h-3.5 w-3.5 mr-1.5" />
                 <span>Advanced Options</span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[500px] p-4 border border-border bg-card shadow-md rounded-md mt-2" align="center" sideOffset={10}>
+            <PopoverContent
+              className="workspace-panel mt-2 w-[500px] rounded-xl border border-border bg-card p-4 shadow-none"
+              align="center"
+              sideOffset={10}
+            >
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-avenir-pro-demi text-foreground mb-1">
@@ -102,7 +106,7 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
                     value={knowledgeBase}
                     onChange={(e) => setKnowledgeBase(e.target.value)}
                     disabled={isLoading}
-                    className="min-h-[100px] font-avenir-pro"
+                    className="fdas-textarea min-h-[100px] font-avenir-pro"
                   />
                   <p className="text-xs text-muted-foreground mt-1 font-avenir-pro">
                     Provide domain-specific knowledge to enhance the analysis.
@@ -118,7 +122,7 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
                     value={userQuery}
                     onChange={(e) => setUserQuery(e.target.value)}
                     disabled={isLoading}
-                    className="min-h-[100px] font-avenir-pro"
+                    className="fdas-textarea min-h-[100px] font-avenir-pro"
                   />
                   <p className="text-xs text-muted-foreground mt-1 font-avenir-pro">
                     Specify a custom question to analyze in the document.
@@ -132,7 +136,7 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
             <Button
               onClick={handleRunAnalysis}
               disabled={isLoading}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              className="workspace-primary-btn"
             >
               {isLoading ? 'Running Analysis...' : 'Run Analysis'}
             </Button>

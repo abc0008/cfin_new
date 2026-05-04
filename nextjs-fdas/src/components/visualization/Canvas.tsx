@@ -197,7 +197,11 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
 
   if (loading) {
     return (
-      <div role="status" aria-label="Loading visualizations" className="flex items-center justify-center p-8 bg-muted/20 rounded-lg h-full">
+      <div
+        role="status"
+        aria-label="Loading visualizations"
+        className="workspace-summary-block flex h-full items-center justify-center p-8"
+      >
         <div className="animate-pulse flex flex-col items-center">
           <div className="h-8 w-40 bg-muted rounded mb-4" />
           <div className="h-80 w-full bg-muted rounded" />
@@ -208,7 +212,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
 
   if (error) {
     return (
-      <div role="alert" className="flex items-center justify-center p-8 bg-destructive/10 rounded-lg h-full">
+      <div role="alert" className="workspace-summary-block flex h-full items-center justify-center border border-destructive/35 bg-destructive/10 p-8">
         <div className="text-destructive text-center">
           <h3 className="font-avenir-pro-demi mb-2">Error loading visualizations</h3>
           <p className="text-sm font-avenir-pro">{error.toString()}</p>
@@ -222,24 +226,28 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
        (!visualizationData.tables || visualizationData.tables.length === 0) && 
        (!visualizationData.metrics || visualizationData.metrics.length === 0))) {
     return (
-      <div role="status" aria-label="No data" className="flex items-center justify-center p-8 bg-muted/20 rounded-lg h-full">
+      <div
+        role="status"
+        aria-label="No data"
+        className="workspace-summary-block flex h-full items-center justify-center p-8"
+      >
         <p className="text-muted-foreground font-avenir-pro">No visualization data available. Try asking a question that requires charts or tables.</p>
       </div>
     );
   }
 
   return (
-    <div role="main" className="w-full h-full bg-card shadow-sm flex flex-col">
-      <div className="border-b border-border flex-shrink-0">
-        <div role="tablist" className="flex space-x-4 px-4">
+    <div role="main" className="flex h-full w-full flex-col bg-card">
+      <div className="workspace-tab-wrap flex-shrink-0 border-b border-border px-4 py-2">
+        <div role="tablist" className="flex items-center gap-2">
           <button
             role="tab"
             aria-selected={currentTab === 'overview'}
             aria-controls="overview-panel"
-            className={`py-4 px-1 text-sm font-avenir-pro-demi transition-colors ${
+            className={`workspace-tab-trigger py-2 text-sm font-avenir-pro-demi transition-colors ${
               currentTab === 'overview'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-foreground hover:border-border'
+                ? 'bg-background text-primary'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
             onClick={() => setCurrentTab('overview')}
           >
@@ -249,10 +257,10 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             role="tab"
             aria-selected={currentTab === 'charts'}
             aria-controls="charts-panel"
-            className={`py-4 px-1 text-sm font-avenir-pro-demi transition-colors ${
+            className={`workspace-tab-trigger py-2 text-sm font-avenir-pro-demi transition-colors ${
               currentTab === 'charts'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-foreground hover:border-border'
+                ? 'bg-background text-primary'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
             onClick={() => setCurrentTab('charts')}
           >
@@ -262,10 +270,10 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             role="tab"
             aria-selected={currentTab === 'tables'}
             aria-controls="tables-panel"
-            className={`py-4 px-1 text-sm font-avenir-pro-demi transition-colors ${
+            className={`workspace-tab-trigger py-2 text-sm font-avenir-pro-demi transition-colors ${
               currentTab === 'tables'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-foreground hover:border-border'
+                ? 'bg-background text-primary'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
             onClick={() => setCurrentTab('tables')}
           >
@@ -279,7 +287,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
           <div className="space-y-2 h-full flex flex-col">
             {/* Textual Summary - Moved to top */}
             {visualizationData.analysisText && (
-              <div className="p-4 bg-muted/30 rounded-lg shadow-sm border border-border">
+              <div className="workspace-summary-block p-4">
                 <h4 className="text-md font-avenir-pro-demi text-foreground mb-2">Textual Summary</h4>
                 <p className="text-sm font-avenir-pro text-muted-foreground whitespace-pre-wrap">
                   {visualizationData.analysisText}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, BarChart2, Upload, FileUp, Zap, ChevronRight, FileSearch } from 'lucide-react'
+import { FileText, BarChart2, Upload, FileUp, ChevronRight, FileSearch } from 'lucide-react'
 import { StreamingChatInterface } from '../../components/chat/StreamingChatInterface'
 import { UploadForm } from '../../components/document/UploadForm'
 import dynamic from 'next/dynamic'
@@ -707,29 +707,31 @@ export default function Workspace() {
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-background to-muted/20">
-      <div className="container mx-auto px-4 pt-2">
-        <h1 className="text-2xl font-avenir-pro-demi text-primary mb-0">Analysis Workspace</h1>
-        <p className="text-muted-foreground font-avenir-pro mb-[6px]">
-          Upload financial documents, ask questions, and analyze the data through interactive visualizations.
+    <div className="workspace-page flex flex-col h-full">
+      <section className="workspace-overview">
+        <p className="workspace-eyebrow">OP_APRT · CFIN WORKSPACE</p>
+        <h1 className="workspace-title">Aperture Analysis Workspace</h1>
+        <p className="workspace-description">
+          Upload filings and financial statements, ask natural-language questions, and generate
+          cited analysis with charts and structured outputs in one workflow.
         </p>
-      </div>
+      </section>
 
-      {/* Main workspace area */}
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 px-4 pb-6">
-        {/* Left side: Chat Interface */}
-        <div className="bg-card rounded-xl shadow-md flex flex-col min-h-[calc(100vh-12rem)] overflow-auto border border-border col-span-1 flex-1">
-          <div className="py-1 px-2 border-b border-border bg-muted/30 rounded-t-xl flex-shrink-0">
-            <h2 className="text-base font-avenir-pro-demi text-foreground flex items-center">
-              <FileSearch className="h-5 w-5 mr-2" />
-              Interactive Chat
+      <div className="workspace-grid flex-1 grid grid-cols-1 gap-4 pb-6 md:grid-cols-3">
+        <div className="workspace-panel col-span-1 flex min-h-[calc(100vh-14rem)] flex-1 flex-col overflow-hidden">
+          <div className="workspace-panel-bar flex-shrink-0 px-4 py-3">
+            <h2 className="flex items-center text-base font-avenir-pro-demi text-foreground">
+              <FileSearch className="mr-2 h-5 w-5 text-primary" />
+              Claude Workspace Chat
             </h2>
-            <p className="text-xs text-muted-foreground font-avenir-pro">Ask questions about your financial documents</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Ask questions about the active document and jump directly to citations.
+            </p>
           </div>
           <div className="flex-1 overflow-hidden">
-            <StreamingChatInterface 
-              messages={messages} 
-              onSendMessage={handleSendMessage} 
+            <StreamingChatInterface
+              messages={messages}
+              onSendMessage={handleSendMessage}
               activeDocuments={selectedDocument ? [selectedDocument.metadata.id] : []}
               isLoading={isLoading}
               conversationId={sessionId || undefined}
@@ -739,128 +741,132 @@ export default function Workspace() {
           </div>
         </div>
 
-        {/* Right side: Document View / Analysis */}
-        <div className="bg-card rounded-xl shadow-md flex flex-col min-h-[calc(100vh-12rem)] overflow-auto border border-border col-span-2 flex-1">
-          {/* Tab navigation */}
-          <div className="border-b border-border bg-muted/30 rounded-t-xl">
-            <Tabs defaultValue="document" className="w-full">
-              <TabsList className="grid grid-cols-2 p-2 bg-transparent">
-                <TabsTrigger 
-                  value="document" 
-                  onClick={() => setActiveTab('document')}
-                  className="data-[state=active]:bg-background data-[state=active]:text-primary font-avenir-pro"
+        <div className="workspace-panel col-span-2 flex min-h-[calc(100vh-14rem)] flex-1 flex-col overflow-hidden">
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as 'document' | 'analysis')}
+            className="flex h-full w-full flex-col"
+          >
+            <div className="workspace-tab-wrap px-3 py-2">
+              <TabsList className="grid grid-cols-2 bg-transparent p-0">
+                <TabsTrigger
+                  value="document"
+                  className="workspace-tab-trigger font-avenir-pro data-[state=active]:bg-background data-[state=active]:text-primary"
                 >
                   <div className="flex items-center">
-                    <FileText className="h-4 w-4 mr-1.5" />
+                    <FileText className="mr-1.5 h-4 w-4" />
                     Document
                   </div>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="analysis" 
-                  onClick={() => setActiveTab('analysis')}
-                  className="data-[state=active]:bg-background data-[state=active]:text-primary font-avenir-pro"
+                <TabsTrigger
+                  value="analysis"
+                  className="workspace-tab-trigger font-avenir-pro data-[state=active]:bg-background data-[state=active]:text-primary"
                 >
                   <div className="flex items-center">
-                    <BarChart2 className="h-4 w-4 mr-1.5" />
+                    <BarChart2 className="mr-1.5 h-4 w-4" />
                     Analysis
                   </div>
                 </TabsTrigger>
               </TabsList>
-              <TabsContent value="document" className="h-[calc(100vh-13rem)] p-0 flex flex-col">
-                {showUploadForm ? (
-                  <div className="p-6">
-                    <h2 className="text-xl font-avenir-pro-demi text-primary mb-4">Upload Document</h2>
-                    <UploadForm 
-                      onUploadSuccess={handleUploadSuccess}
-                      onUploadError={handleUploadError}
-                      sessionId={sessionId || undefined}
-                    />
+            </div>
 
-                  </div>
-                ) : selectedDocument ? (
-                  <div className="h-full flex-1">
-                    <PDFViewer 
-                      document={selectedDocument}
-                      highlightId={highlightId}
-                      extraCitations={(() => {
-                        const allCitations = Array.from(citations.values());
-                        const filtered = allCitations.filter(c => 
-                          c.documentId === selectedDocument?.metadata.id
-                        );
-                        console.log('[workspace] PDFViewer extraCitations:', {
-                          selectedDocId: selectedDocument?.metadata.id,
-                          allCitations: allCitations.map(c => ({
-                            id: c.id,
-                            documentId: c.documentId,
-                            hasRects: c.rects?.length > 0,
-                            text: c.citedText?.substring(0, 50)
-                          })),
-                          filtered: filtered.map(c => ({
-                            id: c.id,
-                            documentId: c.documentId,
-                            hasRects: c.rects?.length > 0,
-                            text: c.citedText?.substring(0, 50)
-                          }))
-                        });
-                        return filtered;
-                      })()}
-                      onCitationCreate={(citation) => {
-                        console.log('Citation created:', citation);
-                        // You can add citation handling logic here
-                      }}
-                      onCitationClick={(citation) => {
-                        console.log('Citation clicked:', citation);
-                        // You can add citation click handling logic here
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="h-full flex items-center justify-center">
-                    <div className="text-center p-6 max-w-md">
-                      <div className="bg-primary/10 p-3 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                        <FileUp className="h-8 w-8 text-primary" />
-                      </div>
-                      <h3 className="text-lg font-avenir-pro-demi text-primary mb-2">No document to display</h3>
-                      <p className="text-muted-foreground font-avenir-pro mb-6">
-                        Upload a financial document to start analyzing it with our AI-powered tools.
-                      </p>
-                      <button
-                        onClick={() => setShowUploadForm(true)}
-                        className="inline-flex items-center bg-primary text-primary-foreground px-6 py-3 rounded-lg text-sm font-avenir-pro-demi hover:bg-primary/90 transition-colors shadow-sm"
-                      >
-                        <Upload className="h-5 w-5 mr-2" />
-                        Upload Document
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="analysis" className="p-0 flex flex-col flex-1">
-                <div className="flex-shrink-0">
-                  <AnalysisControls 
-                    onRunAnalysis={(analysisType, knowledgeBase, userQuery) => {
-                      if (selectedDocument) {
-                        runManualAnalysis(selectedDocument.metadata.id, analysisType, knowledgeBase, userQuery);
-                      } else {
-                        setAnalysisError('Please select a document to analyze');
-                      }
+            <TabsContent value="document" className="h-[calc(100vh-14.5rem)] p-0">
+              {showUploadForm ? (
+                <div className="p-6">
+                  <h2 className="mb-4 text-xl font-avenir-pro-demi text-foreground">Upload Document</h2>
+                  <UploadForm
+                    onUploadSuccess={handleUploadSuccess}
+                    onUploadError={handleUploadError}
+                    sessionId={sessionId || undefined}
+                  />
+                </div>
+              ) : selectedDocument ? (
+                <div className="h-full flex-1">
+                  <PDFViewer
+                    document={selectedDocument}
+                    highlightId={highlightId}
+                    extraCitations={(() => {
+                      const allCitations = Array.from(citations.values())
+                      const filtered = allCitations.filter(
+                        (c) => c.documentId === selectedDocument?.metadata.id,
+                      )
+                      console.log('[workspace] PDFViewer extraCitations:', {
+                        selectedDocId: selectedDocument?.metadata.id,
+                        allCitations: allCitations.map((c) => ({
+                          id: c.id,
+                          documentId: c.documentId,
+                          hasRects: c.rects?.length > 0,
+                          text: c.citedText?.substring(0, 50),
+                        })),
+                        filtered: filtered.map((c) => ({
+                          id: c.id,
+                          documentId: c.documentId,
+                          hasRects: c.rects?.length > 0,
+                          text: c.citedText?.substring(0, 50),
+                        })),
+                      })
+                      return filtered
+                    })()}
+                    onCitationCreate={(citation) => {
+                      console.log('Citation created:', citation)
                     }}
-                    isLoading={analysisLoading}
+                    onCitationClick={(citation) => {
+                      console.log('Citation clicked:', citation)
+                    }}
                   />
                 </div>
-                <div className="flex-1 overflow-hidden">
-                  <Canvas 
-                    analysisResults={analysisResults}
-                    error={analysisError || undefined}
-                    loading={analysisLoading}
-                    onCitationClick={handleCitationClick}
-                    messages={messages}
-                  />
+              ) : (
+                <div className="flex h-full items-center justify-center p-6">
+                  <div className="workspace-empty-state text-center">
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/15">
+                      <FileUp className="h-8 w-8 text-primary" />
+                    </div>
+                    <h3 className="mb-2 text-lg font-avenir-pro-demi text-foreground">
+                      No document to display
+                    </h3>
+                    <p className="mx-auto mb-6 max-w-md text-sm text-muted-foreground">
+                      Start with a filing, deck, or statement. Aperture will parse tables, trace
+                      values to source pages, and prepare the workspace for analysis.
+                    </p>
+                    <button onClick={() => setShowUploadForm(true)} className="workspace-primary-btn">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Document
+                      <ChevronRight className="ml-1 h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-              </TabsContent>
-            </Tabs>
-          </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="analysis" className="flex flex-1 flex-col p-0">
+              <div className="flex-shrink-0">
+                <AnalysisControls
+                  onRunAnalysis={(analysisType, knowledgeBase, userQuery) => {
+                    if (selectedDocument) {
+                      runManualAnalysis(
+                        selectedDocument.metadata.id,
+                        analysisType,
+                        knowledgeBase,
+                        userQuery,
+                      )
+                    } else {
+                      setAnalysisError('Please select a document to analyze')
+                    }
+                  }}
+                  isLoading={analysisLoading}
+                />
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <Canvas
+                  analysisResults={analysisResults}
+                  error={analysisError || undefined}
+                  loading={analysisLoading}
+                  onCitationClick={handleCitationClick}
+                  messages={messages}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

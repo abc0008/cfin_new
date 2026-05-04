@@ -24,13 +24,13 @@ export function CitationProgress({
   const getIcon = () => {
     switch (status) {
       case 'searching':
-        return <FileSearch className="h-5 w-5 text-blue-500 animate-pulse" />;
+        return <FileSearch className="h-5 w-5 text-primary animate-pulse" />;
       case 'processing':
         return <Loader2 className="h-5 w-5 text-primary animate-spin" />;
       case 'complete':
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+        return <CheckCircle2 className="h-5 w-5 text-accent" />;
       case 'error':
-        return <AlertCircle className="h-5 w-5 text-red-500" />;
+        return <AlertCircle className="h-5 w-5 text-destructive" />;
       default:
         return null;
     }

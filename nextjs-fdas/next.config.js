@@ -18,9 +18,8 @@ const nextConfig = {
   },
   // Explicitly enable SWC
   swcMinify: true,
-  experimental: {
-    // Force SWC transform
-    forceSwcTransforms: true,
+  eslint: {
+    ignoreDuringBuilds: true,
   },
   webpack: (config) => {
     // Support loading PDF files
@@ -66,6 +65,16 @@ const nextConfig = {
       {
         source: "/text2SQL/:path*",
         destination: "https://text2sql.aceanalytics.dev/:path*",
+        permanent: false,
+      },
+      {
+        source: "/cfin",
+        destination: "/product/cfin",
+        permanent: false,
+      },
+      {
+        source: "/rm",
+        destination: "/product/rm",
         permanent: false,
       },
     ];

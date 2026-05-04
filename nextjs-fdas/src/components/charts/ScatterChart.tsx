@@ -40,8 +40,8 @@ export default function ScatterChart({ data, height = 400, width = '100%', onDat
   
   if (!chartData || chartData.length === 0) {
     return (
-      <div role="status" aria-label="No data available" className="flex items-center justify-center p-4 bg-gray-50 rounded-lg min-h-[300px]">
-        <p className="text-gray-500">No data available</p>
+      <div role="status" aria-label="No data available" className="workspace-summary-block flex min-h-[300px] items-center justify-center p-4">
+        <p className="text-muted-foreground">No data available</p>
       </div>
     );
   }

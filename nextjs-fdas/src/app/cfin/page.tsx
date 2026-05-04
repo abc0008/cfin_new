@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { CfinHeroPage } from '../page';
+import { redirect } from 'next/navigation';
 
 export const metadata: Metadata = {
   title: 'Financial Document Analysis System | CFIN',
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function CfinPage() {
-  return <CfinHeroPage />;
+  redirect('/product/cfin');
 }

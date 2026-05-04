@@ -123,11 +123,11 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
       console.log('LineChart: Attempting fallback rendering with {x, y} data');
       
       return (
-        <div className="w-full overflow-hidden rounded-lg bg-white p-4 shadow-sm">
+        <div className="workspace-summary-block w-full overflow-hidden p-4">
           {config.title && (
             <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">{config.title}</h3>
-              {config.subtitle && <p className="text-sm text-gray-500">{config.subtitle}</p>}
+              <h3 className="text-lg font-semibold text-foreground">{config.title}</h3>
+              {config.subtitle && <p className="text-sm text-muted-foreground">{config.subtitle}</p>}
             </div>
           )}
           
@@ -161,8 +161,8 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
               
               <Tooltip
                 contentStyle={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                  border: '1px solid #e2e8f0',
+                  backgroundColor: 'hsl(var(--card))',
+                  border: '1px solid hsl(var(--border))',
                   borderRadius: '6px',
                   boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
                   padding: '8px 12px',
@@ -214,7 +214,7 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
         type="monotone"
         dataKey={key}
         name={metricConfig?.label || key}
-        stroke={CHART_COLORS[index % CHART_COLORS.length] || '#8884d8'}
+        stroke={CHART_COLORS[index % CHART_COLORS.length] || CHART_COLORS[0]}
         strokeWidth={2}
         dot={{ r: 3, strokeWidth: 1 }}
         activeDot={{ r: 5, strokeWidth: 1, onClick: handleLineClick }}
@@ -255,11 +255,11 @@ export default function LineChart({ data, height = 400, width = '100%', onDataPo
     
     if (numericKeys.length > 0) {
       return (
-        <div className="w-full overflow-hidden rounded-lg bg-white p-4 shadow-sm">
+        <div className="workspace-summary-block w-full overflow-hidden p-4">
           {config.title && (
             <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">{config.title}</h3>
-              {config.subtitle && <p className="text-sm text-gray-500">{config.subtitle}</p>}
+              <h3 className="text-lg font-semibold text-foreground">{config.title}</h3>
+              {config.subtitle && <p className="text-sm text-muted-foreground">{config.subtitle}</p>}
             </div>
           )}
           

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { CometCard } from "@/components/ui/comet-card";
 import { RainbowButton } from "@/components/ui/rainbow-button";
+import { RM_PRO_FORMA_URL } from "@/lib/app-urls";
 
 interface TimelineRole {
   date: string;
@@ -399,7 +400,7 @@ export default function AboutAlexTimeline() {
                   Connect on LinkedIn
                 </RainbowButton>
                 <Link
-                  href="https://bankanalysis.aceanalytics.dev/rm-pro-forma"
+                  href={RM_PRO_FORMA_URL}
                   className="inline-flex items-center rounded-xl border-2 border-brand-pigeon bg-card px-5 py-2.5 text-foreground font-avenir-pro-demi transition-colors hover:bg-brand-white-smoke"
                 >
                   View Bank Analysis

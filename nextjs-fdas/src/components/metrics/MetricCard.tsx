@@ -17,17 +17,17 @@ export default function MetricCard({ metric, className = '', onClick }: MetricCa
   const trend = metric.trend || 
     (metric.percentChange !== undefined ? getTrend(metric.percentChange) : 'neutral');
   
-  // Determine color based on trend using brand colors
+  // Determine color based on trend using workspace semantic colors
   const colorMap = {
-    up: 'text-brand-hobgoblin', // Hobgoblin for positive
-    down: 'text-brand-lust', // Lust for negative
-    neutral: 'text-brand-mt-rushmore' // Mt. Rushmore for neutral
+    up: 'text-accent',
+    down: 'text-destructive',
+    neutral: 'text-muted-foreground'
   };
   
   const bgColorMap = {
-    up: 'bg-brand-hobgoblin bg-opacity-10',
-    down: 'bg-brand-lust bg-opacity-10', 
-    neutral: 'bg-brand-pigeon bg-opacity-30'
+    up: 'bg-accent/15',
+    down: 'bg-destructive/15', 
+    neutral: 'bg-muted'
   };
   
   const trendColor = colorMap[trend];
@@ -97,7 +97,7 @@ export default function MetricCard({ metric, className = '', onClick }: MetricCa
         
         {/* Display category label if provided */}
         {metric.category && (
-          <span className="px-3 py-1 text-xs rounded-full bg-muted text-muted-foreground font-avenir-pro uppercase tracking-wide">
+          <span className="px-3 py-1 text-xs rounded-full border border-border bg-muted/70 text-muted-foreground font-avenir-pro uppercase tracking-wide">
             {metric.category}
           </span>
         )}

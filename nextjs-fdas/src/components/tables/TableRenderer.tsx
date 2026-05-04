@@ -30,13 +30,13 @@ export default function TableRenderer({
   // Handle loading state
   if (loading) {
     return (
-      <div className={`w-full overflow-hidden rounded-lg bg-white p-4 shadow-sm ${className}`}>
+      <div className={`workspace-summary-block w-full overflow-hidden p-4 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-6 w-40 bg-gray-200 rounded mb-4"></div>
-          <div className="h-4 w-full bg-gray-200 rounded mb-2"></div>
-          <div className="h-4 w-full bg-gray-200 rounded mb-2"></div>
-          <div className="h-4 w-full bg-gray-200 rounded mb-2"></div>
-          <div className="h-4 w-3/4 bg-gray-200 rounded"></div>
+          <div className="mb-4 h-6 w-40 rounded bg-muted"></div>
+          <div className="mb-2 h-4 w-full rounded bg-muted"></div>
+          <div className="mb-2 h-4 w-full rounded bg-muted"></div>
+          <div className="mb-2 h-4 w-full rounded bg-muted"></div>
+          <div className="h-4 w-3/4 rounded bg-muted"></div>
         </div>
       </div>
     );
@@ -45,8 +45,8 @@ export default function TableRenderer({
   // Handle error state
   if (error) {
     return (
-      <div className={`w-full overflow-hidden rounded-lg bg-red-50 p-4 shadow-sm ${className}`}>
-        <div className="text-red-500 text-center">
+      <div className={`workspace-summary-block w-full overflow-hidden border border-destructive/35 bg-destructive/10 p-4 ${className}`}>
+        <div className="text-center text-destructive">
           <h3 className="font-semibold mb-2">Error loading table</h3>
           <p className="text-sm">{error.message}</p>
         </div>
@@ -57,8 +57,8 @@ export default function TableRenderer({
   // If no data is provided, show placeholder
   if (!data) {
     return (
-      <div className={`w-full overflow-hidden rounded-lg bg-white p-4 shadow-sm ${className}`}>
-        <p className="text-gray-500 text-center">No table data available</p>
+      <div className={`workspace-summary-block w-full overflow-hidden p-4 ${className}`}>
+        <p className="text-muted-foreground text-center">No table data available</p>
       </div>
     );
   }
@@ -117,27 +117,27 @@ export default function TableRenderer({
   
   return (
     <div 
-      className={`w-full h-full overflow-hidden rounded-lg bg-white shadow-sm flex flex-col ${className}`}
+      className={`workspace-summary-block flex h-full w-full flex-col overflow-hidden ${className}`}
       style={{ width }}
     >
       {/* Table title and subtitle/description */}
       {config.title && (
         <div className="p-4 pb-0 flex-shrink-0">
-          <h3 className="text-lg font-semibold text-gray-800">{config.title}</h3>
+          <h3 className="text-lg font-avenir-pro-demi text-foreground">{config.title}</h3>
           {config.description && (
-            <p className="text-sm text-gray-500">{config.description}</p>
+            <p className="text-sm text-muted-foreground">{config.description}</p>
           )}
         </div>
       )}
       
       {/* Table - scrollable area */}
       <div className="flex-1 overflow-auto p-4">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 sticky top-0 z-10">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="sticky top-0 z-10 bg-muted/55">
             <tr>
               {/* Row numbers column if enabled */}
               {config.showRowNumbers && (
-                <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+                <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">#</th>
               )}
               
               {/* Column headers */}
@@ -145,7 +145,7 @@ export default function TableRenderer({
                 <th
                   key={`col-${colIndex}`}
                   scope="col"
-                  className={`px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider ${
+                  className={`px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider ${
                     column.align ? `text-${column.align}` : 'text-right'
                   }`}
                   style={{ width: column.width ? `${column.width}px` : 'auto' }}
@@ -156,12 +156,12 @@ export default function TableRenderer({
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-border bg-card">
             {currentRows.map((row, rowIndex) => (
-              <tr key={`row-${rowIndex}`} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+              <tr key={`row-${rowIndex}`} className={rowIndex % 2 === 0 ? 'bg-card' : 'bg-muted/20'}>
                 {/* Row number if enabled */}
                 {config.showRowNumbers && (
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     {currentPage * rowsPerPage + rowIndex + 1}
                   </td>
                 )}
@@ -174,7 +174,7 @@ export default function TableRenderer({
                   return (
                     <td
                       key={`cell-${rowIndex}-${colIndex}`}
-                      className={`px-3 py-4 whitespace-nowrap text-sm text-gray-500 ${
+                      className={`px-3 py-4 whitespace-nowrap text-sm text-foreground ${
                         column.align ? `text-${column.align}` : 'text-right'
                       }`}
                     >
@@ -199,7 +199,7 @@ export default function TableRenderer({
               <tr>
                 <td
                   colSpan={columns.length + (config.showRowNumbers ? 1 : 0)}
-                  className="px-3 py-4 text-center text-sm text-gray-500"
+                  className="px-3 py-4 text-center text-sm text-muted-foreground"
                 >
                   No data available
                 </td>
@@ -213,22 +213,22 @@ export default function TableRenderer({
       <div className="flex-shrink-0">
         {/* Footer if provided */}
         {config.footer && (
-          <div className="px-4 py-2 text-sm text-gray-500 border-t border-gray-200">
+          <div className="border-t border-border px-4 py-2 text-sm text-muted-foreground">
             {config.footer}
           </div>
         )}
         
         {/* Pagination controls */}
         {config.pagination !== false && totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6">
+          <div className="flex items-center justify-between border-t border-border px-4 py-3 sm:px-6">
             <div className="flex flex-1 justify-between sm:hidden">
               <button
                 onClick={goToPrevPage}
                 disabled={currentPage === 0}
                 className={`relative inline-flex items-center rounded-md px-4 py-2 text-sm font-medium ${
                   currentPage === 0
-                    ? 'text-gray-300 cursor-not-allowed'
-                    : 'text-gray-700 hover:bg-gray-50'
+                    ? 'cursor-not-allowed text-muted-foreground/45'
+                    : 'text-foreground hover:bg-muted/45'
                 }`}
               >
                 Previous
@@ -238,8 +238,8 @@ export default function TableRenderer({
                 disabled={currentPage === totalPages - 1}
                 className={`relative ml-3 inline-flex items-center rounded-md px-4 py-2 text-sm font-medium ${
                   currentPage === totalPages - 1
-                    ? 'text-gray-300 cursor-not-allowed'
-                    : 'text-gray-700 hover:bg-gray-50'
+                    ? 'cursor-not-allowed text-muted-foreground/45'
+                    : 'text-foreground hover:bg-muted/45'
                 }`}
               >
                 Next
@@ -247,7 +247,7 @@ export default function TableRenderer({
             </div>
             <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm text-gray-700">
+                <p className="text-sm text-muted-foreground">
                   Showing <span className="font-medium">{currentPage * rowsPerPage + 1}</span> to{' '}
                   <span className="font-medium">
                     {Math.min((currentPage + 1) * rowsPerPage, tableData.length)}
@@ -257,16 +257,16 @@ export default function TableRenderer({
               </div>
               <div>
                 <nav
-                  className="isolate inline-flex -space-x-px rounded-md shadow-sm"
+                  className="isolate inline-flex -space-x-px rounded-md"
                   aria-label="Pagination"
                 >
                   <button
                     onClick={goToPrevPage}
                     disabled={currentPage === 0}
-                    className={`relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ${
+                    className={`relative inline-flex items-center rounded-l-md px-2 py-2 text-muted-foreground ${
                       currentPage === 0
                         ? 'cursor-not-allowed'
-                        : 'hover:bg-gray-50'
+                        : 'hover:bg-muted/45'
                     }`}
                   >
                     <span className="sr-only">Previous</span>
@@ -307,8 +307,8 @@ export default function TableRenderer({
                         aria-current={currentPage === pageNumber ? 'page' : undefined}
                         className={`relative inline-flex items-center px-4 py-2 text-sm font-medium ${
                           currentPage === pageNumber
-                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                            : 'text-gray-500 hover:bg-gray-50'
+                            ? 'z-10 border border-primary/40 bg-primary/15 text-primary'
+                            : 'text-muted-foreground hover:bg-muted/45'
                         }`}
                       >
                         {pageNumber + 1}
@@ -319,10 +319,10 @@ export default function TableRenderer({
                   <button
                     onClick={goToNextPage}
                     disabled={currentPage === totalPages - 1}
-                    className={`relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ${
+                    className={`relative inline-flex items-center rounded-r-md px-2 py-2 text-muted-foreground ${
                       currentPage === totalPages - 1
                         ? 'cursor-not-allowed'
-                        : 'hover:bg-gray-50'
+                        : 'hover:bg-muted/45'
                     }`}
                   >
                     <span className="sr-only">Next</span>

@@ -850,12 +850,12 @@ export function PDFViewer({
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
-          <h3 className="mt-2 text-lg font-semibold text-gray-900">Unable to load PDF</h3>
-          <p className="mt-2 text-sm text-gray-500">
+          <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
+          <h3 className="mt-2 text-lg font-semibold text-foreground">Unable to load PDF</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
             The original PDF file could not be retrieved. Interactive highlighting and citation features are unavailable.
           </p>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="mt-2 text-sm text-muted-foreground/80">
             If you need to view the document text, please contact support or try re-uploading the original PDF.
           </p>
         </div>
@@ -867,9 +867,9 @@ export function PDFViewer({
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
-          <File className="h-12 w-12 text-gray-400 mx-auto" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No document loaded</h3>
-          <p className="mt-1 text-sm text-gray-500">Upload a document to view it here</p>
+          <File className="mx-auto h-12 w-12 text-muted-foreground/70" />
+          <h3 className="mt-2 text-sm font-medium text-foreground">No document loaded</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Upload a document to view it here</p>
         </div>
       </div>
     );
@@ -937,17 +937,17 @@ export function PDFViewer({
   };
 
   return (
-    <div className="h-full bg-gray-50 flex flex-col relative">
+    <div className="relative flex h-full flex-col bg-background">
       {document && (
-        <div className="p-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">{document.metadata.filename}</h2>
+        <div className="workspace-panel-bar border-b border-border p-4">
+          <h2 className="text-lg font-medium text-foreground">{document.metadata.filename}</h2>
           <div className="mt-1 flex flex-col sm:flex-row sm:flex-wrap sm:mt-0 sm:space-x-6">
-            <div className="mt-2 flex items-center text-sm text-gray-500">
-              <File className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" />
+            <div className="mt-2 flex items-center text-sm text-muted-foreground">
+              <File className="mr-1.5 h-5 w-5 flex-shrink-0 text-muted-foreground/80" />
               {document.metadata.mimeType}
             </div>
             {document.confidenceScore !== undefined && (
-              <div className="mt-2 flex items-center text-sm text-gray-500">
+              <div className="mt-2 flex items-center text-sm text-muted-foreground">
                 <span className="mr-1.5">Confidence:</span>
                 {Math.round(document.confidenceScore * 100)}%
               </div>
@@ -1012,11 +1012,11 @@ export function PDFViewer({
                     transformSelection
                   ) => {
                     return (
-                      <div className="bg-white p-2 border border-gray-300 rounded shadow-md">
+                      <div className="workspace-summary-block border border-border bg-card p-2">
                         <div className="flex justify-between mb-2">
-                          <div>Add Highlight</div>
+                          <div className="text-foreground">Add Highlight</div>
                           <button 
-                            className="text-primary hover:text-primary/80 px-3 py-1 rounded text-sm font-avenir-pro" 
+                            className="workspace-primary-btn px-3 py-1 text-sm font-avenir-pro" 
                             onClick={() => {
                               const highlightId = `highlight-${Date.now()}`;
                               addHighlight({
@@ -1049,23 +1049,23 @@ export function PDFViewer({
       
       {/* Performance controls for large PDFs */}
       {totalPages > 50 && (
-        <div className="absolute bottom-4 right-4 bg-white rounded-md shadow p-2 text-xs z-10 border border-gray-200">
-          <div className="mb-1 font-medium">Performance Options</div>
+        <div className="workspace-summary-block absolute bottom-4 right-4 z-10 border border-border p-2 text-xs">
+          <div className="mb-1 font-medium text-foreground">Performance Options</div>
           <div className="flex space-x-2">
             <button 
-              className={`px-2 py-1 rounded ${renderingQuality === 'low' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+              className={`rounded-full px-3 py-1 ${renderingQuality === 'low' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
               onClick={() => setRenderScale(1.0)}
             >
               Low
             </button>
             <button 
-              className={`px-2 py-1 rounded ${renderingQuality === 'medium' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+              className={`rounded-full px-3 py-1 ${renderingQuality === 'medium' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
               onClick={() => setRenderScale(1.5)}
             >
               Medium
             </button>
             <button 
-              className={`px-2 py-1 rounded ${renderingQuality === 'high' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+              className={`rounded-full px-3 py-1 ${renderingQuality === 'high' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
               onClick={() => setRenderScale(2.0)}
             >
               High

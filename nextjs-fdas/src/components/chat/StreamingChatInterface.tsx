@@ -181,7 +181,7 @@ export function StreamingChatInterface({
     if (message.role === 'system' && message.content === 'AI is thinking...') {
       return (
         <div key={message.id} className="flex justify-start">
-          <div className="max-w-[80%] rounded-lg px-4 py-2 bg-muted text-muted-foreground flex items-center">
+          <div className="workspace-message-system flex max-w-[84%] items-center rounded-[16px] px-4 py-2">
             <Loader2 className="h-5 w-5 text-primary animate-spin mr-2" />
             <span className="font-avenir-pro">Analyzing document...</span>
           </div>
@@ -229,12 +229,12 @@ export function StreamingChatInterface({
           className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
         >
           <div 
-            className={`max-w-[80%] rounded-lg px-4 py-3 font-avenir-pro text-sm ${
+            className={`max-w-[84%] rounded-[16px] px-4 py-3 font-avenir-pro text-sm ${
               message.role === 'user' 
-                ? 'bg-primary text-primary-foreground' 
+                ? 'workspace-message-user' 
                 : message.role === 'system' 
-                  ? 'bg-muted text-muted-foreground italic' 
-                  : 'bg-card border border-border text-foreground shadow-sm'
+                  ? 'workspace-message-system'
+                  : 'workspace-message-assistant'
             }`}
           >
             <MessageRenderer 
@@ -294,8 +294,8 @@ export function StreamingChatInterface({
   }, [streamingText, toolsInProgress, isStreaming, streamingCitations, handleCitationClick]);
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      <div className="py-1 px-2 border-b border-border bg-card">
+    <div className="workspace-chat-shell flex h-full flex-col bg-background">
+      <div className="workspace-chat-top px-3 py-2.5">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-avenir-pro-demi text-foreground">Claude Assistant</h2>
           {conversationId && (
@@ -306,10 +306,10 @@ export function StreamingChatInterface({
               )}
               <button
                 onClick={() => setUseStreaming(!useStreaming)}
-                className={`flex items-center px-2 py-1 rounded text-xs transition-colors ${
+                className={`flex items-center rounded-full px-2.5 py-1 text-xs transition-colors ${
                   useStreaming 
                     ? 'bg-primary text-primary-foreground' 
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    : 'border border-border bg-transparent text-muted-foreground hover:bg-muted/40'
                 }`}
                 title={useStreaming ? 'Streaming enabled' : 'Streaming disabled'}
               >
@@ -321,7 +321,7 @@ export function StreamingChatInterface({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-1 px-2 space-y-4 bg-muted/20 text-xs">
+      <div className="workspace-chat-stream flex-1 space-y-4 overflow-y-auto px-3 py-3 text-xs">
         {messages.length === 0 && !isStreaming ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-6">
             <FileText className="h-12 w-12 mb-4 text-muted-foreground/40" />
@@ -331,20 +331,20 @@ export function StreamingChatInterface({
             <div className="text-sm text-left w-full max-w-md space-y-2 font-avenir-pro">
               <p className="font-avenir-pro-demi text-foreground">Try asking:</p>
               <button 
-                onClick={() => setInputValue("What is the company's revenue for last quarter?")}
-                className="p-1 bg-card border border-border rounded-md text-left w-full hover:bg-muted/30 transition-colors text-foreground text-xs"
+                onClick={() => setInputValue("What is the company revenue for last quarter?")}
+                className="workspace-suggestion-btn text-xs"
               >
-                What is the company's revenue for last quarter?
+                What is the company revenue for last quarter?
               </button>
               <button 
                 onClick={() => setInputValue("Calculate the current ratio from the balance sheet.")}
-                className="p-1 bg-card border border-border rounded-md text-left w-full hover:bg-muted/30 transition-colors text-foreground text-xs"
+                className="workspace-suggestion-btn text-xs"
               >
                 Calculate the current ratio from the balance sheet.
               </button>
               <button 
                 onClick={() => setInputValue("How has the gross margin changed over time?")}
-                className="p-1 bg-card border border-border rounded-md text-left w-full hover:bg-muted/30 transition-colors text-foreground text-xs"
+                className="workspace-suggestion-btn text-xs"
               >
                 How has the gross margin changed over time?
               </button>
@@ -358,7 +358,7 @@ export function StreamingChatInterface({
         )}
         {isLoading && !isStreaming && (
           <div className="flex justify-start">
-            <div className="bg-card border border-border rounded-lg rounded-bl-none p-4 max-w-[80%] flex items-center shadow-sm">
+            <div className="workspace-message-assistant flex max-w-[84%] items-center rounded-[16px] p-4">
               <Loader2 className="h-4 w-4 animate-spin mr-2 text-primary" />
               <span className="text-sm text-muted-foreground font-avenir-pro">Claude is thinking...</span>
             </div>
@@ -367,7 +367,7 @@ export function StreamingChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="py-1 px-2 border-t border-border bg-card">
+      <div className="workspace-chat-compose px-3 py-2.5">
         <form onSubmit={handleSubmit} className="flex items-end space-x-2">
           <div className="flex-1 relative">
             <textarea
@@ -384,7 +384,7 @@ export function StreamingChatInterface({
             />
             {activeDocuments && activeDocuments.length > 0 && (
               <div className="absolute bottom-full mb-1 left-0 text-xs text-muted-foreground font-avenir-pro">
-                <span className="bg-muted px-1 py-0.5 rounded">
+                <span className="workspace-status-pill">
                   Using {activeDocuments.length} document{activeDocuments.length !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -393,7 +393,7 @@ export function StreamingChatInterface({
           <button
             type="submit"
             disabled={!inputValue.trim() || isSubmitting || (isStreaming && useStreaming) || (useStreaming && !isConnected)}
-            className="bg-primary text-primary-foreground p-3 rounded-full hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed h-[44px] w-[44px] flex items-center justify-center transition-colors"
+            className="flex h-[44px] w-[44px] items-center justify-center rounded-full bg-primary p-3 text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             title={useStreaming && !isConnected ? "Connecting to real-time chat..." : ""}
           >
             {isSubmitting || (isStreaming && useStreaming) ? (

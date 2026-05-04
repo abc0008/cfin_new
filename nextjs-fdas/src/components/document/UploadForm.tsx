@@ -246,7 +246,7 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
       )}
       
       {warning && !error && (
-        <div className="p-4 border border-brand-lust-border rounded-md flex items-start space-x-2 bg-brand-lust bg-opacity-10 text-brand-lust">
+        <div className="workspace-summary-block flex items-start space-x-2 border border-primary/35 bg-primary/10 p-4 text-foreground">
           <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
           <div className="text-sm">{warning}</div>
         </div>
@@ -260,7 +260,7 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
       )}
       
       <div 
-        className={`flex flex-col items-center p-6 border-2 ${isDragging ? 'border-primary bg-primary/10' : 'border-dashed border-muted bg-background hover:bg-muted/30'} rounded-md transition-colors`}
+        className={`flex flex-col items-center rounded-xl border-2 p-6 transition-colors ${isDragging ? 'border-primary bg-primary/10' : 'border-dashed border-border bg-muted/30 hover:bg-muted/50'}`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -270,7 +270,7 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
           <>
             <File className="h-8 w-8 text-muted-foreground mb-2" />
             <p className="text-sm text-muted-foreground mb-4">Drag and drop your PDF or click to browse</p>
-            <label className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
+            <label className="workspace-primary-btn h-10 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50">
               <Upload className="mr-2 h-4 w-4" />
               Select PDF
               <input 
@@ -314,7 +314,7 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
                   <button
                     type="button"
                     onClick={cancelUpload}
-                    className="bg-brand-lust hover:bg-brand-lust/90 text-white font-avenir-pro-demi py-1.5 px-4 rounded-md shadow-sm transition-all duration-200 flex items-center justify-center text-xs"
+                    className="workspace-danger-btn"
                   >
                     Cancel Upload
                   </button>
@@ -325,7 +325,7 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
                 <button
                   type="button"
                   onClick={cancelUpload}
-                  className="flex-1 border border-input bg-background text-foreground hover:bg-muted rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-sm px-4 py-2"
+                  className="workspace-secondary-btn flex-1 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
                   Cancel
                 </button>
@@ -333,7 +333,7 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
                   type="button"
                   onClick={handleUpload}
                   disabled={isUploading}
-                  className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none text-sm px-4 py-2 flex items-center justify-center"
+                  className="workspace-primary-btn flex-1 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
                 >
                   {isUploading ? (
                     <>
@@ -355,7 +355,7 @@ export function UploadForm({ onUploadSuccess, onUploadError, sessionId }: Upload
           ) : progress < 90 ? (
             <div>Processing your document. This may take a minute...</div>
           ) : (
-            <div className="text-primary font-medium">
+            <div className="font-medium text-accent">
               Verifying financial data extraction...
             </div>
           )}

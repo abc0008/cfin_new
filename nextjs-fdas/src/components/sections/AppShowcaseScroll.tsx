@@ -3,6 +3,7 @@ import React from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { StickyScroll } from "@/components/ui/sticky-scroll-reveal";
+import { RM_PRO_FORMA_URL } from "@/lib/app-urls";
 
 function AppCard({
   logo,
@@ -81,7 +82,7 @@ const appScrollContent = [
     content: (
       <AppCard
         logo="/assets/bank-analysis-logo.png"
-        href="https://bankanalysis.aceanalytics.dev/rm-pro-forma"
+        href={RM_PRO_FORMA_URL}
         label="Open Bank Analysis"
         gradientFrom="from-[#02a88e]"
         gradientTo="to-[#02a88e]/90"

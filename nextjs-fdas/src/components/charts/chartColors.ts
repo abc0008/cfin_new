@@ -2,65 +2,65 @@
 // Optimized for data visualization with strong contrast and clarity
 
 export const CHART_COLORS = [
-  '#8f0f56', // Deep Red/Mulberry - Primary brand color, excellent for key metrics
-  '#02a88e', // Professional Teal - Secondary brand color, great for positive data
-  '#00bed5', // Bright Blue - Accent color, good for highlights and comparisons
-  '#e5241d', // Strong Red - Alert/negative values, clear warning color
-  '#2c3e50', // Dark Blue-Gray - Professional dark neutral
-  '#7f8c8d', // Medium Gray - Balanced neutral color
-  '#95a5a6', // Light Gray - Subtle data points
-  '#34495e', // Charcoal - Alternative dark color
+  '#ffac03', // Aperture gold - primary metric color
+  '#739666', // Aperture green - positive/secondary data
+  '#6e8ea0', // Aperture slate - comparison series
+  '#e6724f', // Aperture orange - caution/negative data
+  '#263c49', // Deep slate - neutral dark series
+  '#606060', // Mid gray - neutral series
+  '#b8b8b8', // Light gray - supporting series
+  '#8b6da5', // Plum accent - overflow series
 ];
 
 // Enhanced color palette with stroke and fill variations for area charts
 export const CHART_COLORS_STROKE_FILL = [
-  { stroke: '#8f0f56', fill: 'rgba(143, 15, 86, 0.1)' },   // Mulberry with transparency
-  { stroke: '#02a88e', fill: 'rgba(2, 168, 142, 0.1)' },   // Teal with transparency
-  { stroke: '#00bed5', fill: 'rgba(0, 190, 213, 0.1)' },   // Blue with transparency
-  { stroke: '#e5241d', fill: 'rgba(229, 36, 29, 0.1)' },   // Red with transparency
-  { stroke: '#2c3e50', fill: 'rgba(44, 62, 80, 0.1)' },    // Dark blue-gray with transparency
-  { stroke: '#7f8c8d', fill: 'rgba(127, 140, 141, 0.1)' }, // Medium gray with transparency
-  { stroke: '#95a5a6', fill: 'rgba(149, 165, 166, 0.1)' }, // Light gray with transparency
-  { stroke: '#34495e', fill: 'rgba(52, 73, 94, 0.1)' },    // Charcoal with transparency
+  { stroke: '#ffac03', fill: 'rgba(255, 172, 3, 0.16)' },
+  { stroke: '#739666', fill: 'rgba(115, 150, 102, 0.14)' },
+  { stroke: '#6e8ea0', fill: 'rgba(110, 142, 160, 0.14)' },
+  { stroke: '#e6724f', fill: 'rgba(230, 114, 79, 0.14)' },
+  { stroke: '#263c49', fill: 'rgba(38, 60, 73, 0.14)' },
+  { stroke: '#606060', fill: 'rgba(96, 96, 96, 0.14)' },
+  { stroke: '#b8b8b8', fill: 'rgba(184, 184, 184, 0.18)' },
+  { stroke: '#8b6da5', fill: 'rgba(139, 109, 165, 0.14)' },
 ];
 
 // Semantic color palette for specific chart types
 export const SEMANTIC_COLORS = {
   // Trend indicators
-  positive: '#02a88e',  // Teal for growth/positive trends
-  negative: '#e5241d',  // Red for decline/negative trends
-  neutral: '#7f8c8d',   // Gray for stable/neutral trends
+  positive: '#739666',  // Aperture green for growth/positive trends
+  negative: '#e6724f',  // Aperture orange for decline/negative trends
+  neutral: '#606060',   // Gray for stable/neutral trends
   
   // Financial categories
-  revenue: '#8f0f56',   // Mulberry for revenue data
-  expenses: '#e5241d',  // Red for expenses
-  profit: '#02a88e',    // Teal for profit
-  assets: '#00bed5',    // Blue for assets
+  revenue: '#ffac03',   // Aperture gold for revenue data
+  expenses: '#e6724f',  // Aperture orange for expenses
+  profit: '#739666',    // Aperture green for profit
+  assets: '#6e8ea0',    // Aperture slate for assets
   
   // Performance indicators
-  high: '#02a88e',      // Teal for high performance
-  medium: '#00bed5',    // Blue for medium performance
-  low: '#7f8c8d',       // Gray for low performance
-  warning: '#f39c12',   // Orange for warnings
+  high: '#739666',      // Green for high performance
+  medium: '#6e8ea0',    // Slate for medium performance
+  low: '#606060',       // Gray for low performance
+  warning: '#ffac03',   // Gold for warnings
   
   // Portfolio colors (matching presentation style)
   portfolio: {
-    primary: '#8f0f56',     // Deep red for primary segments
-    secondary: '#02a88e',   // Teal for secondary segments  
-    tertiary: '#00bed5',    // Blue for tertiary segments
-    quaternary: '#2c3e50',  // Dark gray for additional segments
+    primary: '#ffac03',     // Gold for primary segments
+    secondary: '#739666',   // Green for secondary segments
+    tertiary: '#6e8ea0',    // Slate for tertiary segments
+    quaternary: '#263c49',  // Deep slate for additional segments
   }
 };
 
 // Color palette specifically for pie charts (matching presentation slides)
 export const PIE_CHART_COLORS = [
-  '#8f0f56', // Deep Red - Primary data
-  '#02a88e', // Teal - Secondary data
-  '#00bed5', // Blue - Additional data
-  '#2c3e50', // Dark Gray - Supporting data
-  '#e5241d', // Alert Red - Negative/warning data
-  '#7f8c8d', // Medium Gray - Neutral data
-  '#95a5a6', // Light Gray - Background data
+  '#ffac03', // Gold - Primary data
+  '#739666', // Green - Secondary data
+  '#6e8ea0', // Slate - Additional data
+  '#263c49', // Deep slate - Supporting data
+  '#e6724f', // Orange - Negative/warning data
+  '#606060', // Medium Gray - Neutral data
+  '#b8b8b8', // Light Gray - Background data
 ];
 
 // Export default as main chart colors

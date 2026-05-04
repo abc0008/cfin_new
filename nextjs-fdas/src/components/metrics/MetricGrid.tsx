@@ -25,11 +25,11 @@ export default function MetricGrid({ metrics, title, subtitle, onMetricClick }: 
     : metrics;
   
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
+    <div className="workspace-summary-block p-4">
       {/* Header section with title and category filter */}
       <div className="mb-4">
-        {title && <h2 className="text-lg font-semibold text-gray-800">{title}</h2>}
-        {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+        {title && <h2 className="text-lg font-avenir-pro-demi text-foreground">{title}</h2>}
+        {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
         
         {/* Category filter tabs (only show if we have categories) */}
         {categories.length > 0 && (
@@ -37,8 +37,8 @@ export default function MetricGrid({ metrics, title, subtitle, onMetricClick }: 
             <button
               className={`px-3 py-1 text-xs rounded-full ${
                 selectedCategory === null
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'border border-border bg-muted/70 text-foreground hover:bg-muted'
               }`}
               onClick={() => setSelectedCategory(null)}
             >
@@ -50,8 +50,8 @@ export default function MetricGrid({ metrics, title, subtitle, onMetricClick }: 
                 key={category}
                 className={`px-3 py-1 text-xs rounded-full ${
                   selectedCategory === category
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'border border-border bg-muted/70 text-foreground hover:bg-muted'
                 }`}
                 onClick={() => setSelectedCategory(category)}
               >
@@ -79,7 +79,7 @@ export default function MetricGrid({ metrics, title, subtitle, onMetricClick }: 
         </div>
       ) : (
         <div className="text-center py-6">
-          <p className="text-gray-500">No metrics available</p>
+          <p className="text-muted-foreground">No metrics available</p>
         </div>
       )}
     </div>

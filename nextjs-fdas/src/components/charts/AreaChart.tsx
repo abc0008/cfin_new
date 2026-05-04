@@ -115,8 +115,8 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
 
   if (!chartData || chartData.length === 0) {
     return (
-      <div role="status" aria-label="No data available" className="flex items-center justify-center p-4 bg-gray-50 rounded-lg min-h-[300px]">
-        <p className="text-gray-500">No data available</p>
+      <div role="status" aria-label="No data available" className="workspace-summary-block flex min-h-[300px] items-center justify-center p-4">
+        <p className="text-muted-foreground">No data available</p>
       </div>
     );
   }
@@ -147,17 +147,17 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
   if (allValues.length === 0) {
     console.warn('AreaChart - No valid numeric values found in data');
     return (
-      <div className="w-full">
+      <div className="workspace-summary-block w-full p-4">
         <div className="mb-4">
           {config.title && (
-            <h3 className="text-lg font-semibold text-gray-900">{config.title}</h3>
+            <h3 className="text-lg font-semibold text-foreground">{config.title}</h3>
           )}
           <p className="text-sm text-red-500">
             Chart error: No valid numeric data found
           </p>
           <details className="mt-2">
-            <summary className="text-xs text-gray-500 cursor-pointer">Debug info</summary>
-            <pre className="text-xs text-gray-400 mt-1 overflow-auto max-h-32">
+            <summary className="cursor-pointer text-xs text-muted-foreground">Debug info</summary>
+            <pre className="mt-1 max-h-32 overflow-auto text-xs text-muted-foreground/80">
               {JSON.stringify({ chartData: chartData.slice(0, 2), dataKeys, isMultiSeries }, null, 2)}
             </pre>
           </details>

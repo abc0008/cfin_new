@@ -1,0 +1,3614 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,400&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
+
+.ace-marketing {
+  --bg: #ebebeb;
+  --bg-deep: #d1d1d1;
+  --panel: #efefef;
+  --ink: #111111;
+  --ink-2: #606060;
+  --ink-3: #b8b8b8;
+  --accent: #ffac03;
+  --accent-2: #7a8579;
+  --accent-slate: #263c49;
+  --accent-orange: #d95f3d;
+  --accent-plum: #2b1d34;
+  --accent-olive: #444a3e;
+  --line: rgba(17, 17, 17, 0.12);
+  --line-strong: rgba(17, 17, 17, 0.28);
+  --chrome-body: #fcfaf5;
+  --chrome-bar: #f4eee2;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  font-family: 'Inter Tight', system-ui, sans-serif;
+}
+
+.ace-marketing * {
+  box-sizing: border-box;
+}
+
+.ace-marketing .wrap {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+.ace-marketing .section {
+  padding: 120px 0;
+}
+
+.ace-marketing .mono {
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+.ace-marketing .muted {
+  color: var(--ink-2);
+}
+
+.ace-marketing .ital {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  color: var(--accent);
+}
+
+.ace-marketing .h1 {
+  font-size: clamp(56px, 8vw, 132px);
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+}
+
+.ace-marketing .h2 {
+  font-size: clamp(44px, 6vw, 88px);
+  line-height: 0.94;
+  letter-spacing: -0.03em;
+  margin-top: 24px;
+}
+
+.ace-marketing .lede {
+  font-size: 20px;
+  color: var(--ink-2);
+  line-height: 1.45;
+  max-width: 620px;
+  margin-top: 24px;
+}
+
+.ace-marketing .hero-main-title {
+  font-size: clamp(44px, 7.2vw, 118px);
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.ace-marketing .hero-main-lede {
+  max-width: 46ch;
+  text-wrap: pretty;
+}
+
+.ace-marketing .eyebrow {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.ace-marketing .eyebrow::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.ace-marketing .eyebrow .dot {
+  opacity: 0.5;
+}
+
+.ace-marketing .actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
+  flex-wrap: wrap;
+}
+
+.ace-marketing .btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 13px 20px;
+  border-radius: 99px;
+  border: 1px solid transparent;
+  font-size: 15px;
+  text-decoration: none;
+  color: inherit;
+  transition: 0.2s ease;
+}
+
+.ace-marketing .btn:hover {
+  transform: translateY(-1px);
+}
+
+.ace-marketing .btn-accent {
+  background: var(--accent);
+  color: #111;
+}
+
+.ace-marketing .btn-ghost {
+  border-color: var(--line-strong);
+}
+
+.ace-marketing .btn-ghost:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.ace-marketing .nav {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 40;
+  padding: 18px 28px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  color: #ebebeb;
+  mix-blend-mode: difference;
+}
+
+.ace-marketing .brand {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  font-weight: 600;
+  text-decoration: none;
+  color: inherit;
+}
+
+.ace-marketing .mark {
+  width: 20px;
+  height: 20px;
+  background: #ebebeb;
+  position: relative;
+}
+
+.ace-marketing .mark::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  background: #111;
+}
+
+.ace-marketing .nav .links {
+  display: flex;
+  gap: 24px;
+}
+
+.ace-marketing .nav .links a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.ace-marketing .nav .cta {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ace-marketing .nav-pill {
+  border: 1px solid rgba(235, 235, 235, 0.55);
+  border-radius: 99px;
+  padding: 8px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ace-marketing .nav-pill.filled {
+  background: #ebebeb;
+  color: #111;
+}
+
+.ace-marketing .nav-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ace-marketing .theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(235, 235, 235, 0.55);
+  border-radius: 99px;
+  padding: 2px;
+}
+
+.ace-marketing .theme-toggle button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.55;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.ace-marketing .theme-toggle button.on {
+  opacity: 1;
+  background: rgba(235, 235, 235, 0.22);
+}
+
+.ace-marketing .theme-toggle svg,
+.ace-marketing .layout-trigger svg {
+  width: 15px;
+  height: 15px;
+}
+
+.ace-marketing .layout-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(235, 235, 235, 0.55);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.ace-marketing .layout-trigger {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.ace-marketing .layout-options {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  padding-right: 0;
+  transition:
+    max-width 0.24s ease,
+    opacity 0.2s ease,
+    padding-right 0.2s ease;
+  pointer-events: none;
+}
+
+.ace-marketing .layout-pill.open .layout-options {
+  max-width: 220px;
+  opacity: 1;
+  padding-right: 6px;
+  pointer-events: auto;
+}
+
+.ace-marketing .layout-option {
+  border: 0;
+  border-radius: 99px;
+  background: transparent;
+  color: inherit;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 7px 10px;
+  white-space: nowrap;
+  opacity: 0.7;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.ace-marketing .layout-option.on {
+  opacity: 1;
+  background: rgba(235, 235, 235, 0.22);
+}
+
+.ace-marketing .live {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.ace-marketing .hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding-top: 120px;
+}
+
+.ace-marketing .grid-2 {
+  display: grid;
+  gap: 48px;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+}
+
+.ace-marketing .mock-card {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 28px;
+}
+
+.ace-marketing .ribbon {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+  padding: 20px 0;
+}
+
+.ace-marketing .track {
+  display: flex;
+  width: max-content;
+  gap: 38px;
+  animation: marquee 40s linear infinite;
+}
+
+.ace-marketing .tag {
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ace-marketing .numbers {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 120px 0;
+}
+
+.ace-marketing .numbers .grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 36px;
+}
+
+.ace-marketing .numbers .metric {
+  min-width: 0;
+}
+
+.ace-marketing .numbers .n {
+  font-size: clamp(72px, 10vw, 140px);
+  line-height: 0.92;
+  color: var(--accent);
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+
+.ace-marketing .numbers .desc {
+  margin-top: 14px;
+  font-size: clamp(24px, 2.5vw, 42px);
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  text-wrap: pretty;
+}
+
+.ace-marketing .numbers .cap {
+  margin-top: 10px;
+  font-size: 16px;
+  color: color-mix(in srgb, var(--bg) 82%, transparent);
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.ace-marketing .closing {
+  padding: 140px 0 100px;
+}
+
+.ace-marketing .closing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: end;
+  gap: 56px;
+}
+
+.ace-marketing .closing h2 {
+  font-size: clamp(52px, 7vw, 112px);
+  line-height: 0.94;
+  letter-spacing: -0.04em;
+  margin-top: 24px;
+}
+
+.ace-marketing .closing p {
+  color: var(--ink-2);
+  font-size: 19px;
+}
+
+.ace-marketing .footer {
+  background: var(--bg-deep);
+  padding: 80px 0 40px;
+}
+
+.ace-marketing .mega {
+  font-size: clamp(60px, 9vw, 150px);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  margin: 22px 0 48px;
+}
+
+.ace-marketing .mega .an {
+  color: var(--accent-slate);
+}
+
+.ace-marketing .mega .dev {
+  color: var(--ink-3);
+}
+
+.ace-marketing .grid4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 30px;
+}
+
+.ace-marketing .grid4 h4 {
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: var(--ink-2);
+  margin-bottom: 12px;
+}
+
+.ace-marketing .grid4 ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ace-marketing .grid4 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.ace-marketing .prod-tabs {
+  position: sticky;
+  top: 72px;
+  z-index: 10;
+  display: flex;
+  gap: 10px;
+  padding: 20px 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+
+.ace-marketing .prod-tabs-toolkit {
+  display: block;
+  padding: 14px 0;
+  transition: padding 200ms ease;
+}
+
+.ace-marketing .prod-tabs-toolkit.is-stuck {
+  padding: 10px 0;
+}
+
+.ace-marketing .prod-tabs-toolkit .wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ace-marketing .prod-tabs-toolkit .prod-tabs-ops {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  max-height: 22px;
+  opacity: 0.92;
+  transform: translateY(0);
+  overflow: hidden;
+  transition:
+    max-height 220ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.ace-marketing .prod-tabs-toolkit.is-stuck .prod-tabs-ops {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+
+.ace-marketing .prod-tabs-toolkit .prod-tabs-op {
+  padding: 0 16px;
+}
+
+.ace-marketing .prod-tabs-toolkit .prod-tabs-op-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ace-marketing .prod-tabs-toolkit .prod-tabs-op-text .enc {
+  color: color-mix(in srgb, var(--ink-3) 88%, transparent);
+}
+
+.ace-marketing .prod-tabs-toolkit .prod-tabs-op-text .rev {
+  color: color-mix(in srgb, var(--ink-2) 86%, transparent);
+}
+
+.ace-marketing .prod-tabs-toolkit .prod-tabs-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ace-marketing .prod-tabs .p {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 20px;
+  border-radius: 99px;
+  border: 1px solid var(--line-strong);
+  text-align: left;
+  transition: all 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ace-marketing .prod-tabs-toolkit .p {
+  width: 100%;
+  padding: 9px 16px;
+  gap: 1px;
+}
+
+.ace-marketing .prod-tabs .op {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-2);
+  letter-spacing: 0.12em;
+}
+
+.ace-marketing .prod-tabs .nm {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.ace-marketing .prod-tabs-toolkit .nm {
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+.ace-marketing .prod-tabs .p.on {
+  background: var(--tab-accent, var(--ink));
+  color: var(--tab-fg, var(--bg));
+  border-color: var(--tab-accent, var(--ink));
+}
+
+.ace-marketing .prod-tabs .tg {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.ace-marketing .prod-tabs-toolkit .tg {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.ace-marketing .prod-tabs .p.on .op,
+.ace-marketing .prod-tabs .p.on .tg {
+  color: color-mix(in srgb, var(--tab-fg, var(--bg)) 72%, transparent);
+}
+
+@media (max-width: 960px) {
+  .ace-marketing .prod-tabs-toolkit .prod-tabs-ops,
+  .ace-marketing .prod-tabs-toolkit .prod-tabs-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.ace-marketing .pp-subnav {
+  position: sticky;
+  top: 58px;
+  z-index: 10;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+
+.ace-marketing .pp-subnav-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 28px;
+}
+
+.ace-marketing .pp-back,
+.ace-marketing .pp-tab {
+  color: inherit;
+  text-decoration: none;
+}
+
+.ace-marketing .pp-tabs {
+  display: flex;
+  gap: 14px;
+}
+
+.ace-marketing .pp-tab {
+  display: flex;
+  flex-direction: column;
+}
+
+.ace-marketing .pp-tab .s {
+  color: var(--ink-2);
+  font-size: 11px;
+}
+
+.ace-marketing [data-reveal] {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: 0.6s ease;
+}
+
+.ace-marketing [data-revealed='true'] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 960px) {
+  .ace-marketing .grid-2,
+  .ace-marketing .closing-grid,
+  .ace-marketing .grid4,
+  .ace-marketing .numbers .grid3 {
+    grid-template-columns: 1fr;
+  }
+
+  .ace-marketing .nav {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    position: static;
+    padding: 16px 20px;
+    mix-blend-mode: normal;
+    color: var(--ink);
+    border-bottom: 1px solid var(--line);
+    background: var(--bg);
+  }
+
+  .ace-marketing .nav .cta {
+    justify-content: flex-start;
+  }
+
+  .ace-marketing .theme-toggle {
+    border-color: var(--line-strong);
+  }
+
+  .ace-marketing .theme-toggle button.on,
+  .ace-marketing .layout-option.on {
+    background: color-mix(in srgb, var(--ink) 12%, transparent);
+  }
+
+  .ace-marketing .layout-pill {
+    border-color: var(--line-strong);
+  }
+}
+
+.ace-marketing[data-direction='B'] {
+  --bg: #111111;
+  --bg-deep: #292929;
+  --panel: #333333;
+  --ink: #ebebeb;
+  --ink-2: #d1d1d1;
+  --ink-3: #606060;
+  --accent: #ffac03;
+  --accent-2: #739666;
+  --accent-slate: #6e8ea0;
+  --accent-orange: #e6724f;
+  --accent-plum: #8b6da5;
+  --accent-olive: #8b9178;
+  --line: rgba(235, 235, 235, 0.12);
+  --line-strong: rgba(235, 235, 235, 0.3);
+  --chrome-body: #0b0b0c;
+  --chrome-bar: #111113;
+}
+
+.ace-marketing .display {
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  font-weight: 600;
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+}
+
+.ace-marketing .h3 {
+  font-size: clamp(32px, 3.6vw, 56px);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+}
+
+.ace-marketing .btn .arr {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  position: relative;
+  top: 0;
+}
+
+.ace-marketing .btn .arr::after {
+  content: '→';
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px;
+}
+
+.ace-marketing .btn-ink {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.ace-marketing .btn-ink:hover {
+  background: var(--accent);
+  color: #111;
+}
+
+.ace-marketing .btn-primary {
+  background: var(--accent);
+  color: #111;
+}
+
+.ace-marketing .btn-primary:hover {
+  opacity: 0.92;
+}
+
+.ace-marketing .btn-tool {
+  background: var(--tool-accent, var(--accent));
+  color: #fff;
+}
+
+.ace-marketing .btn-tool:hover {
+  filter: brightness(0.95);
+}
+
+.ace-marketing .hr {
+  height: 1px;
+  background: var(--line);
+  border: 0;
+  width: 100%;
+}
+
+.ace-marketing .hr-strong {
+  height: 1px;
+  background: var(--line-strong);
+  border: 0;
+  width: 100%;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes dashpulse {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(8px);
+    opacity: 0.4;
+  }
+}
+
+.ace-marketing .route {
+  animation: routeIn 500ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes routeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ace-marketing .scroll-hint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.ace-marketing .scroll-hint .dash {
+  display: inline-block;
+  width: 18px;
+  height: 1px;
+  background: var(--ink-2);
+  animation: dashpulse 1.6s infinite;
+}
+
+.ace-marketing .hero-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+}
+
+.ace-marketing .hero-split .r {
+  background: var(--bg-deep);
+  padding: 80px 48px;
+  display: flex;
+  align-items: center;
+}
+
+.ace-marketing .hero-split .l {
+  padding: 80px 48px;
+  display: flex;
+  align-items: center;
+}
+
+.ace-marketing .hero-typo .big {
+  font-size: clamp(80px, 14vw, 260px);
+  line-height: 0.88;
+  letter-spacing: -0.05em;
+  font-weight: 600;
+}
+
+.ace-marketing .tool-pin {
+  height: 320vh;
+  position: relative;
+}
+
+.ace-marketing .tool-pin .stick {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+}
+
+.ace-marketing .tool-pin .content {
+  display: grid;
+  grid-template-columns: 1.05fr 1.2fr;
+  gap: 48px;
+  width: 100%;
+  align-items: center;
+}
+
+.ace-marketing .tool-pin .tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.ace-marketing .tool-pin .tabs .t {
+  width: 40px;
+  height: 3px;
+  background: var(--line);
+  transition: background 400ms ease, width 400ms ease;
+}
+
+.ace-marketing .tool-pin .tabs .t.on {
+  background: var(--ink);
+  width: 64px;
+}
+
+.ace-marketing .tool-pin .tool-name {
+  font-weight: 600;
+  font-size: clamp(56px, 8vw, 124px);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+
+.ace-marketing .tool-pin .tool-desc {
+  margin-top: 20px;
+  color: var(--ink-2);
+  font-size: 20px;
+  max-width: 480px;
+}
+
+.ace-marketing .tool-pin .slide {
+  transition: opacity 600ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ace-marketing .philosophy-pin {
+  height: 300vh;
+  position: relative;
+}
+
+.ace-marketing .philosophy-pin .stick {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+}
+
+.ace-marketing .phil-split {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 36px;
+  min-height: 70vh;
+}
+
+.ace-marketing .phil-left .item {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 26px;
+  align-items: baseline;
+  padding: 20px 0;
+  opacity: 0.16;
+  transform: translateX(-20px);
+  transition: opacity 500ms ease, transform 500ms ease;
+}
+
+.ace-marketing .phil-left .item.active {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.ace-marketing .phil-left .item h3 {
+  font-size: clamp(42px, 6vw, 96px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.ace-marketing .phil-left .item p {
+  margin-top: 10px;
+  color: var(--ink-2);
+  max-width: 520px;
+}
+
+.ace-marketing .phil-right {
+  position: relative;
+  min-height: 560px;
+  overflow: hidden;
+}
+
+.ace-marketing .phil-art-label {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  display: flex;
+  gap: 12px;
+  z-index: 2;
+  color: #fff;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.ace-marketing .phil-art {
+  position: absolute;
+  inset: 0;
+  transition: opacity 300ms ease;
+}
+
+.ace-marketing .philosophy-pin .progress {
+  position: absolute;
+  bottom: 40px;
+  left: 28px;
+  right: 28px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  max-width: 1264px;
+  margin: 0 auto;
+}
+
+.ace-marketing .philosophy-pin .progress span {
+  height: 2px;
+  background: var(--line);
+  transition: background 400ms ease;
+}
+
+.ace-marketing .philosophy-pin .progress span.on {
+  background: var(--ink);
+}
+
+.ace-marketing .mkt {
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--ink);
+}
+
+.ace-marketing .mkt .ticker-strip {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  border-bottom: 1px solid var(--line);
+}
+
+.ace-marketing .mkt .ticker-strip > div {
+  padding: 10px 12px;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+}
+
+.ace-marketing .mkt .ticker-strip > div:last-child {
+  border-right: 0;
+}
+
+.ace-marketing .mkt .sym {
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.08em;
+}
+
+.ace-marketing .mkt .px {
+  color: var(--ink-2);
+  font-size: 11px;
+}
+
+.ace-marketing .mkt .delta {
+  font-size: 10.5px;
+}
+
+.ace-marketing .mkt .up {
+  color: var(--accent);
+}
+
+.ace-marketing .mkt .dn {
+  color: var(--ink-2);
+}
+
+.ace-marketing .mkt .body {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+}
+
+.ace-marketing .mkt .left-pane {
+  padding: 20px;
+  border-right: 1px solid var(--line);
+}
+
+.ace-marketing .mkt .hdr {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.ace-marketing .mkt .sym-head {
+  font-size: 11px;
+  color: var(--ink-2);
+  letter-spacing: 0.1em;
+}
+
+.ace-marketing .mkt .price-big {
+  font-family: 'Inter Tight', sans-serif;
+  font-weight: 500;
+  font-size: 34px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.ace-marketing .mkt .chg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.ace-marketing .mkt .livepill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 99px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+}
+
+.ace-marketing .mkt .livepill .d {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.6s infinite;
+}
+
+.ace-marketing .mkt .ranges {
+  display: flex;
+  gap: 4px;
+  margin: 14px 0 12px;
+}
+
+.ace-marketing .mkt .ranges span {
+  padding: 5px 10px;
+  font-size: 10.5px;
+  border-radius: 99px;
+  color: var(--ink-2);
+  letter-spacing: 0.1em;
+}
+
+.ace-marketing .mkt .ranges span.active {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.ace-marketing .mkt .chart-wrap {
+  position: relative;
+  height: 220px;
+}
+
+.ace-marketing .mkt .chart-wrap svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.ace-marketing .mkt .kpi-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  gap: 8px;
+}
+
+.ace-marketing .mkt .kpi-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ace-marketing .mkt .kpi-row .k {
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: 0.08em;
+}
+
+.ace-marketing .mkt .kpi-row .v {
+  font-size: 13px;
+  color: var(--ink);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.ace-marketing .mkt .right-pane {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ace-marketing .mkt .l2-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--ink-2);
+  margin-bottom: 10px;
+  letter-spacing: 0.1em;
+}
+
+.ace-marketing .mkt .l2 {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.ace-marketing .mkt .l2-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  position: relative;
+  font-size: 10.5px;
+  padding: 3px 0;
+}
+
+.ace-marketing .mkt .bid,
+.ace-marketing .mkt .ask {
+  position: relative;
+  padding: 1px 6px;
+  z-index: 1;
+}
+
+.ace-marketing .mkt .bid {
+  text-align: right;
+  color: var(--accent);
+}
+
+.ace-marketing .mkt .ask {
+  text-align: left;
+  color: var(--ink);
+}
+
+.ace-marketing .mkt .bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+  opacity: 0.14;
+}
+
+.ace-marketing .mkt .bar.b {
+  right: 50%;
+  background: var(--accent);
+}
+
+.ace-marketing .mkt .bar.a {
+  left: 50%;
+  background: var(--ink);
+}
+
+.ace-marketing .mkt .spread {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--ink-2);
+  letter-spacing: 0.08em;
+}
+
+.ace-marketing .chrome {
+  border-radius: 14px;
+  background: #fcfaf5;
+  color: var(--ink);
+  overflow: hidden;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--line);
+}
+
+.ace-marketing[data-direction='B'] .chrome {
+  background: #0b0b0c;
+  color: #ebebeb;
+}
+
+.ace-marketing .chrome .bar {
+  height: 36px;
+  background: #f4eee2;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ace-marketing[data-direction='B'] .chrome .bar {
+  background: #111113;
+}
+
+.ace-marketing .chrome .tl {
+  display: flex;
+  gap: 6px;
+}
+
+.ace-marketing .chrome .tl span {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.ace-marketing .chrome .tl .d1 {
+  background: #ffac03;
+}
+
+.ace-marketing .chrome .tl .d2 {
+  background: #c8b68f;
+}
+
+.ace-marketing .chrome .tl .d3 {
+  background: #b8b8b8;
+}
+
+.ace-marketing .chrome .url {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-2);
+  letter-spacing: 0.04em;
+}
+
+.ace-marketing .apr {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 0;
+  padding: 20px;
+}
+
+.ace-marketing .apr .side {
+  padding-right: 20px;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ace-marketing .apr .side .it {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
+.ace-marketing .apr .side .it .lbl {
+  color: var(--ink-2);
+  letter-spacing: 0.04em;
+}
+
+.ace-marketing .apr .side .it .val {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.ace-marketing .apr .main {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ace-marketing .apr .toggles {
+  display: flex;
+  gap: 4px;
+}
+
+.ace-marketing .apr .toggles span {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 5px 10px;
+  letter-spacing: 0.1em;
+  border-radius: 99px;
+  color: var(--ink-2);
+}
+
+.ace-marketing .apr .toggles span.on {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.ace-marketing .apr .stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.ace-marketing .apr .stats .s {
+  padding: 14px;
+  border: 1px solid var(--line);
+}
+
+.ace-marketing .apr .stats .k {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-2);
+  letter-spacing: 0.08em;
+}
+
+.ace-marketing .apr .stats .v {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+  color: var(--ink);
+}
+
+.ace-marketing .apr .stats .d {
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.ace-marketing .ltt {
+  padding: 20px;
+}
+
+.ace-marketing .ltt .head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.ace-marketing .ltt .name {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.ace-marketing .ltt .pill-row {
+  display: flex;
+  gap: 6px;
+}
+
+.ace-marketing .ltt .pill-row span {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 5px 10px;
+  border-radius: 99px;
+  letter-spacing: 0.1em;
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+
+.ace-marketing .ltt .pill-row span.on {
+  background: var(--accent);
+  color: #111;
+  border-color: var(--accent);
+}
+
+.ace-marketing .dlct {
+  background: #0b0b0c;
+  color: #ebebeb;
+  padding: 22px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.ace-marketing .dlct .prompt-pill {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+  color: #ebebeb;
+  font-family: 'Inter Tight', sans-serif;
+  font-style: italic;
+}
+
+.ace-marketing .dlct .prompt-typewriter {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 2.4em;
+}
+
+.ace-marketing .dlct .prompt-typewriter-ghost {
+  visibility: hidden;
+  display: block;
+  width: 100%;
+  white-space: normal;
+}
+
+.ace-marketing .dlct .prompt-typewriter-live {
+  position: absolute;
+  inset: 0;
+  display: block;
+  white-space: normal;
+}
+
+.ace-marketing .dlct .prompt-typewriter-cursor {
+  display: inline-block;
+  width: 6px;
+  height: 1.1em;
+  margin-left: 3px;
+  vertical-align: -0.16em;
+  background: rgba(235, 235, 235, 0.7);
+  opacity: 0;
+  transition: opacity 120ms linear;
+}
+
+.ace-marketing .dlct .prompt-typewriter-cursor.on {
+  opacity: 0.95;
+}
+
+.ace-marketing .dlct .meta {
+  font-size: 10.5px;
+  color: #606060;
+  letter-spacing: 0.1em;
+  margin: 14px 0 10px;
+  min-height: 16px;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.ace-marketing .dlct .meta.on {
+  opacity: 1;
+}
+
+.ace-marketing .dlct .meta .meta-validated {
+  color: #7ed782;
+  text-shadow:
+    0 0 5px rgba(126, 215, 130, 0.48),
+    0 0 12px rgba(126, 215, 130, 0.28);
+  animation: metaValidatedPulse 1.7s ease-in-out infinite;
+}
+
+@keyframes metaValidatedPulse {
+  0%,
+  100% {
+    text-shadow:
+      0 0 4px rgba(126, 215, 130, 0.44),
+      0 0 10px rgba(126, 215, 130, 0.22);
+  }
+  50% {
+    text-shadow:
+      0 0 8px rgba(126, 215, 130, 0.72),
+      0 0 16px rgba(126, 215, 130, 0.38);
+  }
+}
+
+.ace-marketing .dlct pre {
+  white-space: pre;
+  overflow: auto;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #ebebeb;
+  margin: 0;
+}
+
+.ace-marketing .dlct .sql-terminal {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  contain: layout paint;
+}
+
+.ace-marketing .dlct .sql-terminal-ghost,
+.ace-marketing .dlct .sql-terminal-live {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+}
+
+.ace-marketing .dlct .sql-terminal-ghost {
+  visibility: hidden;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ace-marketing .dlct .sql-terminal-live {
+  position: absolute;
+  inset: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+}
+
+.ace-marketing .dlct .sql-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 1.1em;
+  margin-left: 3px;
+  vertical-align: -0.16em;
+  background: #b8b8b8;
+  opacity: 0;
+  transition: opacity 120ms linear;
+}
+
+.ace-marketing .dlct .sql-cursor.on {
+  opacity: 0.95;
+}
+
+.ace-marketing .dlct .kw {
+  color: #c4f56a;
+}
+
+.ace-marketing .dlct .fn {
+  color: #6ed0d9;
+}
+
+.ace-marketing .dlct .st {
+  color: #ffac03;
+}
+
+.ace-marketing .dlct .id {
+  color: #ede7d3;
+}
+
+.ace-marketing .dlct .stats {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(235, 235, 235, 0.1);
+  display: flex;
+  gap: 24px;
+}
+
+.ace-marketing .dlct .stats div {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #b8b8b8;
+}
+
+.ace-marketing .dlct .stats b {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.ace-marketing .flow {
+  background: var(--bg-deep);
+  padding: 120px 0;
+}
+
+.ace-marketing .flow .cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 48px;
+}
+
+.ace-marketing .flow .card {
+  border: 1px solid var(--line);
+  padding: 24px;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--bg);
+}
+
+.ace-marketing .flow .card .n {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent-olive);
+  letter-spacing: 0.12em;
+}
+
+.ace-marketing .flow .card h5 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin-top: 40px;
+}
+
+.ace-marketing .feat-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.ace-marketing .feat-4 .cell {
+  padding: 32px 24px;
+  border-right: 1px solid var(--line);
+}
+
+.ace-marketing .feat-4 .cell:last-child {
+  border-right: 0;
+}
+
+.ace-marketing .feat-4 .ix {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.12em;
+}
+
+.ace-marketing .feat-4 .cell h5 {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 60px;
+  line-height: 1.15;
+}
+
+.ace-marketing .feat-4 .cell p {
+  margin-top: 14px;
+  font-size: 15px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.ace-marketing .grid-2-even {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+
+.ace-marketing .specs {
+  display: flex;
+  flex-direction: column;
+}
+
+.ace-marketing .specs .row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 24px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.ace-marketing .specs .row:first-child {
+  border-top: 1px solid var(--line);
+}
+
+.ace-marketing .specs .k {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+  text-transform: uppercase;
+}
+
+.ace-marketing .specs .v {
+  font-size: 17px;
+  color: var(--ink);
+}
+
+.ace-marketing .portrait {
+  aspect-ratio: 4/5;
+  background: repeating-linear-gradient(135deg, var(--panel) 0 14px, var(--bg-deep) 14px 16px);
+  border: 1px solid var(--line);
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 24px;
+}
+
+.ace-marketing .portrait .tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+  text-transform: uppercase;
+}
+
+.ace-marketing .portrait.about-photo {
+  overflow: hidden;
+  padding: 0;
+  align-items: flex-end;
+  justify-content: flex-start;
+}
+
+.ace-marketing .portrait.about-photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 35%, color-mix(in srgb, var(--bg) 64%, transparent) 100%);
+  pointer-events: none;
+}
+
+.ace-marketing .about-photo-img {
+  object-fit: cover;
+  object-position: center top;
+}
+
+.ace-marketing .about-photo-tag {
+  position: relative;
+  z-index: 3;
+  padding: 22px;
+}
+
+.ace-marketing .about-top-name {
+  margin-top: 20px;
+  font-size: clamp(58px, 7.2vw, 108px);
+  font-weight: 600;
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+}
+
+.ace-marketing .about-top-lede {
+  margin-top: 24px;
+  font-size: 32px;
+  line-height: 1.24;
+  letter-spacing: -0.022em;
+  color: var(--ink-2);
+  max-width: 820px;
+}
+
+.ace-marketing .values {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.ace-marketing .vcard {
+  border: 1px solid var(--line);
+  padding: 32px;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.ace-marketing .vcard h4 {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.ace-marketing .vcard .ix {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent-plum);
+  letter-spacing: 0.1em;
+}
+
+.ace-marketing .contact-band {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 120px 0;
+}
+
+.ace-marketing .contact-band h2 {
+  font-size: clamp(64px, 9vw, 148px);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+
+.ace-marketing .contact-band .rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.ace-marketing .contact-band .row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  padding: 20px 0;
+  border-top: 1px solid rgba(235, 235, 235, 0.14);
+  gap: 24px;
+  align-items: center;
+}
+
+.ace-marketing .contact-band .row:last-child {
+  border-bottom: 1px solid rgba(235, 235, 235, 0.14);
+}
+
+.ace-marketing .contact-band .k {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #b8b8b8;
+}
+
+.ace-marketing .contact-band .v {
+  font-size: 20px;
+}
+
+.ace-marketing .log {
+  background: var(--bg-deep);
+  padding: 120px 0;
+}
+
+.ace-marketing .log .entry {
+  display: grid;
+  grid-template-columns: 120px 200px 1fr;
+  gap: 24px;
+  padding: 28px 0;
+  border-top: 1px solid var(--line);
+}
+
+.ace-marketing .log .entry:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.ace-marketing .log .yr {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--accent-slate);
+  letter-spacing: 0.12em;
+}
+
+.ace-marketing .log .ttl {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.ace-marketing .log .body {
+  font-size: 16px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.ace-marketing .about-beam-grid {
+  display: block;
+}
+
+.ace-marketing .about-summary-pin {
+  position: sticky;
+  top: 120px;
+}
+
+.ace-marketing .about-summary-card {
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--panel) 92%, transparent) 0%,
+    color-mix(in srgb, var(--bg) 90%, var(--panel)) 100%
+  );
+  border: 1px solid var(--line-strong);
+  border-radius: 24px;
+  padding: 26px 24px;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.16);
+}
+
+.ace-marketing .about-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 99px;
+  padding: 6px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--ink-2);
+}
+
+.ace-marketing .about-summary-card h3 {
+  margin-top: 18px;
+  font-size: 34px;
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+}
+
+.ace-marketing .about-summary-card p {
+  margin-top: 16px;
+  color: var(--ink-2);
+  line-height: 1.55;
+  font-size: 15px;
+}
+
+.ace-marketing .about-summary-stats {
+  margin-top: 22px;
+  display: grid;
+  gap: 10px;
+}
+
+.ace-marketing .about-summary-stats .row {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.ace-marketing .about-summary-stats .k {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ace-marketing .about-summary-stats .v {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.ace-marketing .about-summary-stats-wide {
+  margin-top: 36px;
+  max-width: 760px;
+}
+
+.ace-marketing .about-summary-stats-wide .row {
+  grid-template-columns: 130px 1fr;
+}
+
+.ace-marketing .about-summary-stats-wide .v {
+  font-size: 18px;
+}
+
+.ace-marketing .about-summary-current {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.ace-marketing .about-summary-current .label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ace-marketing .about-summary-current .value {
+  margin-top: 6px;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.ace-marketing .about-track {
+  position: relative;
+  padding-left: 72px;
+}
+
+.ace-marketing .about-track-line,
+.ace-marketing .about-track-progress {
+  position: absolute;
+  left: 30px;
+  top: 8px;
+  width: 2px;
+  border-radius: 999px;
+}
+
+.ace-marketing .about-track-line {
+  bottom: 8px;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+}
+
+.ace-marketing .about-track-progress {
+  background: linear-gradient(180deg, var(--accent-orange) 0%, var(--accent) 54%, var(--accent-slate) 100%);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--accent) 38%, transparent);
+  max-height: calc(100% - 16px);
+}
+
+.ace-marketing .about-beam-card {
+  position: relative;
+  padding: 24px 26px 24px 28px;
+  margin-bottom: 22px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--panel) 84%, transparent) 0%,
+    color-mix(in srgb, var(--panel) 70%, var(--bg)) 100%
+  );
+  transition:
+    border-color 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ace-marketing .about-beam-card:last-child {
+  margin-bottom: 0;
+}
+
+.ace-marketing .about-beam-card.on {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line-strong));
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--accent) 16%, transparent);
+  transform: translateX(4px);
+}
+
+.ace-marketing .about-beam-dot {
+  position: absolute;
+  left: -48px;
+  top: 34px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  background: var(--panel);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--bg-deep) 88%, transparent);
+  transition:
+    border-color 220ms ease,
+    background-color 220ms ease,
+    transform 220ms ease;
+}
+
+.ace-marketing .about-beam-card.on .about-beam-dot {
+  border-color: var(--accent);
+  background: var(--accent);
+  transform: scale(1.06);
+}
+
+.ace-marketing .about-beam-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.ace-marketing .about-beam-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ace-marketing .about-beam-logo {
+  flex: 0 0 auto;
+  width: 58px;
+  height: 58px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.ace-marketing .about-beam-logo.wide {
+  width: 58px;
+  height: 58px;
+}
+
+.ace-marketing .about-beam-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.ace-marketing .about-year {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 99px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.ace-marketing .about-company {
+  font-size: 12px;
+  color: var(--ink-2);
+  letter-spacing: 0.01em;
+}
+
+.ace-marketing .about-beam-card h3 {
+  margin-top: 14px;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.ace-marketing .about-beam-card p {
+  margin-top: 12px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+
+.ace-marketing .about-beam-card ul {
+  margin: 16px 0 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  padding: 0;
+}
+
+.ace-marketing .about-beam-card li {
+  position: relative;
+  padding-left: 14px;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.ace-marketing .about-beam-card li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 82%, var(--accent-slate));
+}
+
+.ace-marketing .footer .legal {
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+  margin-top: 28px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+
+.ace-marketing .tweaks {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 200;
+  width: 280px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 18px;
+  color: var(--ink);
+  font-family: 'Inter Tight', sans-serif;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+}
+
+.ace-marketing .tweaks .head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.ace-marketing .tweaks .head .t {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+  text-transform: uppercase;
+}
+
+.ace-marketing .tweaks label {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-2);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 14px 0 8px;
+}
+
+.ace-marketing .tweaks .seg {
+  display: flex;
+  background: var(--bg-deep);
+  border-radius: 99px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.ace-marketing .tweaks .seg button {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 12px;
+  border-radius: 99px;
+  color: var(--ink-2);
+  font-weight: 500;
+  border: 0;
+  background: transparent;
+}
+
+.ace-marketing .tweaks .seg button.on {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.ace-marketing .pp-subnav {
+  position: sticky;
+  top: 56px;
+  z-index: 40;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+}
+
+.ace-marketing .pp-subnav .wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.ace-marketing .pp-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--ink-2);
+  padding: 6px 0;
+}
+
+.ace-marketing .pp-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.ace-marketing .pp-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 10px 18px;
+  border-left: 2px solid transparent;
+  transition: all 260ms ease;
+}
+
+.ace-marketing .pp-tab .l {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.ace-marketing .pp-tab .s {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+}
+
+.ace-marketing .pp-tab.on {
+  border-left-color: var(--tab-accent);
+  background: rgba(17, 17, 17, 0.04);
+}
+
+.ace-marketing .pp-tab.on .s {
+  color: var(--tab-accent);
+}
+
+.ace-marketing .pp-hero {
+  padding: 80px 0 64px;
+}
+
+.ace-marketing .pp-hero-dark {
+  background: linear-gradient(180deg, #0f1418 0%, #0b0b0c 100%);
+  color: #ebebeb;
+}
+
+.ace-marketing .pp-hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 64px;
+  align-items: center;
+}
+
+.ace-marketing .pp-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+}
+
+.ace-marketing .pp-eyebrow .op {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.ace-marketing .pp-eyebrow .pill {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 99px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-2);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+}
+
+.ace-marketing .pp-h1 {
+  margin-top: 28px;
+  font-size: clamp(52px, 7vw, 108px);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 0.94;
+}
+
+.ace-marketing .pp-h1 .ital {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.ace-marketing .pp-lede {
+  margin-top: 28px;
+  font-size: 20px;
+  color: var(--ink-2);
+  max-width: 520px;
+  line-height: 1.45;
+}
+
+.ace-marketing .pp-hero-actions {
+  margin-top: 36px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ace-marketing .pp-hero-tags {
+  margin-top: 48px;
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.ace-marketing .pp-tag .t {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--tc, var(--ink));
+}
+
+.ace-marketing .pp-tag .s {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.ace-marketing .pp-strip {
+  padding: 80px 0;
+  border-top: 1px solid var(--line);
+}
+
+.ace-marketing .pp-strip .wrap {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+.ace-marketing .pp-cap {
+  padding: 28px 2px 0 0;
+  border-top: 2px solid var(--c);
+}
+
+.ace-marketing .pp-cap .ix {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--c);
+  letter-spacing: 0.14em;
+}
+
+.ace-marketing .pp-cap h3 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin-top: 12px;
+  line-height: 1.2;
+}
+
+.ace-marketing .pp-cap p {
+  margin-top: 12px;
+  color: var(--ink-2);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.ace-marketing .pp-split {
+  padding: 120px 0 80px;
+}
+
+.ace-marketing .pp-split-head {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 40px;
+  align-items: end;
+  margin-bottom: 56px;
+}
+
+.ace-marketing .pp-h2 {
+  font-size: clamp(40px, 5vw, 72px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.ace-marketing .pp-h2 .ital {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+
+.ace-marketing .pp-modules {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+
+.ace-marketing .pp-module {
+  background: var(--bg);
+  padding: 32px 28px 24px;
+  position: relative;
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ace-marketing .pp-module .ix {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--m-color);
+  letter-spacing: 0.14em;
+}
+
+.ace-marketing .pp-module h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin-top: 14px;
+  line-height: 1.1;
+  color: var(--m-color);
+}
+
+.ace-marketing .pp-module p {
+  margin-top: 14px;
+  color: var(--ink-2);
+  font-size: 14.5px;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.ace-marketing .pp-module .arrow {
+  font-size: 22px;
+  color: var(--m-color);
+  margin-top: 20px;
+}
+
+.ace-marketing .apt-mock,
+.ace-marketing .prx-mock,
+.ace-marketing .dlc-mock {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+}
+
+.ace-marketing .apt-chrome,
+.ace-marketing .prx-chrome,
+.ace-marketing .dlc-chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
+.ace-marketing .apt-chrome .dot,
+.ace-marketing .prx-chrome .dot,
+.ace-marketing .dlc-chrome .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.ace-marketing .apt-body {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  min-height: 420px;
+}
+
+.ace-marketing .apt-doc {
+  padding: 24px;
+  border-right: 1px solid var(--line);
+  position: relative;
+  background: #fdfbf6;
+}
+
+.ace-marketing .apt-page-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+  margin-bottom: 14px;
+}
+
+.ace-marketing .apt-th,
+.ace-marketing .apt-tr {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  padding: 8px 4px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--line);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.ace-marketing .apt-th {
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: 0.12em;
+}
+
+.ace-marketing .apt-tr .l {
+  color: var(--ink);
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 12.5px;
+}
+
+.ace-marketing .apt-tr .v {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.ace-marketing .apt-tr.hot {
+  background: rgba(255, 172, 3, 0.1);
+}
+
+.ace-marketing .apt-box {
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  height: 26px;
+  border: 1.5px solid var(--accent);
+  background: rgba(255, 172, 3, 0.08);
+  transition: top 460ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ace-marketing .apt-extract {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ace-marketing .apt-card {
+  border: 1px solid var(--accent);
+  background: rgba(255, 172, 3, 0.06);
+  padding: 18px;
+}
+
+.ace-marketing .apt-card .v {
+  font-size: 44px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--accent);
+}
+
+.ace-marketing .apt-ratios {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: auto;
+}
+
+.ace-marketing .apt-ratios .r {
+  border: 1px solid var(--line);
+  padding: 10px;
+  border-left: 2px solid var(--r-c);
+}
+
+.ace-marketing .prx-body {
+  padding: 26px;
+}
+
+.ace-marketing .prx-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.ace-marketing .prx-head .v {
+  font-size: 56px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin-top: 6px;
+  color: var(--accent-orange);
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+}
+
+.ace-marketing .rm-is {
+  margin-top: 40px;
+  border: 1px solid var(--line);
+}
+
+.ace-marketing .rm-is table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+}
+
+.ace-marketing .rm-is th,
+.ace-marketing .rm-is td {
+  text-align: right;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ace-marketing .rm-is th:first-child,
+.ace-marketing .rm-is td:first-child {
+  text-align: left;
+}
+
+.ace-marketing .dlc-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ace-marketing .dlc-prompt {
+  padding: 14px 16px;
+  border: 1px solid rgba(235, 235, 235, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(235, 235, 235, 0.02);
+}
+
+.ace-marketing .dlc-prompt .label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: rgba(235, 235, 235, 0.45);
+}
+
+.ace-marketing .dlc-prompt .q {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 19px;
+  color: #ebebeb;
+}
+
+.ace-marketing .pp-t2s-pipe {
+  padding: 100px 0 60px;
+  background: #0b0b0c;
+  color: #ebebeb;
+}
+
+.ace-marketing .agent-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: rgba(235, 235, 235, 0.08);
+  border: 1px solid rgba(235, 235, 235, 0.08);
+  margin-top: 40px;
+}
+
+.ace-marketing .agent-card {
+  background: #0b0b0c;
+  padding: 24px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 180px;
+}
+
+.ace-marketing .agent-card .n {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.14em;
+}
+
+.ace-marketing .agent-card .k {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.ace-marketing .agent-card .d {
+  color: rgba(235, 235, 235, 0.6);
+  font-size: 14px;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.ace-marketing .agent-card .bar {
+  height: 2px;
+  background: rgba(235, 235, 235, 0.08);
+  position: relative;
+}
+
+.ace-marketing .agent-card .bar span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: var(--accent);
+  width: 100%;
+}
+
+.ace-marketing .pp-flow {
+  padding: 120px 0 100px;
+  border-top: 1px solid var(--line);
+}
+
+.ace-marketing .pp-flow-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+
+.ace-marketing .pp-step .n {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--c);
+  letter-spacing: 0.16em;
+}
+
+.ace-marketing .pp-step .bar {
+  height: 1px;
+  background: var(--line-strong);
+  margin: 6px 0;
+  position: relative;
+}
+
+.ace-marketing .pp-step .bar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -2px;
+  width: 40px;
+  height: 5px;
+  background: var(--c);
+}
+
+.ace-marketing .pp-step h4 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.ace-marketing .pp-step p {
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.5;
+  max-width: 340px;
+}
+
+.ace-marketing .pp-cta {
+  padding: 140px 0 120px;
+  border-top: 1px solid var(--line);
+}
+
+.ace-marketing .pp-cta.dark {
+  background: #0b0b0c;
+  color: #ebebeb;
+}
+
+.ace-marketing .pp-cta .wrap {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 48px;
+  align-items: end;
+}
+
+.ace-marketing .pp-cta h2 {
+  font-size: clamp(56px, 8vw, 120px);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 0.94;
+}
+
+.ace-marketing .pp-cta p {
+  color: var(--ink-2);
+  font-size: 19px;
+  max-width: 440px;
+}
+
+.ace-marketing .pp-cta.dark p {
+  color: rgba(235, 235, 235, 0.6);
+}
+
+.ace-marketing .pp-cta .actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+
+.ace-marketing .pp-beam {
+  padding: 120px 0 100px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.ace-marketing .pp-beam-head {
+  max-width: 720px;
+  margin-bottom: 56px;
+}
+
+.ace-marketing .pp-beam-head .pp-h2 {
+  margin-top: 16px;
+}
+
+.ace-marketing .pp-beam-sub {
+  margin-top: 18px;
+  max-width: 620px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.ace-marketing .beam-stage {
+  position: relative;
+  height: 440px;
+  margin-bottom: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--bg);
+}
+
+.ace-marketing .beam-wires {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.ace-marketing .beam-wires .wire-base {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ink) 36%, transparent);
+  stroke-width: 2;
+  stroke-opacity: 0.2;
+}
+
+.ace-marketing .beam-wires .wire-pulse {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  animation: beamFlow 3.1s linear infinite;
+}
+
+.ace-marketing .beam-orb-wrap {
+  position: absolute;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ace-marketing .beam-orb-right {
+  flex-direction: row-reverse;
+}
+
+.ace-marketing .beam-orb {
+  --orb-tone: var(--accent);
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--orb-tone) 36%, transparent);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--bg) 78%, #ffffff 22%) 0%,
+    color-mix(in srgb, var(--orb-tone) 20%, var(--bg) 80%) 100%
+  );
+  box-shadow:
+    0 8px 24px color-mix(in srgb, var(--bg) 78%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--orb-tone) 24%, transparent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 260ms ease, box-shadow 260ms ease;
+}
+
+.ace-marketing .beam-orb:hover {
+  transform: scale(1.08);
+  box-shadow:
+    0 12px 30px color-mix(in srgb, var(--bg) 72%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--orb-tone) 44%, transparent);
+}
+
+.ace-marketing .beam-orb-lust {
+  --orb-tone: var(--accent-orange);
+}
+
+.ace-marketing .beam-orb-hobgoblin {
+  --orb-tone: var(--accent-2);
+}
+
+.ace-marketing .beam-orb-rushmore {
+  --orb-tone: var(--ink-2);
+}
+
+.ace-marketing .beam-orb-caribbean {
+  --orb-tone: var(--accent-slate);
+}
+
+.ace-marketing .beam-orb-core {
+  --orb-tone: var(--accent-plum);
+  width: 82px;
+  height: 82px;
+  border-width: 3px;
+}
+
+.ace-marketing .beam-orb-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.ace-marketing .beam-orb-core .beam-orb-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.ace-marketing .beam-icon-lust {
+  filter: invert(15%) sepia(95%) saturate(6765%) hue-rotate(347deg) brightness(92%) contrast(101%);
+}
+
+.ace-marketing .beam-icon-caribbean {
+  filter: invert(61%) sepia(39%) saturate(2834%) hue-rotate(162deg) brightness(101%) contrast(101%);
+}
+
+.ace-marketing .beam-orb-meta,
+.ace-marketing .beam-core-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ace-marketing .beam-orb-right .beam-orb-meta {
+  text-align: right;
+}
+
+.ace-marketing .beam-meta-op {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 72%, transparent);
+}
+
+.ace-marketing .beam-meta-label {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.ace-marketing .beam-meta-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--ink) 82%, transparent);
+  line-height: 1.3;
+}
+
+.ace-marketing .beam-orb-core-wrap {
+  flex-direction: column;
+  align-items: center;
+}
+
+.ace-marketing .beam-core-meta {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 10px);
+  transform: translateX(-50%);
+  width: max-content;
+  text-align: center;
+}
+
+.ace-marketing .beam-pos-in-1 {
+  left: 28px;
+  top: 12%;
+}
+
+.ace-marketing .beam-pos-in-2 {
+  left: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ace-marketing .beam-pos-in-3 {
+  left: 28px;
+  bottom: 12%;
+}
+
+.ace-marketing .beam-pos-core {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.ace-marketing .beam-pos-out-1 {
+  right: 28px;
+  top: 25%;
+  transform: translateY(-50%);
+}
+
+.ace-marketing .beam-pos-out-2 {
+  right: 28px;
+  bottom: 25%;
+  transform: translateY(50%);
+}
+
+.ace-marketing .beam-legend {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 28px;
+}
+
+.ace-marketing .beam-legend .lg {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ace-marketing .beam-legend .lg-k {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.ace-marketing .beam-legend .lg-v {
+  font-family: 'Fraunces', serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+@keyframes beamFlow {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -100%;
+  }
+}
+
+@media (max-width: 1100px) {
+  .ace-marketing .tool-pin .content,
+  .ace-marketing .grid-2-even,
+  .ace-marketing .pp-hero-grid,
+  .ace-marketing .pp-split-head,
+  .ace-marketing .pp-cta .wrap,
+  .ace-marketing .pp-flow-grid,
+  .ace-marketing .agent-grid,
+  .ace-marketing .pp-strip .wrap,
+  .ace-marketing .pp-modules,
+  .ace-marketing .flow .cards,
+  .ace-marketing .feat-4,
+  .ace-marketing .values,
+  .ace-marketing .about-beam-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ace-marketing .mkt .body,
+  .ace-marketing .apt-body {
+    grid-template-columns: 1fr;
+  }
+
+  .ace-marketing .mkt .left-pane,
+  .ace-marketing .apt-doc {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .ace-marketing .phil-split {
+    grid-template-columns: 1fr;
+  }
+
+  .ace-marketing .beam-stage {
+    height: 400px;
+  }
+
+  .ace-marketing .beam-orb {
+    width: 58px;
+    height: 58px;
+  }
+
+  .ace-marketing .beam-orb-core {
+    width: 74px;
+    height: 74px;
+  }
+
+  .ace-marketing .beam-orb-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .ace-marketing .beam-orb-core .beam-orb-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .ace-marketing .beam-meta-label {
+    font-size: 22px;
+  }
+
+  .ace-marketing .beam-meta-sub {
+    max-width: 22ch;
+  }
+
+  .ace-marketing .tweaks {
+    display: none;
+  }
+
+  .ace-marketing .about-summary-pin {
+    position: static;
+  }
+
+  .ace-marketing .about-top-name {
+    font-size: clamp(52px, 12vw, 86px);
+  }
+
+  .ace-marketing .about-top-lede {
+    font-size: 24px;
+  }
+
+  .ace-marketing .about-track {
+    padding-left: 58px;
+  }
+
+  .ace-marketing .about-track-line,
+  .ace-marketing .about-track-progress {
+    left: 24px;
+  }
+
+  .ace-marketing .about-beam-dot {
+    left: -40px;
+  }
+}
+
+/* Prototype-parity overrides (product detail pages) */
+.ace-marketing .pp-hero-dark .pp-lede {
+  color: rgba(235, 235, 235, 0.72);
+}
+
+.ace-marketing .pp-hero-dark .pp-tag .s {
+  color: rgba(235, 235, 235, 0.5);
+}
+
+.ace-marketing .pp-hero-dark .btn-ghost {
+  border-color: rgba(235, 235, 235, 0.25);
+  color: rgba(235, 235, 235, 0.9);
+}
+
+.ace-marketing .pp-strip-dark {
+  background: #0b0b0c;
+  color: #ebebeb;
+  border-top: 1px solid rgba(235, 235, 235, 0.08);
+}
+
+.ace-marketing .pp-cap.dark {
+  color: #ebebeb;
+}
+
+.ace-marketing .pp-cap.dark p {
+  color: rgba(235, 235, 235, 0.6);
+}
+
+.ace-marketing .prx-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.ace-marketing .prx-kpis .k {
+  border: 1px solid var(--line);
+  padding: 12px;
+  border-left: 2px solid var(--c);
+}
+
+.ace-marketing .prx-kpis .l {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+}
+
+.ace-marketing .prx-kpis .n {
+  font-size: 20px;
+  font-weight: 500;
+  margin-top: 4px;
+  color: var(--c);
+}
+
+.ace-marketing .rm-is-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  color: var(--ink-2);
+}
+
+.ace-marketing .rm-is-head .legend {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.ace-marketing .rm-is-head .legend span {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.ace-marketing .rm-is tr.tot td {
+  background: rgba(217, 95, 61, 0.06);
+  border-top: 1px solid var(--accent-orange);
+  border-bottom: 1px solid var(--accent-orange);
+}
+
+.ace-marketing .rm-is tr.sep td {
+  padding: 0;
+  height: 8px;
+  border: 0;
+  background: var(--bg-deep);
+}
+
+.ace-marketing .rm-is tr.ratio td {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.ace-marketing .rm-is tr.ratio td.m {
+  color: var(--ink);
+}
+
+.ace-marketing .dlc-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ace-marketing .dlc-row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  gap: 16px;
+  padding: 9px 14px;
+  border-left: 2px solid var(--accent);
+  background: rgba(255, 172, 3, 0.04);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  opacity: 0;
+  transform: translateX(-8px);
+  animation: ace-dlc-in 400ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation-delay: var(--d);
+}
+
+.ace-marketing .dlc-row .agent {
+  color: var(--accent);
+  letter-spacing: 0.12em;
+  font-weight: 500;
+}
+
+.ace-marketing .dlc-row .detail {
+  color: rgba(235, 235, 235, 0.75);
+}
+
+.ace-marketing .dlc-row .t {
+  color: rgba(235, 235, 235, 0.45);
+  font-size: 10.5px;
+}
+
+@keyframes ace-dlc-in {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.ace-marketing .dlc-sql {
+  background: #0e0e10;
+  border: 1px solid rgba(235, 235, 235, 0.08);
+  padding: 16px 18px;
+}
+
+.ace-marketing .dlc-sql .label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: rgba(235, 235, 235, 0.4);
+  margin-bottom: 10px;
+}
+
+.ace-marketing .dlc-sql pre {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  color: #ebebeb;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.ace-marketing .dlc-sql .kw {
+  color: #c4f56a;
+}
+
+.ace-marketing .dlc-sql .fn {
+  color: #6ed0d9;
+}
+
+.ace-marketing .dlc-sql .st {
+  color: #ffac03;
+}
+
+.ace-marketing .dlc-sql .co {
+  color: rgba(235, 235, 235, 0.4);
+}
+
+.ace-marketing .pp-t2s-pipe .pp-h2 {
+  color: #ebebeb;
+}
+
+.ace-marketing .agent-card {
+  transition: background 300ms ease;
+}
+
+.ace-marketing .agent-card:hover {
+  background: #111115;
+}
+
+.ace-marketing .agent-card .bar {
+  position: relative;
+}
+
+.ace-marketing .agent-card .bar span {
+  width: 0;
+  transition: width 800ms ease;
+}
+
+.ace-marketing .agent-card:hover .bar span {
+  width: 100%;
+}
+
+.ace-marketing .pp-flow.dark {
+  background: #0b0b0c;
+  color: #ebebeb;
+  border-top-color: rgba(235, 235, 235, 0.08);
+}
+
+.ace-marketing .pp-flow.dark .pp-h2 {
+  color: #ebebeb;
+}
+
+.ace-marketing .pp-flow.dark .pp-step .bar {
+  background: rgba(235, 235, 235, 0.12);
+}
+
+.ace-marketing .pp-flow.dark .pp-step p {
+  color: rgba(235, 235, 235, 0.6);
+}
+
+.ace-marketing .pp-cta.dark {
+  background: #0b0b0c;
+  color: #ebebeb;
+  border-top-color: rgba(235, 235, 235, 0.08);
+}
+
+@media (max-width: 880px) {
+  .ace-marketing .beam-stage {
+    height: 360px;
+  }
+
+  .ace-marketing .beam-wires {
+    opacity: 0.85;
+  }
+
+  .ace-marketing .beam-pos-in-1 {
+    left: 14px;
+    top: 14%;
+  }
+
+  .ace-marketing .beam-pos-in-2 {
+    left: 14px;
+  }
+
+  .ace-marketing .beam-pos-in-3 {
+    left: 14px;
+    bottom: 14%;
+  }
+
+  .ace-marketing .beam-pos-out-1 {
+    right: 14px;
+  }
+
+  .ace-marketing .beam-pos-out-2 {
+    right: 14px;
+  }
+
+  .ace-marketing .beam-orb {
+    width: 52px;
+    height: 52px;
+  }
+
+  .ace-marketing .beam-orb-core {
+    width: 66px;
+    height: 66px;
+  }
+
+  .ace-marketing .beam-orb-icon {
+    width: 25px;
+    height: 25px;
+  }
+
+  .ace-marketing .beam-orb-core .beam-orb-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .ace-marketing .beam-orb-meta,
+  .ace-marketing .beam-core-meta {
+    display: none;
+  }
+
+  .ace-marketing .beam-legend {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+
+  .ace-marketing .about-track {
+    padding-left: 44px;
+  }
+
+  .ace-marketing .about-track-line,
+  .ace-marketing .about-track-progress {
+    left: 17px;
+  }
+
+  .ace-marketing .about-beam-dot {
+    left: -30px;
+    top: 28px;
+    width: 12px;
+    height: 12px;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--bg-deep) 88%, transparent);
+  }
+
+  .ace-marketing .about-beam-card {
+    padding: 20px 18px 20px 20px;
+    border-radius: 18px;
+  }
+
+  .ace-marketing .about-beam-card h3 {
+    font-size: 22px;
+  }
+
+  .ace-marketing .about-summary-stats .row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .ace-marketing .about-summary-stats-wide .v {
+    font-size: 16px;
+  }
+
+  .ace-marketing .about-beam-logo {
+    width: 52px;
+    height: 52px;
+    padding: 3px;
+  }
+
+  .ace-marketing .about-beam-logo.wide {
+    width: 52px;
+    height: 52px;
+  }
+
+}

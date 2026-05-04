@@ -40,14 +40,14 @@ const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%',
 
   if (!chartData || chartData.length === 0) {
     return (
-      <div className="flex items-center justify-center p-8 bg-muted/20 rounded-lg min-h-[300px]">
+      <div className="workspace-summary-block flex min-h-[300px] items-center justify-center p-8">
         <p role="status" className="text-muted-foreground font-avenir-pro">No pie chart data available</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full bg-card rounded-lg shadow-sm border border-border p-4">
+    <div className="w-full bg-card rounded-lg border border-border p-4">
       {/* Header */}
       <div className="mb-6">
         <h3 className="font-avenir-pro-demi text-xl text-foreground tracking-tighter">{config.title}</h3>

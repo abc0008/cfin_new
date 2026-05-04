@@ -49,9 +49,9 @@ export function ToolProgressIndicator({ toolName, toolId }: ToolProgressIndicato
   };
 
   return (
-    <div className="inline-flex items-center px-2 py-1 bg-primary/10 text-primary rounded text-xs">
+    <div className="workspace-status-pill inline-flex items-center gap-1 normal-case tracking-normal">
       {getToolIcon(toolName)}
-      <span className="ml-1">{getToolLabel(toolName)}</span>
+      <span>{getToolLabel(toolName)}</span>
     </div>
   );
 }
@@ -82,7 +82,7 @@ export function StreamingMessage({
   
   return (
     <div className="flex justify-start mb-4">
-      <div className="max-w-[80%] rounded-lg px-4 py-3 bg-card border border-border text-foreground shadow-sm font-avenir-pro text-sm">
+      <div className="workspace-message-assistant max-w-[84%] rounded-[16px] px-4 py-3 font-avenir-pro text-sm">
         <div className="whitespace-pre-wrap">
           {TextWithCitations && citations.length > 0 ? (
             <TextWithCitations 
@@ -145,7 +145,7 @@ export function VisualizationReadyIndicator({ type, count }: VisualizationReadyI
   };
 
   return (
-    <div className="inline-flex items-center px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
+    <div className="inline-flex items-center rounded-full border border-accent/35 bg-accent/15 px-2 py-1 text-xs text-accent">
       {getIcon()}
       <span className="ml-1">{getLabel()}</span>
     </div>
@@ -159,9 +159,9 @@ interface ConnectionStatusProps {
 
 export function ConnectionStatus({ isConnected, isStreaming }: ConnectionStatusProps) {
   const getStatus = () => {
-    if (isStreaming) return { label: 'Streaming', color: 'text-blue-600 bg-blue-500' };
-    if (isConnected) return { label: 'Connected', color: 'text-green-600 bg-green-500' };
-    return { label: 'Disconnected', color: 'text-red-600 bg-red-500' };
+    if (isStreaming) return { label: 'Streaming', color: 'text-primary bg-primary' };
+    if (isConnected) return { label: 'Connected', color: 'text-accent bg-accent' };
+    return { label: 'Disconnected', color: 'text-destructive bg-destructive' };
   };
 
   const status = getStatus();
