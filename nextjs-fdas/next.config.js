@@ -48,6 +48,12 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: "/",
+        has: [{ type: "host", value: "fdas.aceanalytics.dev" }],
+        destination: "/workspace",
+        permanent: false,
+      },
+      {
         source: "/text2sql",
         destination: "https://text2sql.aceanalytics.dev",
         permanent: false,
@@ -74,7 +80,22 @@ const nextConfig = {
       },
       {
         source: "/rm",
-        destination: "/product/rm",
+        destination: "/product/lattice",
+        permanent: false,
+      },
+      {
+        source: "/product/rm",
+        destination: "/product/lattice",
+        permanent: false,
+      },
+      {
+        source: "/credit-spread",
+        destination: "/product/credit-spread",
+        permanent: false,
+      },
+      {
+        source: "/lattice",
+        destination: "/product/lattice",
         permanent: false,
       },
     ];

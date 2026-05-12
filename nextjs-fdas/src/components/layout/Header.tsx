@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { BarChart2, FileText, Home, MoonStar, Sun } from 'lucide-react'
+import { BOOK_DEMO_URL } from '@/lib/app-urls'
 
 type Direction = 'A' | 'B'
 
@@ -83,7 +84,7 @@ export default function Header() {
           <Link href="/product/cfin" className="workspace-header-pill">
             OP_APRT
           </Link>
-          <a href="mailto:hello@aceanalytics.dev" className="workspace-header-pill filled">
+          <a href={BOOK_DEMO_URL} className="workspace-header-pill filled">
             Book Demo
           </a>
         </div>

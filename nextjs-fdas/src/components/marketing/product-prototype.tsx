@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { ClosingCTA, Eyebrow, MarketingFooter, useReveal } from '@/components/marketing/shared'
+import { BOOK_DEMO_URL } from '@/lib/app-urls'
 import { PROTOTYPE_TOOLS } from '@/components/marketing/home-prototype'
 import { EncryptedText } from '@/components/ui/encrypted-text'
 
@@ -46,18 +47,6 @@ export function ProductPrototypePage() {
   const featureRows = useMemo(
     () => [
       [
-        ['Confidence-scored', 'Every extracted field carries a p-score tied back to its source page and bounding box.'],
-        ['Filings-native', 'Trained on 10-K, 10-Q, S-1, and private PCAP decks. Knows XBRL, knows footnotes.'],
-        ['Diff mode', 'Compare quarter to quarter, year to year, peer to peer - with explanations a junior analyst can defend.'],
-        ['Committee-ready', 'Export to Excel, PDF, or push straight to your deal memo. Audit trail attached, always.'],
-      ],
-      [
-        ['OCR for reality', 'Handles scans, photos, stamps, handwriting, and the occasional coffee stain.'],
-        ['Credit spreading', 'Outputs a clean spread with DSCR, LTV, FCC, and debt/EBITDA ready for committee.'],
-        ['Covenant engine', 'Tracks covenants and flags breaches under stress scenarios before signature.'],
-        ['Tax return savvy', 'Understands 1040, 1041, 1065, 1120, K-1s, and reconciles personal to business flows.'],
-      ],
-      [
         ['Scenario trees', 'Fork BASE into BULL and BEAR without losing references.'],
         ['Breakeven finder', 'Solve for month, price, cost line, or CAC with dynamic recalibration.'],
         ['Excel bridge', 'Two-way sync with workbook ranges so teams keep existing process muscle.'],
@@ -68,6 +57,18 @@ export function ProductPrototypePage() {
         ['Validated first', 'Planner checks types, joins, and PII access before execution.'],
         ['Read, not write', 'No DDL, no DML. IAM governed and SIEM logged.'],
         ['Natural handoff', 'Attach generated SQL to Jira, export to Excel, or paste into committee memos.'],
+      ],
+      [
+        ['Confidence-scored', 'Every extracted field carries a p-score tied back to its source page and bounding box.'],
+        ['Filings-native', 'Trained on 10-K, 10-Q, S-1, and private PCAP decks. Knows XBRL, knows footnotes.'],
+        ['Diff mode', 'Compare quarter to quarter, year to year, peer to peer - with explanations a junior analyst can defend.'],
+        ['Committee-ready', 'Export to Excel, PDF, or push straight to your deal memo. Audit trail attached, always.'],
+      ],
+      [
+        ['OCR for reality', 'Handles scans, photos, stamps, handwriting, and the occasional coffee stain.'],
+        ['Credit spreading', 'Outputs a clean spread with DSCR, LTV, FCC, and debt/EBITDA ready for committee.'],
+        ['Covenant engine', 'Tracks covenants and flags breaches under stress scenarios before signature.'],
+        ['Tax return savvy', 'Understands 1040, 1041, 1065, 1120, K-1s, and reconciles personal to business flows.'],
       ],
     ],
     [],
@@ -162,12 +163,12 @@ export function ProductPrototypePage() {
                 >
                   Visit {activeTool.name.toLowerCase()} →
                 </Link>
-                <a className="btn btn-ink" href="mailto:hello@aceanalytics.dev">
+                <a className="btn btn-ink" href={BOOK_DEMO_URL}>
                   Book a demo <span className="arr" />
                 </a>
-                <a className="btn btn-ghost" href="mailto:hello@aceanalytics.dev">
+                <Link className="btn btn-ghost" href={activeTool.methodsRoute}>
                   Read the methods
-                </a>
+                </Link>
               </div>
             </div>
             <div>{activeTool.mock()}</div>

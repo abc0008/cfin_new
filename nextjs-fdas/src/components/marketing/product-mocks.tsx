@@ -500,7 +500,7 @@ LIMIT 14;`
     promptKickoffTimeoutRef.current = window.setTimeout(() => {
       setTerminalRun(true)
       promptKickoffTimeoutRef.current = null
-    }, 500)
+    }, 180)
   }
 
   const handleTerminalComplete = () => {
@@ -515,7 +515,7 @@ LIMIT 14;`
           <TypewriterEffect
             text={prompt}
             run={shouldAnimate}
-            typingSpeedMs={48}
+            typingSpeedMs={22}
             className="prompt-typewriter"
             ghostClassName="prompt-typewriter-ghost"
             liveClassName="prompt-typewriter-live"
@@ -528,7 +528,7 @@ LIMIT 14;`
         </div>
         <SqlTerminal
           text={query}
-          typingSpeedMs={100}
+          typingSpeedMs={42}
           startDelayMs={0}
           loop={false}
           run={terminalRun}

@@ -11,6 +11,9 @@ const TIMELINE_ENTRIES = [
     company: 'Synovus + Pinnacle Integration',
     logo: '/assets/logos/pinnacle.jpeg',
     logoAlt: 'Pinnacle Financial Partners logo',
+    banner: '/assets/logos/synovus-pinnacle-banner.jpeg',
+    bannerAlt:
+      'Southeastern U.S. footprint with Pinnacle Financial Partners and Synovus branding',
     body: 'Building a centralized enterprise analytics function for a combined $117B bank and translating that craft into product.',
     points: ['Team of 9 analysts/developers', 'Instrument-level finance models', 'Executive scorecards + advisor insights'],
   },
@@ -116,7 +119,7 @@ export function AboutPrototypePage() {
         <div className="wrap">
           <Eyebrow op="/ ABOUT">The person behind the tool</Eyebrow>
           <h1 className="display h1" style={{ marginTop: 40 }}>
-            One engineer,
+            One builder,
             <br />
             <span className="ital">ten years</span>
             <br />
@@ -195,32 +198,47 @@ export function AboutPrototypePage() {
                   ref={(node) => {
                     cardRefs.current[index] = node
                   }}
-                  className={`about-beam-card${index === activeCard ? ' on' : ''}`}
+                  className={`about-beam-card${index === activeCard ? ' on' : ''}${'banner' in entry && entry.banner ? ' has-banner' : ''}`}
                   data-reveal
                 >
                   <span className="about-beam-dot" />
-                  <div className="about-beam-head">
-                    <div className="about-beam-meta">
-                      <span className="about-year">{entry.years}</span>
-                      <span className="about-company">{entry.company}</span>
-                    </div>
-                    <div className="about-beam-logo">
+                  {'banner' in entry && entry.banner ? (
+                    <div className="about-beam-banner">
                       <Image
-                        src={entry.logo}
-                        alt={entry.logoAlt}
-                        width={56}
-                        height={40}
-                        className="about-beam-logo-img"
+                        src={entry.banner}
+                        alt={entry.bannerAlt ?? ''}
+                        fill
+                        sizes="(max-width: 900px) 92vw, 820px"
+                        className="about-beam-banner-img"
+                        priority={index === 0}
                       />
+                      <div className="about-beam-banner-fade" aria-hidden />
                     </div>
+                  ) : null}
+                  <div className="about-beam-card-main">
+                    <div className="about-beam-head">
+                      <div className="about-beam-meta">
+                        <span className="about-year">{entry.years}</span>
+                        <span className="about-company">{entry.company}</span>
+                      </div>
+                      <div className="about-beam-logo">
+                        <Image
+                          src={entry.logo}
+                          alt={entry.logoAlt}
+                          width={56}
+                          height={40}
+                          className="about-beam-logo-img"
+                        />
+                      </div>
+                    </div>
+                    <h3>{entry.title}</h3>
+                    <p>{entry.body}</p>
+                    <ul>
+                      {entry.points.map((point) => (
+                        <li key={point}>{point}</li>
+                      ))}
+                    </ul>
                   </div>
-                  <h3>{entry.title}</h3>
-                  <p>{entry.body}</p>
-                  <ul>
-                    {entry.points.map((point) => (
-                      <li key={point}>{point}</li>
-                    ))}
-                  </ul>
                 </article>
               ))}
             </div>
@@ -276,14 +294,22 @@ export function AboutPrototypePage() {
             </div>
             <div className="rows">
               {[
-                ['Email', 'hello@aceanalytics.dev'],
-                ['Office', 'Brooklyn, NY · 40.713°N 74.006°W'],
-                ['Press', 'press@aceanalytics.dev'],
-                ['Calendar', 'cal.aceanalytics.dev/demo'],
-              ].map(([k, v]) => (
-                <div className="row" key={k}>
-                  <div className="k">{k}</div>
-                  <div className="v">{v}</div>
+                { label: 'Email', value: 'hello@aceanalytics.dev', href: 'mailto:hello@aceanalytics.dev' },
+                { label: 'Office', value: 'Birmingham, AL · 33.519°N 86.810°W' },
+                { label: 'Press', value: 'press@aceanalytics.dev', href: 'mailto:press@aceanalytics.dev' },
+                { label: 'Calendar', value: 'cal.aceanalytics.dev/demo', href: 'https://cal.aceanalytics.dev/demo' },
+              ].map((item) => (
+                <div className="row" key={item.label}>
+                  <div className="k">{item.label}</div>
+                  <div className="v">
+                    {item.href ? (
+                      <a href={item.href} style={{ color: 'inherit', textDecoration: 'underline' }}>
+                        {item.value}
+                      </a>
+                    ) : (
+                      item.value
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

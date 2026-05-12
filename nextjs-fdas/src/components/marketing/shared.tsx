@@ -13,11 +13,10 @@ import {
   useState,
 } from 'react'
 
+import { BOOK_DEMO_URL } from '@/lib/app-urls'
+
 type Direction = 'A' | 'B'
 type HeroVariant = 'cinematic' | 'split' | 'typographic'
-
-const TEXT2SQL_APP_URL =
-  process.env.NEXT_PUBLIC_TEXT2SQL_APP_URL || 'https://text2sql.aceanalytics.dev'
 
 type MarketingSettingsContextType = {
   direction: Direction
@@ -180,7 +179,7 @@ export function MarketingNav() {
           <span className="live" />
           Status · All systems
         </span>
-        <a href="mailto:hello@aceanalytics.dev" className="nav-pill filled">
+        <a href={BOOK_DEMO_URL} className="nav-pill filled">
           Book a demo
         </a>
       </div>
@@ -307,7 +306,7 @@ export function ClosingCTA() {
             no slides.
           </p>
           <div className="actions">
-            <a className="btn btn-accent" href="mailto:hello@aceanalytics.dev">
+            <a className="btn btn-accent" href={BOOK_DEMO_URL}>
               Book a demo <span className="arr" />
             </a>
             <a className="btn btn-ghost" href="mailto:hello@aceanalytics.dev">
@@ -336,8 +335,8 @@ export function MarketingFooter() {
           <div>
             <h4>Built in</h4>
             <ul>
-              <li>Brooklyn, NY</li>
-              <li>40.713°N 74.006°W</li>
+              <li>Birmingham, AL</li>
+              <li>33.519°N 86.810°W</li>
               <li>Independent</li>
             </ul>
           </div>
@@ -345,16 +344,16 @@ export function MarketingFooter() {
             <h4>Product</h4>
             <ul>
               <li>
-                <Link href="/product/cfin">Aperture</Link>
-              </li>
-              <li>
-                <Link href="/product/rm">Parallax</Link>
+                <Link href="/product/lattice">Lattice</Link>
               </li>
               <li>
                 <Link href="/product/text2sql">Dialect</Link>
               </li>
               <li>
-                <a href={TEXT2SQL_APP_URL}>Text2SQL App</a>
+                <Link href="/product/cfin">Aperture</Link>
+              </li>
+              <li>
+                <Link href="/product/credit-spread">Parallax</Link>
               </li>
             </ul>
           </div>
@@ -365,7 +364,7 @@ export function MarketingFooter() {
                 <Link href="/about">About</Link>
               </li>
               <li>
-                <a href="mailto:hello@aceanalytics.dev">Book a demo</a>
+                <a href={BOOK_DEMO_URL}>Book a demo</a>
               </li>
               <li>
                 <a href="mailto:press@aceanalytics.dev">Press</a>
@@ -376,13 +375,13 @@ export function MarketingFooter() {
             <h4>Legal</h4>
             <ul>
               <li>
-                <a href="#">Privacy</a>
+                <Link href="/legal/privacy">Privacy</Link>
               </li>
               <li>
-                <a href="#">Terms</a>
+                <Link href="/legal/terms">Terms</Link>
               </li>
               <li>
-                <a href="#">SOC 2 Type II</a>
+                <Link href="/legal/soc2-status">SOC 2 Type II Status</Link>
               </li>
             </ul>
           </div>
@@ -419,9 +418,10 @@ export function ProductSubnav() {
   const pathname = usePathname()
 
   const items = [
-    { href: '/product/cfin', label: 'CFIN', sub: 'Aperture', color: 'var(--accent)' },
-    { href: '/product/rm', label: 'RM Pro-Forma', sub: 'Parallax', color: 'var(--accent-orange)' },
+    { href: '/product/lattice', label: 'Breakeven + Forecasting', sub: 'Lattice', color: 'var(--accent-2)' },
     { href: '/product/text2sql', label: 'Text2SQL', sub: 'Dialect', color: 'var(--accent-slate)' },
+    { href: '/product/cfin', label: 'CFIN Workspace', sub: 'Aperture', color: 'var(--accent)' },
+    { href: '/product/credit-spread', label: 'Credit Spreading', sub: 'Parallax', color: 'var(--accent-orange)' },
   ]
 
   return (

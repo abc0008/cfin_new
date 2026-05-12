@@ -2,17 +2,18 @@
 
 import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
+import { ParallaxMock } from '@/components/marketing/product-mocks'
 import { Eyebrow, ProductSubnav, useReveal } from '@/components/marketing/shared'
-import { RM_PRO_FORMA_URL } from '@/lib/app-urls'
+import {
+  BOOK_DEMO_URL,
+  CFIN_WORKSPACE_URL,
+  CREDIT_SPREAD_URL,
+  RM_PRO_FORMA_URL,
+} from '@/lib/app-urls'
 
 const TEXT2SQL_APP_URL =
   process.env.NEXT_PUBLIC_TEXT2SQL_APP_URL || 'https://text2sql.aceanalytics.dev'
 const TEXT2SQL_GUIDED_MODE_URL = `${TEXT2SQL_APP_URL.replace(/\/+$/, '')}/guided-mode`
-const CFIN_WORKSPACE_URL =
-  process.env.NEXT_PUBLIC_CFIN_WORKSPACE_URL ||
-  (process.env.NODE_ENV === 'development'
-    ? 'http://localhost:3000/workspace'
-    : 'https://fdas.aceanalytics.dev/workspace')
 
 export function CfinProductDetailPage() {
   return (
@@ -41,7 +42,7 @@ export function CfinProductDetailPage() {
               <a className="btn btn-primary" href={CFIN_WORKSPACE_URL}>
                 Upload a document →
               </a>
-              <a className="btn btn-ghost" href="mailto:hello@aceanalytics.dev">
+              <a className="btn btn-ghost" href={BOOK_DEMO_URL}>
                 See a live run
               </a>
             </div>
@@ -95,7 +96,7 @@ export function CfinProductDetailPage() {
 
       <ApertureBeam />
 
-      <section className="pp-split">
+      <section className="pp-split" id="methods">
         <div className="wrap">
           <div className="pp-split-head">
             <Eyebrow op="OP_APRT_02">Specialized analyses</Eyebrow>
@@ -186,7 +187,7 @@ export function CfinProductDetailPage() {
         primary="Open CFIN Workspace"
         primaryHref={CFIN_WORKSPACE_URL}
         secondary="See benchmark methodology"
-        secondaryHref="mailto:hello@aceanalytics.dev"
+        secondaryHref="/product/cfin#methods"
         accent="var(--accent)"
       />
     </main>
@@ -533,7 +534,7 @@ function ApertureBeam() {
   )
 }
 
-export function RmProductDetailPage() {
+export function CreditSpreadProductDetailPage() {
   return (
     <main className="pp pp-rm">
       <ProductSubnav />
@@ -545,36 +546,36 @@ export function RmProductDetailPage() {
               <span className="op" style={{ color: 'var(--accent-orange)' }}>
                 OP_PRLX
               </span>
-              <span className="pill">bankanalysis.aceanalytics.dev / rm-pro-forma</span>
+              <span className="pill">bankanalysis.aceanalytics.dev / credit-spread</span>
             </div>
             <h1 className="pp-h1">
-              A pro-forma
+              Borrower packages,
               <br />
               <span className="ital" style={{ color: 'var(--accent-orange)' }}>
-                for every hire.
+                spread cleanly.
               </span>
             </h1>
             <p className="pp-lede">
-              Parallax builds production-grade pro-forma models for new RMs - yield curve, loan
-              production, payback, and full financial statements. Tied to live rate assumptions.
+              Parallax ingests scanned borrower packets and outputs committee-ready spreads with
+              covenants, DSCR, and risk-ready ratios tied to source pages.
             </p>
             <div className="pp-hero-actions">
               <a
                 className="btn btn-primary"
                 style={{ background: 'var(--accent-orange)', color: '#fff' }}
-                href={RM_PRO_FORMA_URL}
+                href={CREDIT_SPREAD_URL}
               >
-                Start a model →
+                Open Credit Spreading App →
               </a>
-              <a className="btn btn-ghost" href="mailto:hello@aceanalytics.dev">
-                Export to Excel
+              <a className="btn btn-ghost" href="/product/credit-spread#methods">
+                See sample spread output
               </a>
             </div>
             <div className="pp-hero-tags">
               {[
-                ['1y 5mo', 'avg. payback'],
-                ['6 years', 'projection horizon'],
-                ['$18.4M', 'modeled assets · yr 6'],
+                ['OCR-first', 'scans + handwriting'],
+                ['Committee-ready', 'DSCR · FCC · LTV'],
+                ['Covenant aware', 'stress-tested outputs'],
               ].map(([a, b], i) => (
                 <div key={i} className="pp-tag" style={{ '--tc': 'var(--accent-orange)' } as React.CSSProperties}>
                   <div className="t">{a}</div>
@@ -585,7 +586,143 @@ export function RmProductDetailPage() {
           </div>
 
           <div className="pp-hero-art">
-            <ParallaxMockLive />
+            <ParallaxMock isActive />
+          </div>
+        </div>
+      </section>
+
+      <section className="pp-strip" id="methods">
+        <div className="wrap">
+          <CapCard
+            ix="01"
+            title="OCR tuned for real packets"
+            body="Tax returns, K-1s, statements, appraisals, and scanned exhibits are parsed into structured fields."
+            accent="var(--accent-orange)"
+          />
+          <CapCard
+            ix="02"
+            title="Credit spreading outputs"
+            body="DSCR, FCC, LTV, leverage, and trend deltas are computed automatically from the extracted package."
+            accent="var(--accent-slate)"
+          />
+          <CapCard
+            ix="03"
+            title="Covenant sensitivity"
+            body="Scenario overlays highlight where thresholds break before a package reaches committee."
+            accent="var(--accent-2)"
+          />
+          <CapCard
+            ix="04"
+            title="Audit trail included"
+            body="Each line item and ratio can be traced back to source pages for defensible underwriting."
+            accent="var(--accent-plum)"
+          />
+        </div>
+      </section>
+
+      <PPFlow
+        op="OP_PRLX_03"
+        title={
+          <>
+            Ingest.{' '}
+            <span className="ital" style={{ color: 'var(--accent-orange)' }}>
+              Spread.
+            </span>{' '}
+            Deliver.
+          </>
+        }
+        steps={[
+          {
+            n: '01',
+            t: 'Upload packet',
+            b: 'Drop a borrower package and let OCR parse forms, statements, and appendices in one pass.',
+          },
+          {
+            n: '02',
+            t: 'Review spread',
+            b: 'Inspect normalized financials, covenants, and risk metrics with source-linked context.',
+          },
+          {
+            n: '03',
+            t: 'Ship to committee',
+            b: 'Export a lender-ready spread package with confidence annotations and audit support.',
+          },
+        ]}
+        accent="var(--accent-orange)"
+      />
+
+      <PPCta
+        title={
+          <>
+            Spread with speed.
+            <br />
+            Defend with <span className="ital">evidence.</span>
+          </>
+        }
+        sub="Parallax replaces hand-keyed borrower spreading with a repeatable, auditable workflow."
+        primary="Open Credit Spreading App"
+        primaryHref={CREDIT_SPREAD_URL}
+        secondary="Read the methods"
+        secondaryHref="/product/credit-spread#methods"
+        accent="var(--accent-orange)"
+      />
+    </main>
+  )
+}
+
+export function LatticeProductDetailPage() {
+  return (
+    <main className="pp pp-rm">
+      <ProductSubnav />
+
+      <section className="pp-hero">
+        <div className="wrap pp-hero-grid">
+          <div className="pp-hero-copy">
+            <div className="pp-eyebrow">
+              <span className="op" style={{ color: 'var(--accent-2)' }}>
+                OP_LTTC
+              </span>
+              <span className="pill">bankanalysis.aceanalytics.dev / rm-pro-forma</span>
+            </div>
+            <h1 className="pp-h1">
+              Breakeven models
+              <br />
+              <span className="ital" style={{ color: 'var(--accent-2)' }}>
+                for every hire.
+              </span>
+            </h1>
+            <p className="pp-lede">
+              Lattice builds production-grade pro-forma models for new RMs - yield curve, loan
+              production, payback, and full financial statements tied to live rate assumptions.
+            </p>
+            <div className="pp-hero-actions">
+              <a
+                className="btn btn-primary"
+                style={{ background: 'var(--accent-2)', color: '#fff' }}
+                href={RM_PRO_FORMA_URL}
+              >
+                Open Lattice Workspace →
+              </a>
+              <a className="btn btn-ghost" href={RM_PRO_FORMA_URL}>
+                Export to Excel
+              </a>
+            </div>
+            <div className="pp-hero-tags">
+              {[
+                ['1y 5mo', 'avg. payback'],
+                ['6 years', 'projection horizon'],
+                ['$18.4M', 'modeled assets · yr 6'],
+              ].map(([a, b], i) => (
+                <div key={i} className="pp-tag" style={{ '--tc': 'var(--accent-2)' } as React.CSSProperties}>
+                  <div className="t">{a}</div>
+                  <div className="s">{b}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="pp-hero-art">
+            <LatticeMockLive />
           </div>
         </div>
       </section>
@@ -596,7 +733,7 @@ export function RmProductDetailPage() {
             ix="01"
             title="RM Type & Start"
             body="Hire date, segment, book assumptions. The model adapts to the persona you're funding."
-            accent="var(--accent-orange)"
+            accent="var(--accent-2)"
           />
           <CapCard
             ix="02"
@@ -619,15 +756,15 @@ export function RmProductDetailPage() {
         </div>
       </section>
 
-      <section className="pp-rm-statements">
+      <section className="pp-rm-statements" id="methods">
         <div className="wrap">
           <div className="pp-split-head">
-            <Eyebrow op="OP_PRLX_02">Full financial statements</Eyebrow>
+            <Eyebrow op="OP_LTTC_02">Full financial statements</Eyebrow>
             <h2 className="pp-h2">
               Balance sheet, income statement,
               <br />
               and{' '}
-              <span className="ital" style={{ color: 'var(--accent-orange)' }}>
+              <span className="ital" style={{ color: 'var(--accent-2)' }}>
                 key ratios.
               </span>{' '}
               Every time.
@@ -638,11 +775,11 @@ export function RmProductDetailPage() {
       </section>
 
       <PPFlow
-        op="OP_PRLX_03"
+        op="OP_LTTC_03"
         title={
           <>
             Configure.{' '}
-            <span className="ital" style={{ color: 'var(--accent-orange)' }}>
+            <span className="ital" style={{ color: 'var(--accent-2)' }}>
               Calculate.
             </span>{' '}
             Commit.
@@ -665,7 +802,7 @@ export function RmProductDetailPage() {
             b: 'Lock the assumption set, export to Excel or to a committee memo PDF.',
           },
         ]}
-        accent="var(--accent-orange)"
+        accent="var(--accent-2)"
       />
 
       <PPCta
@@ -676,26 +813,26 @@ export function RmProductDetailPage() {
             not just the role.
           </>
         }
-        sub="Parallax replaces the ad-hoc RM spreadsheet that every bank keeps rebuilding."
-        primary="Open RM Pro-Forma"
+        sub="Lattice replaces the ad-hoc RM spreadsheet every bank keeps rebuilding."
+        primary="Open Lattice Workspace"
         primaryHref={RM_PRO_FORMA_URL}
         secondary="See sample committee output"
-        secondaryHref="mailto:hello@aceanalytics.dev"
-        accent="var(--accent-orange)"
+        secondaryHref="/product/lattice#methods"
+        accent="var(--accent-2)"
       />
     </main>
   )
 }
 
-function ParallaxMockLive() {
+function LatticeMockLive() {
   return (
     <div className="prx-mock">
       <div className="prx-chrome">
         <span className="dot" />
         <span className="dot" />
         <span className="dot" />
-        <div className="url">parallax.ace / RM 1 · Consolidated View</div>
-        <div className="tag" style={{ color: 'var(--accent-orange)' }}>
+        <div className="url">lattice.ace / RM 1 · Consolidated View</div>
+        <div className="tag" style={{ color: 'var(--accent-2)' }}>
           ● PRO-FORMA · READY
         </div>
       </div>
@@ -715,7 +852,7 @@ function ParallaxMockLive() {
         <PrxChart />
         <div className="prx-kpis">
           {[
-            ['ROE', '5.40%', 'var(--accent-orange)'],
+            ['ROE', '5.40%', 'var(--accent-2)'],
             ['ROA', '4.39%', 'var(--accent-slate)'],
             ['NIM', '6.65%', 'var(--accent-2)'],
             ['EFF', '26.2%', 'var(--accent-plum)'],
@@ -761,21 +898,21 @@ function PrxChart() {
   return (
     <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
       <line x1="0" y1={y(0)} x2={width} y2={y(0)} stroke="currentColor" strokeOpacity="0.2" strokeDasharray="3 4" />
-      <path d={area} fill="var(--accent-orange)" fillOpacity="0.12" />
-      <path d={line} fill="none" stroke="var(--accent-orange)" strokeWidth="1.8" />
+      <path d={area} fill="var(--accent-2)" fillOpacity="0.12" />
+      <path d={line} fill="none" stroke="var(--accent-2)" strokeWidth="1.8" />
       <path
         d={`M 0 ${y(0)} L ${cx} ${y(0)} L ${cx} ${height} L 0 ${height} Z`}
         fill="var(--accent-plum)"
         fillOpacity="0.14"
       />
-      <circle cx={cx} cy={cy} r="4" fill="var(--accent-orange)" />
-      <line x1={cx} y1={y(0)} x2={cx} y2="10" stroke="var(--accent-orange)" strokeOpacity="0.6" strokeDasharray="2 3" />
+      <circle cx={cx} cy={cy} r="4" fill="var(--accent-2)" />
+      <line x1={cx} y1={y(0)} x2={cx} y2="10" stroke="var(--accent-2)" strokeOpacity="0.6" strokeDasharray="2 3" />
       <text
         x={cx + 6}
         y="16"
         fontFamily="JetBrains Mono, monospace"
         fontSize="10"
-        fill="var(--accent-orange)"
+        fill="var(--accent-2)"
         letterSpacing="0.1em"
       >
         SEP 2027
@@ -821,7 +958,7 @@ function RmIncomeStatement() {
       <div className="rm-is-head">
         <div className="caption">INCOME STATEMENT · PROJECTED</div>
         <div className="legend">
-          <span style={{ background: 'var(--accent-orange)' }} />
+          <span style={{ background: 'var(--accent-2)' }} />
           NET POSITIVE &nbsp;·&nbsp;
           <span style={{ background: 'var(--accent-plum)' }} />
           NET NEGATIVE
@@ -851,7 +988,7 @@ function RmIncomeStatement() {
               <td
                 key={i}
                 style={{
-                  color: v.startsWith('-') ? 'var(--accent-plum)' : 'var(--accent-orange)',
+                  color: v.startsWith('-') ? 'var(--accent-plum)' : 'var(--accent-2)',
                   fontWeight: 600,
                 }}
               >
@@ -931,7 +1068,7 @@ export function Text2SqlProductDetailPage() {
         </div>
       </section>
 
-      <section className="pp-t2s-pipe">
+      <section className="pp-t2s-pipe" id="methods">
         <div className="wrap">
           <div className="pp-split-head">
             <Eyebrow op="OP_DLCT_02">The 9-agent pipeline</Eyebrow>
@@ -1025,7 +1162,7 @@ export function Text2SqlProductDetailPage() {
         primary="Open Text2SQL app"
         primaryHref={TEXT2SQL_APP_URL}
         secondary="Read the context paper"
-        secondaryHref="mailto:hello@aceanalytics.dev"
+        secondaryHref="/product/text2sql#methods"
         accent="var(--accent)"
       />
     </main>

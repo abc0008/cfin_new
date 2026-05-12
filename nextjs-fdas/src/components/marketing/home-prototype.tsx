@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { MarketPanel } from '@/components/marketing/market-panel'
 import { ApertureMock, DialectMock, LatticeMock, ParallaxMock } from '@/components/marketing/product-mocks'
 import { EncryptedText } from '@/components/ui/encrypted-text'
-import { RM_PRO_FORMA_URL } from '@/lib/app-urls'
+import { BOOK_DEMO_URL } from '@/lib/app-urls'
 import {
   ClosingCTA,
   Eyebrow,
@@ -18,47 +18,51 @@ import {
 export const PROTOTYPE_TOOLS = [
   {
     op: 'OP_A1',
-    code: 'APRT',
-    name: 'Aperture',
-    tag: 'PDF Financial Analysis',
-    color: 'var(--accent-slate)',
-    desc: 'Upload a 10-K, 10-Q, or S-1. Get a line-item model with OHLC-quality charts, in seconds. Confidence-scored, audit-logged, and tied back to the source page.',
-    route: '/product/cfin',
-    mock: (isActive?: boolean, _shouldAnimate?: boolean) => <ApertureMock isActive={isActive} />,
-  },
-  {
-    op: 'OP_A2',
-    code: 'PRLX',
-    name: 'Parallax',
-    tag: 'OCR · Credit Spreading',
-    color: 'var(--accent-orange)',
-    desc: "Drop a scanned borrower package - tax returns, K-1s, bank statements. Get a clean, committee-ready credit spread with covenants, DSCR, and a sensitivity table. OCR that reads handwriting and stamps.",
-    route: '/product/rm',
-    mock: (isActive?: boolean, _shouldAnimate?: boolean) => <ParallaxMock isActive={isActive} />,
-  },
-  {
-    op: 'OP_A3',
     code: 'LTTC',
     name: 'Lattice',
     tag: 'Breakeven + Forecasting',
     color: 'var(--accent-2)',
     desc: 'Model revenue curves, fixed and variable cost, and CAC payback. Flip between BASE, BULL, BEAR. Find the month you cross the line - and what it takes to move it left.',
-    route: RM_PRO_FORMA_URL,
+    route: '/product/lattice',
+    methodsRoute: '/product/lattice#methods',
     mock: (isActive?: boolean, shouldAnimate?: boolean) => (
       <LatticeMock isActive={isActive} shouldAnimate={shouldAnimate} />
     ),
   },
   {
-    op: 'OP_A4',
+    op: 'OP_A2',
     code: 'DLCT',
     name: 'Dialect',
     tag: 'Text-to-SQL for banks',
     color: 'var(--accent-olive)',
     desc: 'Ask a question in plain English. Get calibrated SQL against your warehouse - no prompt engineering. Fine-tuned on bank schemas, validated by the planner before anyone sees a row.',
     route: '/product/text2sql',
+    methodsRoute: '/product/text2sql#methods',
     mock: (isActive?: boolean, shouldAnimate?: boolean) => (
       <DialectMock isActive={isActive} shouldAnimate={shouldAnimate} />
     ),
+  },
+  {
+    op: 'OP_A3',
+    code: 'APRT',
+    name: 'Aperture',
+    tag: 'PDF Financial Analysis',
+    color: 'var(--accent-slate)',
+    desc: 'Upload a 10-K, 10-Q, or S-1. Get a line-item model with OHLC-quality charts, in seconds. Confidence-scored, audit-logged, and tied back to the source page.',
+    route: '/product/cfin',
+    methodsRoute: '/product/cfin#methods',
+    mock: (isActive?: boolean, _shouldAnimate?: boolean) => <ApertureMock isActive={isActive} />,
+  },
+  {
+    op: 'OP_A4',
+    code: 'PRLX',
+    name: 'Parallax',
+    tag: 'OCR · Credit Spreading',
+    color: 'var(--accent-orange)',
+    desc: "Drop a scanned borrower package - tax returns, K-1s, bank statements. Get a clean, committee-ready credit spread with covenants, DSCR, and a sensitivity table. OCR that reads handwriting and stamps.",
+    route: '/product/credit-spread',
+    methodsRoute: '/product/credit-spread#methods',
+    mock: (isActive?: boolean, _shouldAnimate?: boolean) => <ParallaxMock isActive={isActive} />,
   },
 ]
 
@@ -123,12 +127,12 @@ function HeroCinematic() {
                 </span>
               </h1>
               <p className="lede hero-main-lede" style={{ marginTop: 36 }}>
-                Four focused AI tools for financial analysts. Filings to model, borrower packages
-                to credit spread, scenario to breakeven, natural language to SQL. Calibrated on
+                Four focused AI tools for financial analysts. Scenario to breakeven, natural
+                language to SQL, filings to model, and borrower packages to credit spread. Calibrated on
                 real filings, audited end to end.
               </p>
               <div style={{ display: 'flex', gap: 12, marginTop: 40, flexWrap: 'wrap' }}>
-                <a className="btn btn-ink" href="mailto:hello@aceanalytics.dev">
+                <a className="btn btn-ink" href={BOOK_DEMO_URL}>
                   Book a demo <span className="arr" />
                 </a>
                 <Link className="btn btn-ghost" href="/product">
@@ -162,11 +166,11 @@ function HeroSplit() {
             </span>
           </h1>
           <p className="lede hero-main-lede" style={{ marginTop: 28 }}>
-            Four focused AI tools for financial analysts. Filings to model, scans to credit spread,
-            scenario to breakeven, natural language to SQL.
+            Four focused AI tools for financial analysts. Scenario to breakeven, natural language
+            to SQL, filings to model, and scans to credit spread.
           </p>
           <div style={{ display: 'flex', gap: 12, marginTop: 32, flexWrap: 'wrap' }}>
-            <a className="btn btn-ink" href="mailto:hello@aceanalytics.dev">
+            <a className="btn btn-ink" href={BOOK_DEMO_URL}>
               Book a demo <span className="arr" />
             </a>
             <Link className="btn btn-ghost" href="/product">
@@ -203,12 +207,12 @@ function HeroTypographic() {
           }}
         >
           <p className="lede" style={{ maxWidth: 600 }}>
-            Four focused AI tools for financial analysts. Filings to model, scans to credit spread,
-            scenario to breakeven, natural language to SQL. Calibrated on real filings, audited end
-            to end.
+            Four focused AI tools for financial analysts. Scenario to breakeven, natural language
+            to SQL, filings to model, and scans to credit spread. Calibrated on real filings,
+            audited end to end.
           </p>
           <div style={{ display: 'flex', gap: 12 }}>
-            <a className="btn btn-ink" href="mailto:hello@aceanalytics.dev">
+            <a className="btn btn-ink" href={BOOK_DEMO_URL}>
               Book a demo <span className="arr" />
             </a>
             <Link className="btn btn-ghost" href="/product">
@@ -294,9 +298,9 @@ function ToolMorpher() {
                     >
                       See {tool.name} <span className="arr" />
                     </Link>
-                    <a className="btn btn-ghost" href="mailto:hello@aceanalytics.dev">
+                    <Link className="btn btn-ghost" href={tool.methodsRoute}>
                       Read the methods
-                    </a>
+                    </Link>
                   </div>
                 </div>
               ))}

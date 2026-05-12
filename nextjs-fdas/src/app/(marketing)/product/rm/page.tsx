@@ -1,5 +1,5 @@
-import { RmProductDetailPage } from '@/components/marketing/product-pages-prototype'
+import { redirect } from 'next/navigation'
 
 export default function MarketingRmPage() {
-  return <RmProductDetailPage />
+  redirect('/product/lattice')
 }
