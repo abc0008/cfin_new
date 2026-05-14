@@ -178,9 +178,29 @@ export function PDFViewer({
     );
   }, []);
 
-  const centerElementInView = useCallback((element: HTMLElement) => {
-    element.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+  const scrollElementIntoPdfView = useCallback((element: HTMLElement, block: 'start' | 'center') => {
+    const scrollContainer = element.closest('.PdfHighlighter') as HTMLElement | null;
+    if (scrollContainer && scrollContainer.scrollHeight > scrollContainer.clientHeight) {
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+      const centerOffset = block === 'center'
+        ? (scrollContainer.clientHeight - elementRect.height) / 2
+        : 0;
+      const targetTop = scrollContainer.scrollTop + elementRect.top - containerRect.top - centerOffset;
+
+      scrollContainer.scrollTo({
+        top: Math.max(0, targetTop),
+        behavior: 'auto',
+      });
+      return;
+    }
+
+    element.scrollIntoView({ behavior: 'auto', block, inline: 'nearest' });
   }, []);
+
+  const centerElementInView = useCallback((element: HTMLElement) => {
+    scrollElementIntoPdfView(element, 'center');
+  }, [scrollElementIntoPdfView]);
 
   // Use pdf.js 2.16.x which matches react-pdf-highlighter's internal version.
   // Provide local worker first, with CDN fallback **of the same version**.
@@ -236,6 +256,13 @@ export function PDFViewer({
 
   // Combine AI-generated highlights with user highlights and citation highlights
   const allHighlights = [...userHighlights, ...aiHighlights, ...citationHighlights];
+  const highlightScrollVersion = React.useMemo(
+    () =>
+      allHighlights
+        .map((h) => `${h.id}:${h.position.pageNumber}:${h.position.rects.length}`)
+        .join('|'),
+    [allHighlights]
+  );
 
   // Keep latest arrays in refs so scroll retry logic can read fresh data without
   // re-starting the retry effect on every highlight/citation state churn.
@@ -467,7 +494,7 @@ export function PDFViewer({
           session.pageKickDone = true;
           if (pageEl) {
             try {
-              pageEl.scrollIntoView({ behavior: 'auto', block: 'start', inline: 'nearest' });
+              scrollElementIntoPdfView(pageEl, 'start');
             } catch (err) {
               console.warn('[PDFViewer] Page kick scroll failed', err);
             }
@@ -553,9 +580,9 @@ export function PDFViewer({
       const pageNumber = pageOnlyCitation.startPageNumber;
       setCurrentPage((prev) => (prev === pageNumber ? prev : pageNumber));
       const pageSelector = `.PdfHighlighter .page[data-page-number='${pageNumber}']`;
-      const pageEl = globalThis.document?.querySelector(pageSelector);
+      const pageEl = globalThis.document?.querySelector(pageSelector) as HTMLElement | null;
       if (pageEl) {
-        (pageEl as HTMLElement).scrollIntoView({ behavior: 'auto', block: 'start', inline: 'nearest' });
+        scrollElementIntoPdfView(pageEl, 'start');
         console.log('[PDFViewer] Scrolled to page via citation fallback', { highlightId, pageNumber });
         return true;
       }
@@ -566,7 +593,8 @@ export function PDFViewer({
   }, [
     centerElementInView,
     getHighlightElement,
-    isElementVisibleInViewport
+    isElementVisibleInViewport,
+    scrollElementIntoPdfView
   ]);
   
   // Handler for adding highlights
@@ -735,9 +763,41 @@ export function PDFViewer({
       return;
     }
 
-    // Prevent retry loops from repeatedly re-scrolling the same target on highlight/state churn.
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const visibilityCheckTimeouts: ReturnType<typeof setTimeout>[] = [];
+
+    const scheduleVisibilityChecks = (target: string) => {
+      [500, 1500, 3500, 6500].forEach((delay) => {
+        const checkTimeoutId = setTimeout(() => {
+          const targetEl = getHighlightElement(target);
+          if (targetEl && isElementVisibleInViewport(targetEl)) {
+            return;
+          }
+
+          lastScrolledHighlightIdRef.current = null;
+          lastScrollRefKickTargetRef.current = null;
+          scrollSessionRef.current = null;
+          pendingScrollHighlightIdRef.current = target;
+          scrollToHighlight(target);
+        }, delay);
+
+        visibilityCheckTimeouts.push(checkTimeoutId);
+      });
+    };
+
+    // Prevent retry loops from repeatedly re-scrolling the same target on highlight/state churn,
+    // but allow a fresh scroll after PDF/citation hydration re-renders the target offscreen.
     if (lastScrolledHighlightIdRef.current === highlightId) {
-      return;
+      const currentTarget = getHighlightElement(highlightId);
+      if (currentTarget && isElementVisibleInViewport(currentTarget)) {
+        scheduleVisibilityChecks(highlightId);
+        return () => {
+          visibilityCheckTimeouts.forEach(clearTimeout);
+        };
+      }
+      lastScrolledHighlightIdRef.current = null;
+      lastScrollRefKickTargetRef.current = null;
+      scrollSessionRef.current = null;
     }
 
     if (pendingScrollHighlightIdRef.current !== highlightId) {
@@ -747,7 +807,6 @@ export function PDFViewer({
 
     pendingScrollHighlightIdRef.current = highlightId;
     let attempts = 0;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const tryScroll = () => {
       const target = pendingScrollHighlightIdRef.current;
@@ -761,6 +820,7 @@ export function PDFViewer({
         lastScrolledHighlightIdRef.current = target;
         lastScrollRefKickTargetRef.current = null;
         scrollSessionRef.current = null;
+        scheduleVisibilityChecks(target);
         return;
       }
 
@@ -776,8 +836,9 @@ export function PDFViewer({
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
+      visibilityCheckTimeouts.forEach(clearTimeout);
     };
-  }, [highlightId, scrollToHighlight]);
+  }, [highlightId, scrollToHighlight, highlightScrollVersion, getHighlightElement, isElementVisibleInViewport]);
   
   // Update render scale when renderingQuality changes
   useEffect(() => {

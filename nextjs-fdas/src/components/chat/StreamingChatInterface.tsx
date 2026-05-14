@@ -248,6 +248,7 @@ export function StreamingChatInterface({
                   documentId: citation.documentId,
                   page: citation.startPageNumber
                 });
+                handleCitationClick(citation);
                 // Delegate to CitationContext which loads/merges rects (if missing)
                 // and dispatches the "citation-navigation" event when ready.
                 openCitation(citation.id).catch((err) => {

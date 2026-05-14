@@ -1080,7 +1080,8 @@ class DocumentRepository:
                         "column_terms": set(),
                         "row_terms": set(),
                     }
-                    linked_messages = getattr(citation, "messages", None) or []
+                    linked_messages = citation.__dict__.get("messages") or []
+                    explicit_message_context = getattr(citation, "_message_context_text", None)
                     marker_index_hint = getattr(citation, "_marker_index_hint", None)
                     if marker_index_hint is None:
                         marker_index_hint = getattr(citation, "section", None)
@@ -1141,9 +1142,14 @@ class DocumentRepository:
                     best_hint: Optional[Dict[str, Any]] = None
                     best_hint_score = float("-inf")
 
+                    message_contexts = []
+                    if explicit_message_context:
+                        message_contexts.append(str(explicit_message_context))
                     for link in linked_messages:
                         msg = getattr(link, "message", None)
-                        content = str(getattr(msg, "content", "") or "")
+                        message_contexts.append(str(getattr(msg, "content", "") or ""))
+
+                    for content in message_contexts:
                         if not content:
                             continue
 

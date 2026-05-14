@@ -30,7 +30,7 @@ class Message(BaseModel):
     referenced_documents: List[str] = Field(default_factory=list, alias="referencedDocuments")
     referenced_analyses: List[str] = Field(default_factory=list, alias="referencedAnalyses")
     citation_links: List[str] = Field(default_factory=list, alias="citationLinks")
-    citations: Optional[List[Citation]] = Field(default_factory=list)
+    citations: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     content_blocks: Optional[List[ContentBlock]] = Field(default=None, alias="contentBlocks")
     analysis_blocks: Optional[List[Dict[str, Any]]] = Field(default=None, alias="analysisBlocks")
     follow_up_questions: Optional[List[str]] = Field(default=None, alias="followUpQuestions")

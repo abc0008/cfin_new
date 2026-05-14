@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { Message, Citation } from '@/types';
 import { ExternalLink } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { CopyToClipboard, MessageActions } from './InteractiveElements';
 
 interface MessageRendererProps {
   message: Message;
@@ -61,6 +62,8 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
           <MarkdownRenderer 
             key={`text-${lastIndex}`}
             content={content.substring(lastIndex, match.index)} 
+            inline
+            showMessageActions={false}
           />
         );
       }
@@ -69,14 +72,18 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
       if (citations[citationIndex]) {
         const citation = citations[citationIndex];
         parts.push(
-          <button
+          <a
+            href={`#citation-${encodeURIComponent(citation.id)}`}
             key={`cite-${citation.id}-${match.index}`}
             className="citation-link inline-flex items-center px-1 py-0.5 mx-0.5 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-200 cursor-pointer text-xs align-top"
-            onClick={() => onCitationClick?.(citation)}
+            onClick={(event) => {
+              event.preventDefault();
+              onCitationClick?.(citation);
+            }}
             aria-label={`Citation ${citationIndex + 1}: ${(citation.displayText || citation.citedText).substring(0, 50)}...`}
           >
             <sup className="font-medium">{citationIndex + 1}</sup>
-          </button>
+          </a>
         );
       } else {
         // Fallback if citation not found
@@ -96,6 +103,8 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
         <MarkdownRenderer 
           key={`text-${lastIndex}`}
           content={content.substring(lastIndex)} 
+          inline
+          showMessageActions={false}
         />
       );
     }
@@ -247,6 +256,10 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
       return (
         <div className="message-content">
           {renderContentWithCitations(processedContent, message.citations, onCitationClick)}
+          <MessageActions className="mt-2 justify-start">
+            <CopyToClipboard text={processedContent} />
+            <span className="text-xs text-gray-500 ml-2">Copy message</span>
+          </MessageActions>
         </div>
       );
     }
@@ -257,14 +270,18 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
         <MarkdownRenderer content={processedContent} />
         <div className="mt-2 inline-flex flex-wrap items-center gap-1 align-top">
           {message.citations.map((citation, idx) => (
-            <button
+            <a
+              href={`#citation-${encodeURIComponent(citation.id)}`}
               key={`cite-strip-${citation.id}-${idx}`}
               className="citation-link inline-flex items-center px-1 py-0.5 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-200 cursor-pointer text-xs"
-              onClick={() => onCitationClick?.(citation)}
+              onClick={(event) => {
+                event.preventDefault();
+                onCitationClick?.(citation);
+              }}
               aria-label={`Citation ${idx + 1}: ${(citation.displayText || citation.citedText).substring(0, 50)}...`}
             >
               <sup className="font-medium">{idx + 1}</sup>
-            </button>
+            </a>
           ))}
         </div>
       </div>

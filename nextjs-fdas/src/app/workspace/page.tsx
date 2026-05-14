@@ -8,7 +8,9 @@ import { UploadForm } from '../../components/document/UploadForm'
 import dynamic from 'next/dynamic'
 import { ProcessedDocument, AnalysisResult, Message, Citation } from '@/types'
 import { conversationApi } from '@/lib/api/conversation'
+import { conversationsApi } from '@/lib/api/conversations'
 import { analysisApi } from '@/lib/api/analysis'
+import { documentsApi } from '@/lib/api/documents'
 import Canvas from '@/components/visualization/Canvas'
 import { AnalysisControls } from '@/components/analysis/AnalysisControls'
 import { AnalysisResultSchema } from '@/validation/schemas'
@@ -28,7 +30,7 @@ const PDFViewer = dynamic(
 )
 
 export default function Workspace() {
-  const { citations } = useCitation();
+  const { citations, addCitations } = useCitation();
   const [activeTab, setActiveTab] = useState<'document' | 'analysis'>('document')
   // Store messages as a normalized object with ID as key for better deduplication
   const [messagesMap, setMessagesMap] = useState<Record<string, Message>>({});
@@ -50,6 +52,8 @@ export default function Workspace() {
   const [showReflectionsDialog, setShowReflectionsDialog] = useState(false);
   const processedAnalysisMessageIdsRef = useRef<Set<string>>(new Set());
   const analysisRequestInFlightRef = useRef<Set<string>>(new Set());
+  const initSessionRunRef = useRef(0);
+  const documentPanelRef = useRef<HTMLDivElement | null>(null);
   
   // Message ID generation with hash to ensure uniqueness
   const generateMessageId = useCallback((role: string, content: string) => {
@@ -71,8 +75,10 @@ export default function Workspace() {
 
   // Initialize conversation session when component mounts
   useEffect(() => {
-    let mounted = true;
     let sessionInitialized = false;
+    const runId = ++initSessionRunRef.current;
+    let cancelled = false;
+    const isCurrentRun = () => !cancelled && runId === initSessionRunRef.current;
 
     const initSession = async () => {
       // Only create a session if we don't have one and haven't tried to initialize yet
@@ -80,9 +86,46 @@ export default function Workspace() {
         sessionInitialized = true;
         try {
           setIsLoading(true);
+          const params = new URLSearchParams(window.location.search);
+          const requestedConversationId = params.get('conversationId') || params.get('sessionId');
+          const requestedDocumentId = params.get('documentId');
+
+          if (requestedConversationId) {
+            const conversationId = requestedConversationId;
+
+            const [history, document] = await Promise.all([
+              conversationsApi.getConversationHistory(conversationId, 100),
+              requestedDocumentId
+                ? documentsApi.getDocument(requestedDocumentId)
+                : Promise.resolve(null),
+            ]);
+
+            if (isCurrentRun()) {
+              setSessionId(conversationId);
+
+              if (document) {
+                setSelectedDocument(document);
+              }
+
+              setMessagesMap(
+                history.reduce<Record<string, Message>>((acc, message) => {
+                  acc[message.id] = message;
+                  return acc;
+                }, {})
+              );
+
+              console.log('Loaded existing workspace session:', {
+                conversationId,
+                documentId: document?.metadata.id,
+                messageCount: history.length,
+              });
+            }
+            return;
+          }
+
           // Create a new conversation session
           const response = await conversationApi.createConversation('New Conversation');
-          if (mounted) {
+          if (isCurrentRun()) {
             // The backend returns sessionId in camelCase due to alias_generator
             const sessionIdValue = response.sessionId || response.session_id;
             setSessionId(sessionIdValue);
@@ -104,7 +147,7 @@ export default function Workspace() {
             }
           }));
         } finally {
-          if (mounted) {
+          if (isCurrentRun()) {
             setIsLoading(false);
           }
         }
@@ -114,7 +157,7 @@ export default function Workspace() {
     initSession();
 
     return () => {
-      mounted = false;
+      cancelled = true;
     };
   }, []);
 
@@ -692,6 +735,7 @@ export default function Workspace() {
   // scroll to the related highlight (if we have its ID)
   const handleNavigateToHighlight = useCallback((citation: Citation) => {
     if (citation) {
+      addCitations([citation]);
       // Use the citation ID (which might be a temp ID)
       // The PDFViewer has been updated to handle both temp IDs and UUIDs
       const navigationHighlightId = citation.highlightId || citation.id;
@@ -701,10 +745,17 @@ export default function Workspace() {
         navigationHighlightId,
         page: citation.startPageNumber
       });
-      setHighlightId(navigationHighlightId);
+      if (typeof documentPanelRef.current?.scrollIntoView === 'function') {
+        documentPanelRef.current.scrollIntoView({
+          behavior: 'auto',
+          block: 'start',
+          inline: 'nearest',
+        });
+      }
       setActiveTab('document');
+      setHighlightId(navigationHighlightId);
     }
-  }, []);
+  }, [addCitations]);
 
   return (
     <div className="workspace-page flex flex-col h-full">
@@ -741,7 +792,10 @@ export default function Workspace() {
           </div>
         </div>
 
-        <div className="workspace-panel col-span-2 flex min-h-[calc(100vh-14rem)] flex-1 flex-col overflow-hidden">
+        <div
+          ref={documentPanelRef}
+          className="workspace-panel col-span-2 flex min-h-[calc(100vh-14rem)] flex-1 flex-col overflow-hidden scroll-mt-20"
+        >
           <Tabs
             value={activeTab}
             onValueChange={(value) => setActiveTab(value as 'document' | 'analysis')}

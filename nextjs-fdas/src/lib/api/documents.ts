@@ -46,6 +46,39 @@ interface FinancialDataVerifyResponse {
   message: string;
 }
 
+const DOCUMENT_CONTENT_TYPES = new Set<ProcessedDocument['contentType']>([
+  'balance_sheet',
+  'income_statement',
+  'cash_flow',
+  'notes',
+  'other',
+]);
+
+const DOCUMENT_PROCESSING_STATUSES = new Set<ProcessedDocument['processingStatus']>([
+  'pending',
+  'processing',
+  'completed',
+  'failed',
+]);
+
+const normalizeDocumentContentType = (
+  value: unknown,
+  fallback: ProcessedDocument['contentType'] = 'other'
+): ProcessedDocument['contentType'] => {
+  return typeof value === 'string' && DOCUMENT_CONTENT_TYPES.has(value as ProcessedDocument['contentType'])
+    ? (value as ProcessedDocument['contentType'])
+    : fallback;
+};
+
+const normalizeProcessingStatus = (
+  value: unknown,
+  fallback: ProcessedDocument['processingStatus'] = 'pending'
+): ProcessedDocument['processingStatus'] => {
+  return typeof value === 'string' && DOCUMENT_PROCESSING_STATUSES.has(value as ProcessedDocument['processingStatus'])
+    ? (value as ProcessedDocument['processingStatus'])
+    : fallback;
+};
+
 // API citation format (for request/response to/from backend)
 interface ApiCitation {
   id?: string;
@@ -132,6 +165,63 @@ export const documentsApi = {
   async listDocuments(page: number = 1, pageSize: number = 10): Promise<any[]> {
     try {
       return await apiService.get(`/api/documents?page=${page}&page_size=${pageSize}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Gets a single processed document.
+   */
+  async getDocument(documentId: string): Promise<ProcessedDocument> {
+    try {
+      const response = await apiService.get<DocumentResponse>(`/api/documents/${documentId}`);
+
+      return {
+        metadata: {
+          id: response.metadata?.id || (response as any).id || documentId,
+          filename: response.metadata?.filename || (response as any).filename || 'Document',
+          uploadTimestamp:
+            response.metadata?.uploadTimestamp ||
+            (response.metadata as any)?.upload_timestamp ||
+            (response as any).uploadTimestamp ||
+            (response as any).upload_timestamp ||
+            new Date().toISOString(),
+          fileSize:
+            response.metadata?.fileSize ||
+            (response.metadata as any)?.file_size ||
+            (response as any).fileSize ||
+            (response as any).file_size ||
+            0,
+          mimeType:
+            response.metadata?.mimeType ||
+            (response.metadata as any)?.mime_type ||
+            (response as any).mimeType ||
+            (response as any).mime_type ||
+            'application/pdf',
+          userId:
+            response.metadata?.userId ||
+            (response.metadata as any)?.user_id ||
+            (response as any).userId ||
+            (response as any).user_id ||
+            'default-user',
+          citationLinks:
+            response.metadata?.citationLinks ||
+            (response.metadata as any)?.citation_links ||
+            [],
+        },
+        contentType: normalizeDocumentContentType(response.contentType || response.content_type),
+        extractionTimestamp:
+          response.extractionTimestamp ||
+          (response as any).extraction_timestamp ||
+          new Date().toISOString(),
+        periods: response.periods || [],
+        extractedData: response.extractedData || response.extracted_data || {},
+        confidenceScore: response.confidenceScore || response.confidence_score || 0,
+        processingStatus: normalizeProcessingStatus(response.processingStatus || response.processing_status),
+        errorMessage: response.errorMessage || response.error_message,
+        citations: response.citations || [],
+      };
     } catch (error) {
       throw handleApiError(error);
     }

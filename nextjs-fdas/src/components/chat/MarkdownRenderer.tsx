@@ -16,7 +16,7 @@ import {
 import type { ComponentPropsWithoutRef } from 'react';
 import { Components } from 'react-markdown';
 import { useRouter } from 'next/navigation';
-import { processFinancialTerms, FinancialTerms } from './FinancialTerms';
+import { processFinancialTerms } from './FinancialTerms';
 import { processMessageReferences } from './MessageReference';
 
 interface MarkdownRendererProps {
@@ -36,6 +36,8 @@ interface MarkdownRendererProps {
   parentMessages?: Message[];
   onMessageReferenceClick?: (messageId: string) => void;
   enableFinancialTerms?: boolean;
+  showMessageActions?: boolean;
+  inline?: boolean;
 }
 
 export function MarkdownRenderer({ 
@@ -46,7 +48,9 @@ export function MarkdownRenderer({
   expandableContent = [],
   parentMessages = [],
   onMessageReferenceClick = () => {},
-  enableFinancialTerms = true
+  enableFinancialTerms = true,
+  showMessageActions = true,
+  inline = false
 }: MarkdownRendererProps) {
   const router = useRouter();
 
@@ -231,6 +235,19 @@ export function MarkdownRenderer({
     },
     // Process text nodes to find and highlight citations
     p({ children, ...props }) {
+      if (inline) {
+        return (
+          <>
+            {React.Children.map(children, child => {
+              if (typeof child === 'string') {
+                return processCitations(child);
+              }
+              return child;
+            })}
+          </>
+        );
+      }
+
       // Check for potentially problematic children that would cause hydration errors
       const hasComplexContent = React.Children.toArray(children).some(child => 
         React.isValidElement(child) && 
@@ -336,6 +353,17 @@ export function MarkdownRenderer({
     }
   };
 
+  if (inline) {
+    return (
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={components}
+      >
+        {content}
+      </ReactMarkdown>
+    );
+  }
+
   return (
     <div className="markdown-content prose max-w-none break-words">
       <ReactMarkdown
@@ -344,9 +372,6 @@ export function MarkdownRenderer({
       >
         {content}
       </ReactMarkdown>
-      
-      {/* Add financial terms detector if enabled */}
-      {enableFinancialTerms && <FinancialTerms text={content} />}
       
       {/* Render suggestion chips if provided */}
       {suggestions.length > 0 && (
@@ -375,10 +400,12 @@ export function MarkdownRenderer({
       ))}
       
       {/* Add message copy functionality */}
-      <MessageActions className="mt-2 justify-start">
-        <CopyToClipboard text={content} />
-        <span className="text-xs text-gray-500 ml-2">Copy message</span>
-      </MessageActions>
+      {showMessageActions && (
+        <MessageActions className="mt-2 justify-start">
+          <CopyToClipboard text={content} />
+          <span className="text-xs text-gray-500 ml-2">Copy message</span>
+        </MessageActions>
+      )}
     </div>
   );
 }

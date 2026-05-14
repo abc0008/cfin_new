@@ -6,12 +6,10 @@ import json
 import asyncio
 import re
 from sqlalchemy.ext.asyncio import AsyncSession
-from enum import Enum
 
 from models.message import ConversationCreateRequest, MessageRequest, MessageResponse
 from utils.dependencies import get_conversation_service, get_document_service
 from models.message import Message, MessageRole, ConversationState
-from models.citation import PageLocationCitation, CharLocationCitation, ContentBlockLocationCitation, CitationType
 from services.conversation_service import ConversationService
 from pdf_processing.api_service import ClaudeService
 from pdf_processing.document_service import DocumentService
@@ -44,6 +42,35 @@ def _normalize_message_citations_for_markers(citations: List[Any], content: str)
     The frontend maps [1], [2], ... to citations by array index. If citations come back in
     non-deterministic order (or with duplicates), the marker can jump to the wrong source.
     """
+    markers = [int(m) for m in re.findall(r"\[(\d+)\]", content or "")]
+    if markers:
+        highest_marker = max(markers)
+        if highest_marker > 0:
+            marker_citations = [
+                citation for citation in citations
+                if 0 < _citation_marker_index(citation) <= highest_marker
+            ]
+            if marker_citations:
+                marker_citations.sort(key=_citation_marker_index)
+                selected_citations = marker_citations[:highest_marker]
+            else:
+                # Older stored messages can have duplicate citation rows without
+                # persisted marker indexes. Preserve ordered duplicates here so
+                # marker [2] gets its own citation object and the rect finder can
+                # use marker-local answer context.
+                selected_citations = list(citations[:highest_marker])
+
+            for marker_index, citation in enumerate(selected_citations, start=1):
+                setattr(citation, "_marker_index_hint", marker_index)
+
+            logger.info(
+                "Normalized citations by visible markers: markers=%s, selected=%s, citations_before=%s",
+                highest_marker,
+                len(selected_citations),
+                len(citations),
+            )
+            return selected_citations
+
     unique_citations: List[Any] = []
     seen = set()
 
@@ -60,33 +87,6 @@ def _normalize_message_citations_for_markers(citations: List[Any], content: str)
             continue
         seen.add(signature)
         unique_citations.append(citation)
-
-    markers = [int(m) for m in re.findall(r"\[(\d+)\]", content or "")]
-    if markers:
-        highest_marker = max(markers)
-        if highest_marker > 0:
-            marker_citations = [
-                citation for citation in unique_citations
-                if 0 < _citation_marker_index(citation) <= highest_marker
-            ]
-            if marker_citations:
-                marker_citations.sort(key=_citation_marker_index)
-                if len(marker_citations) > highest_marker:
-                    marker_citations = marker_citations[:highest_marker]
-                logger.info(
-                    "Normalized citations by marker index: markers=%s, marker_citations=%s, citations_before=%s",
-                    highest_marker,
-                    len(marker_citations),
-                    len(unique_citations),
-                )
-                unique_citations = marker_citations
-            elif len(unique_citations) > highest_marker:
-                logger.info(
-                    "Trimming citations to match markers: markers=%s, citations_before=%s",
-                    highest_marker,
-                    len(unique_citations),
-                )
-                unique_citations = unique_citations[:highest_marker]
 
     return unique_citations
 
@@ -300,47 +300,14 @@ async def get_conversation_history(
         if citations:
             logger.info(f"First citation data: id={citations[0].id}, text={citations[0].text[:50] if citations[0].text else 'None'}...")
         
-        # Convert citations to Citation objects
+        # Convert citations to frontend-ready payloads, preserving backend IDs,
+        # document IDs, and computed PDF rects for citation jump navigation.
         citation_objects = []
         for citation in citations:
-            # Get the document for this citation
-            document = await conversation_service.document_repository.get_document(citation.document_id)
-            doc_title = document.filename if document else "Unknown Document"
-            
-            # Create the appropriate citation type based on the citation type field
-            citation_type = citation.type or 'page_location'  # Default to page_location
-            
-            # Create citation dictionary with proper field names for frontend
-            base_citation = {
-                'id': str(citation.id),
-                'type': citation_type,
-                'citedText': citation.cited_text or citation.text or "",
-                'documentId': str(citation.document_id),  # Include actual document ID
-                'documentIndex': 0,  # Keep for backward compatibility
-                'documentTitle': doc_title,
-                'highlightId': citation.highlight_id or str(citation.id),
-                'rects': (lambda r: [] if not r else (
-                    (json.loads(r) if isinstance(r, str) else r)
-                ))(citation.rects)
-            }
-            
-            if citation_type == 'page_location' or citation_type == CitationType.PAGE_LOCATION:
-                base_citation.update({
-                    'startPageNumber': citation.start_page_number or citation.page or 1,
-                    'endPageNumber': citation.end_page_number or citation.start_page_number or citation.page or 1,
-                })
-            elif citation_type == 'char_location' or citation_type == CitationType.CHAR_LOCATION:
-                base_citation.update({
-                    'startCharIndex': citation.start_char_index or 0,
-                    'endCharIndex': citation.end_char_index or 0,
-                })
-            else:  # content_block_location
-                base_citation.update({
-                    'startBlockIndex': citation.start_block_index or 0,
-                    'endBlockIndex': citation.end_block_index or 0,
-                })
-            
-            citation_objects.append(base_citation)
+            setattr(citation, "_message_context_text", msg.content or "")
+            citation_objects.append(
+                conversation_service.document_repository.citation_to_api_schema(citation)
+            )
         
         # Debug logging for converted citations
         logger.info(f"Converted {len(citation_objects)} citations for message {msg.id}")
@@ -775,47 +742,14 @@ async def get_message(
         # Get citations for this message
         citations = await conversation_service.conversation_repository.get_message_citations(message.id)
         
-        # Convert citations to Citation objects
+        # Convert citations to frontend-ready payloads, preserving backend IDs,
+        # document IDs, and computed PDF rects for citation jump navigation.
         citation_objects = []
         for citation in citations:
-            # Get the document for this citation
-            document = await conversation_service.document_repository.get_document(citation.document_id)
-            doc_title = document.filename if document else "Unknown Document"
-            
-            # Create the appropriate citation type based on the citation type field
-            citation_type = citation.type or 'page_location'  # Default to page_location
-            
-            # Create citation dictionary with proper field names for frontend
-            base_citation = {
-                'id': str(citation.id),
-                'type': citation_type,
-                'citedText': citation.cited_text or citation.text or "",
-                'documentId': str(citation.document_id),  # Include actual document ID
-                'documentIndex': 0,  # Keep for backward compatibility
-                'documentTitle': doc_title,
-                'highlightId': citation.highlight_id or str(citation.id),
-                'rects': (lambda r: [] if not r else (
-                    (json.loads(r) if isinstance(r, str) else r)
-                ))(citation.rects)
-            }
-            
-            if citation_type == 'page_location' or citation_type == CitationType.PAGE_LOCATION:
-                base_citation.update({
-                    'startPageNumber': citation.start_page_number or citation.page or 1,
-                    'endPageNumber': citation.end_page_number or citation.start_page_number or citation.page or 1,
-                })
-            elif citation_type == 'char_location' or citation_type == CitationType.CHAR_LOCATION:
-                base_citation.update({
-                    'startCharIndex': citation.start_char_index or 0,
-                    'endCharIndex': citation.end_char_index or 0,
-                })
-            else:  # content_block_location
-                base_citation.update({
-                    'startBlockIndex': citation.start_block_index or 0,
-                    'endBlockIndex': citation.end_block_index or 0,
-                })
-            
-            citation_objects.append(base_citation)
+            setattr(citation, "_message_context_text", message.content or "")
+            citation_objects.append(
+                conversation_service.document_repository.citation_to_api_schema(citation)
+            )
         
         # Get analysis blocks for this message
         analysis_blocks = []
