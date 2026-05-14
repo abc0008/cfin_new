@@ -525,6 +525,19 @@ export default function Workspace() {
   };
 
   const runManualAnalysis = async (documentId: string, analysisType: string, knowledgeBase?: string, userQuery?: string) => {
+    const requestKey = JSON.stringify({
+      documentId,
+      analysisType,
+      knowledgeBase: knowledgeBase || '',
+      userQuery: userQuery || '',
+    });
+
+    if (analysisRequestInFlightRef.current.size > 0) {
+      console.log(`[runManualAnalysis] Analysis request already in flight. Skipping ${requestKey}.`);
+      return;
+    }
+
+    analysisRequestInFlightRef.current.add(requestKey);
     setAnalysisLoading(true);
     setAnalysisError(null);
 
@@ -628,6 +641,7 @@ export default function Workspace() {
         }
       }));
     } finally {
+      analysisRequestInFlightRef.current.delete(requestKey);
       setAnalysisLoading(false);
     }
   };
@@ -758,7 +772,7 @@ export default function Workspace() {
   }, [addCitations]);
 
   return (
-    <div className="workspace-page flex flex-col h-full">
+    <div className="workspace-page flex h-[calc(100dvh-72px)] min-h-0 flex-col overflow-hidden">
       <section className="workspace-overview">
         <p className="workspace-eyebrow">OP_APRT · CFIN WORKSPACE</p>
         <h1 className="workspace-title">Aperture Analysis Workspace</h1>
@@ -768,8 +782,8 @@ export default function Workspace() {
         </p>
       </section>
 
-      <div className="workspace-grid flex-1 grid grid-cols-1 gap-4 pb-6 md:grid-cols-3">
-        <div className="workspace-panel col-span-1 flex min-h-[calc(100vh-14rem)] flex-1 flex-col overflow-hidden">
+      <div className="workspace-grid grid min-h-0 flex-1 grid-cols-1 gap-4 pb-6 md:grid-cols-3">
+        <div className="workspace-panel col-span-1 flex min-h-0 flex-col overflow-hidden">
           <div className="workspace-panel-bar flex-shrink-0 px-4 py-3">
             <h2 className="flex items-center text-base font-avenir-pro-demi text-foreground">
               <FileSearch className="mr-2 h-5 w-5 text-primary" />
@@ -779,7 +793,7 @@ export default function Workspace() {
               Ask questions about the active document and jump directly to citations.
             </p>
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-hidden">
             <StreamingChatInterface
               messages={messages}
               onSendMessage={handleSendMessage}
@@ -794,12 +808,12 @@ export default function Workspace() {
 
         <div
           ref={documentPanelRef}
-          className="workspace-panel col-span-2 flex min-h-[calc(100vh-14rem)] flex-1 flex-col overflow-hidden scroll-mt-20"
+          className="workspace-panel col-span-2 flex min-h-0 flex-col overflow-hidden scroll-mt-20"
         >
           <Tabs
             value={activeTab}
             onValueChange={(value) => setActiveTab(value as 'document' | 'analysis')}
-            className="flex h-full w-full flex-col"
+            className="flex min-h-0 flex-1 flex-col"
           >
             <div className="workspace-tab-wrap px-3 py-2">
               <TabsList className="grid grid-cols-2 bg-transparent p-0">
@@ -824,7 +838,7 @@ export default function Workspace() {
               </TabsList>
             </div>
 
-            <TabsContent value="document" className="h-[calc(100vh-14.5rem)] p-0">
+            <TabsContent value="document" className="flex min-h-0 flex-1 p-0">
               {showUploadForm ? (
                 <div className="p-6">
                   <h2 className="mb-4 text-xl font-avenir-pro-demi text-foreground">Upload Document</h2>
@@ -835,7 +849,7 @@ export default function Workspace() {
                   />
                 </div>
               ) : selectedDocument ? (
-                <div className="h-full flex-1">
+                <div className="flex h-full min-h-0 flex-1">
                   <PDFViewer
                     document={selectedDocument}
                     highlightId={highlightId}
@@ -892,7 +906,7 @@ export default function Workspace() {
               )}
             </TabsContent>
 
-            <TabsContent value="analysis" className="flex flex-1 flex-col p-0">
+            <TabsContent value="analysis" className="flex min-h-0 flex-1 flex-col p-0">
               <div className="flex-shrink-0">
                 <AnalysisControls
                   onRunAnalysis={(analysisType, knowledgeBase, userQuery) => {
@@ -910,7 +924,7 @@ export default function Workspace() {
                   isLoading={analysisLoading}
                 />
               </div>
-              <div className="flex-1 overflow-hidden">
+              <div className="min-h-0 flex-1 overflow-hidden">
                 <Canvas
                   analysisResults={analysisResults}
                   error={analysisError || undefined}

@@ -229,9 +229,44 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
     
     return content;
   };
+
+  const removeTrailingDuplicateBlock = (content: string): string => {
+    const getPlainText = (text: string): string =>
+      text
+        .replace(/\[\d+\]/g, '')
+        .replace(/^\d+\.\s+/gm, '')
+        .replace(/^[-*]\s+/gm, '')
+        .replace(/^#+\s+/gm, '')
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+
+    const blocks = content.split(/\n{2,}/);
+    if (blocks.length < 2) return content;
+
+    const lastBlock = blocks[blocks.length - 1].trim();
+    if (lastBlock.length < 160) return content;
+
+    const previousBlocks = blocks.slice(0, -1).join('\n\n').trim();
+    const previousPlain = getPlainText(previousBlocks);
+    const lastPlain = getPlainText(lastBlock);
+
+    if (lastPlain.length > 120 && previousPlain.includes(lastPlain.slice(0, 120))) {
+      return previousBlocks;
+    }
+
+    return content;
+  };
   
   // Apply duplicate detection and removal
-  if (!hasCitationMarkers) {
+  if (hasCitationMarkers) {
+    const dedupedContent = removeTrailingDuplicateBlock(processedContent);
+    if (/\[\d+\]/.test(dedupedContent)) {
+      processedContent = dedupedContent;
+    }
+  } else {
     processedContent = detectDuplicateText(processedContent);
   }
 

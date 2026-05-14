@@ -92,7 +92,7 @@ export default function ScatterChart({ data, height = 400, width = '100%', onDat
       </div>
 
       {/* Chart */}
-      <figure className="flex justify-center items-center" style={{ width: width, height: chartHeight, minHeight: '300px' }} role="figure" aria-label={`Scatter plot of ${config.title || 'data points'}`}>
+      <figure className="flex justify-center items-center" style={{ width: width, height: chartHeight, minHeight: '240px' }} role="figure" aria-label={`Scatter plot of ${config.title || 'data points'}`}>
         <ResponsiveContainer width="100%" height="100%">
           <RechartsScatterChart margin={{ top: 10, right: 20, left: 0, bottom: 50 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />

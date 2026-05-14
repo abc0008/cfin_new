@@ -427,7 +427,10 @@ body.workspace-theme-active[data-direction='B'] {
 }
 
 .workspace-theme-shell .workspace-page {
+  height: calc(100dvh - 72px);
   min-height: calc(100vh - 72px);
+  min-height: calc(100dvh - 72px);
+  overflow: hidden;
   background:
     radial-gradient(1000px 420px at 8% -2%, color-mix(in srgb, hsl(var(--primary)) 14%, transparent), transparent 62%),
     radial-gradient(900px 380px at 92% 108%, color-mix(in srgb, hsl(var(--secondary)) 14%, transparent), transparent 58%),
@@ -436,8 +439,9 @@ body.workspace-theme-active[data-direction='B'] {
 
 .workspace-theme-shell .workspace-overview {
   max-width: 1360px;
+  width: 100%;
   margin: 0 auto;
-  padding: 22px 24px 8px;
+  padding: 14px 24px 6px;
 }
 
 .workspace-theme-shell .workspace-eyebrow {
@@ -460,27 +464,30 @@ body.workspace-theme-active[data-direction='B'] {
 }
 
 .workspace-theme-shell .workspace-title {
-  margin-top: 14px;
-  font-size: clamp(30px, 3.2vw, 46px);
-  line-height: 0.96;
+  margin-top: 8px;
+  font-size: clamp(26px, 2.4vw, 36px);
+  line-height: 1.03;
   letter-spacing: -0.03em;
   font-weight: 600;
 }
 
 .workspace-theme-shell .workspace-description {
-  margin-top: 10px;
+  margin-top: 6px;
   max-width: 70ch;
-  font-size: 16px;
+  font-size: 14px;
   color: hsl(var(--muted-foreground));
 }
 
 .workspace-theme-shell .workspace-grid {
   max-width: 1360px;
+  width: 100%;
+  min-height: 0;
   margin: 0 auto;
   padding: 10px 24px 24px;
 }
 
 .workspace-theme-shell .workspace-panel {
+  min-height: 0;
   border: 1px solid var(--ws-line);
   border-radius: 18px;
   background: var(--ws-panel);
@@ -592,6 +599,27 @@ body.workspace-theme-active[data-direction='B'] {
   border: 1px solid var(--ws-line);
   background: color-mix(in srgb, var(--ws-panel-strong) 92%, transparent);
   color: hsl(var(--foreground));
+}
+
+.workspace-theme-shell .workspace-message-assistant,
+.workspace-theme-shell .workspace-message-user,
+.workspace-theme-shell .workspace-message-system {
+  line-height: 1.65;
+}
+
+.workspace-theme-shell .workspace-message-assistant .message-content,
+.workspace-theme-shell .workspace-message-user .message-content,
+.workspace-theme-shell .workspace-message-system .message-content,
+.workspace-theme-shell .workspace-chat-stream .markdown-content {
+  line-height: 1.65;
+}
+
+.workspace-theme-shell .workspace-message-assistant .citation-link {
+  justify-content: center;
+  min-width: 1.15rem;
+  min-height: 1rem;
+  line-height: 1.1;
+  vertical-align: 0.08em;
 }
 
 .workspace-theme-shell .workspace-message-system {
@@ -723,6 +751,12 @@ body.workspace-theme-active .fdas-textarea::placeholder {
 }
 
 @media (max-width: 1180px) {
+  .workspace-theme-shell .workspace-page {
+    height: auto;
+    min-height: calc(100dvh - 72px);
+    overflow: visible;
+  }
+
   .workspace-theme-shell .workspace-header-wrap {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -901,6 +935,7 @@ body.workspace-theme-active .fdas-textarea::placeholder {
 /* PDF Highlighter with brand colors */
 .PdfHighlighter {
   @apply h-full w-full;
+  inset: 0;
 }
 
 .Highlight {

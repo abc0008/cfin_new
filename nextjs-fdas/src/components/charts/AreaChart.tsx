@@ -192,7 +192,7 @@ const AreaChart: React.FC<AreaChartProps> = ({ data, height = 400, width = '100%
       </div>
 
       {/* Chart */}
-      <figure className="flex justify-center items-center" style={{ width: width, height: chartHeight, minHeight: '300px' }}>
+      <figure className="flex justify-center items-center" style={{ width: width, height: chartHeight, minHeight: '240px' }}>
         <ResponsiveContainer width="100%" height="100%">
           <RechartsAreaChart
             data={chartData}

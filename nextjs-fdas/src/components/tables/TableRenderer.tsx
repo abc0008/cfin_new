@@ -117,21 +117,21 @@ export default function TableRenderer({
   
   return (
     <div 
-      className={`workspace-summary-block flex h-full w-full flex-col overflow-hidden ${className}`}
-      style={{ width }}
+      className={`workspace-summary-block flex h-full min-h-0 w-full flex-col overflow-hidden ${className}`}
+      style={{ width, height }}
     >
       {/* Table title and subtitle/description */}
       {config.title && (
-        <div className="p-4 pb-0 flex-shrink-0">
-          <h3 className="text-lg font-avenir-pro-demi text-foreground">{config.title}</h3>
+        <div className="flex-shrink-0 p-4 pb-0">
+          <h3 className="text-base font-avenir-pro-demi text-foreground">{config.title}</h3>
           {config.description && (
-            <p className="text-sm text-muted-foreground">{config.description}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{config.description}</p>
           )}
         </div>
       )}
       
       {/* Table - scrollable area */}
-      <div className="flex-1 overflow-auto p-4">
+      <div className="min-h-0 flex-1 overflow-auto p-4">
         <table className="min-w-full divide-y divide-border">
           <thead className="sticky top-0 z-10 bg-muted/55">
             <tr>

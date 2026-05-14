@@ -188,6 +188,12 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
   }, []);
 
   const visualizationData = processAnalysisResults(analysisResults, messages);
+  const chartCount = visualizationData.charts?.length || 0;
+  const tableCount = visualizationData.tables?.length || 0;
+  const metricCount = visualizationData.metrics?.length || 0;
+  const hasVisualizationData = chartCount > 0 || tableCount > 0 || metricCount > 0;
+  const singleChartClass = chartCount === 1 ? 'lg:col-span-2' : '';
+  const singleTableClass = tableCount === 1 ? 'lg:col-span-2' : '';
 
   const handleCellClick = useCallback((citation: Citation) => {
     if (onCitationClick) {
@@ -195,7 +201,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
     }
   }, [onCitationClick]);
 
-  if (loading) {
+  if (loading && !hasVisualizationData) {
     return (
       <div
         role="status"
@@ -210,7 +216,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
     );
   }
 
-  if (error) {
+  if (error && !hasVisualizationData) {
     return (
       <div role="alert" className="workspace-summary-block flex h-full items-center justify-center border border-destructive/35 bg-destructive/10 p-8">
         <div className="text-destructive text-center">
@@ -221,10 +227,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
     );
   }
 
-  if (!visualizationData || 
-      ((!visualizationData.charts || visualizationData.charts.length === 0) && 
-       (!visualizationData.tables || visualizationData.tables.length === 0) && 
-       (!visualizationData.metrics || visualizationData.metrics.length === 0))) {
+  if (!visualizationData || !hasVisualizationData) {
     return (
       <div
         role="status"
@@ -237,7 +240,7 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
   }
 
   return (
-    <div role="main" className="flex h-full w-full flex-col bg-card">
+    <div role="main" className="flex h-full min-h-0 w-full flex-col bg-card">
       <div className="workspace-tab-wrap flex-shrink-0 border-b border-border px-4 py-2">
         <div role="tablist" className="flex items-center gap-2">
           <button
@@ -282,9 +285,19 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
         </div>
       </div>
 
-      <div className="flex-1 p-4 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {loading && (
+          <div role="status" className="workspace-summary-block mb-4 border border-primary/25 bg-primary/10 p-3 text-sm text-primary">
+            Running analysis. Existing visualizations remain available while the new result is generated.
+          </div>
+        )}
+        {error && (
+          <div role="alert" className="workspace-summary-block mb-4 border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
+            Latest analysis failed: {error.toString()}
+          </div>
+        )}
         {currentTab === 'overview' ? (
-          <div className="space-y-2 h-full flex flex-col">
+          <div className="space-y-4 pb-4">
             {/* Textual Summary - Moved to top */}
             {visualizationData.analysisText && (
               <div className="workspace-summary-block p-4">
@@ -301,9 +314,9 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             
             {/* Charts Grid - Flexibly displays all charts */}
             {visualizationData.charts && visualizationData.charts.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 {visualizationData.charts.map((chart, index) => (
-                  <div key={index} className="h-full">
+                  <div key={index} className={`min-h-[380px] ${singleChartClass}`}>
                     <ChartRenderer data={chart} onDataPointClick={handleDataPointClick} />
                   </div>
                 ))}
@@ -311,13 +324,15 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             )}
             
             {visualizationData.tables && visualizationData.tables.length > 0 && (
-              <div className="flex-1 flex flex-col space-y-4">
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 {visualizationData.tables.map((table, idx) => (
-                  <TableRenderer
-                    key={idx}
-                    data={table}
-                    onCellClick={onCitationClick ? handleCellClick : undefined}
-                  />
+                  <div key={idx} className={`h-[300px] min-h-0 ${singleTableClass}`}>
+                    <TableRenderer
+                      data={table}
+                      height={300}
+                      onCellClick={onCitationClick ? handleCellClick : undefined}
+                    />
+                  </div>
                 ))}
               </div>
             )}
@@ -329,18 +344,19 @@ const Canvas: React.FC<CanvasProps> = ({ analysisResults, messages = [], loading
             role="tabpanel"
             id={`${currentTab}-panel`}
             aria-labelledby={`${currentTab}-tab`}
-            className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full"
+            className="grid grid-cols-1 gap-4 pb-4 xl:grid-cols-2"
           >
             {currentTab === 'charts' ? 
               (visualizationData.charts || []).map((chart, index) => (
-                <div key={index} className="col-span-1 h-full">
+                <div key={index} className={`h-[360px] min-h-0 ${singleChartClass}`}>
                   <ChartRenderer data={chart} onDataPointClick={handleDataPointClick} />
                 </div>
               )) :
               (visualizationData.tables || []).map((table, index) => (
-                <div key={index} className="col-span-1 h-full">
+                <div key={index} className={`h-[330px] min-h-0 ${singleTableClass}`}>
                   <TableRenderer
                     data={table}
+                    height={330}
                     onCellClick={onCitationClick ? handleCellClick : undefined}
                   />
                 </div>

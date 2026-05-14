@@ -101,7 +101,7 @@ const MultiBarChart: React.FC<MultiBarChartProps> = ({ data, height = 400, width
       </div>
 
       {/* Chart */}
-      <figure className="flex justify-center items-center" style={{ width: width, height: chartHeight, minHeight: '300px' }} role="figure" aria-label={config.title || 'Multi Bar Chart'}>
+      <figure className="flex justify-center items-center" style={{ width: width, height: chartHeight, minHeight: '240px' }} role="figure" aria-label={config.title || 'Multi Bar Chart'}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={processedData}

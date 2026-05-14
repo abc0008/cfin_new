@@ -72,40 +72,47 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     );
   }
 
+  const visualHeight =
+    typeof data.config?.height === 'number' && data.config.height > 0
+      ? data.config.height
+      : chartType === 'pie'
+        ? 270
+        : 240;
+
   // Render the appropriate chart component based on chartType
   switch (chartType) {
     case 'bar':
       return (
-        <figure aria-label={data.config?.title || 'Bar Chart'} className={`h-full flex justify-center ${className}`}>
-          <div className="w-full max-w-4xl">
-            <BarChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        <figure aria-label={data.config?.title || 'Bar Chart'} className={`flex w-full justify-center ${className}`}>
+          <div className="w-full max-w-5xl">
+            <BarChart data={data} height={visualHeight} onDataPointClick={onDataPointClick} />
           </div>
         </figure>
       );
     
     case 'multiBar':
       return (
-        <figure aria-label={data.config?.title || 'Multi Bar Chart'} className={`h-full flex justify-center ${className}`}>
-          <div className="w-full max-w-4xl">
-            <MultiBarChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        <figure aria-label={data.config?.title || 'Multi Bar Chart'} className={`flex w-full justify-center ${className}`}>
+          <div className="w-full max-w-5xl">
+            <MultiBarChart data={data} height={visualHeight} onDataPointClick={onDataPointClick} />
           </div>
         </figure>
       );
     
     case 'line':
       return (
-        <figure aria-label={data.config?.title || 'Line Chart'} className={`h-full flex justify-center ${className}`}>
-          <div className="w-full max-w-4xl">
-            <LineChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        <figure aria-label={data.config?.title || 'Line Chart'} className={`flex w-full justify-center ${className}`}>
+          <div className="w-full max-w-5xl">
+            <LineChart data={data} height={visualHeight} onDataPointClick={onDataPointClick} />
           </div>
         </figure>
       );
     
     case 'pie':
       return (
-        <figure aria-label={data.config?.title || 'Pie Chart'} className={`h-full flex justify-center ${className}`}>
+        <figure aria-label={data.config?.title || 'Pie Chart'} className={`flex w-full justify-center ${className}`}>
           <div className="w-full max-w-3xl">
-            <PieChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+            <PieChart data={data} height={visualHeight} onDataPointClick={onDataPointClick} />
           </div>
         </figure>
       );
@@ -113,18 +120,18 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     case 'area':
     case 'stackedArea':
       return (
-        <figure aria-label={data.config?.title || 'Area Chart'} className={`h-full flex justify-center ${className}`}>
-          <div className="w-full max-w-4xl">
-            <AreaChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        <figure aria-label={data.config?.title || 'Area Chart'} className={`flex w-full justify-center ${className}`}>
+          <div className="w-full max-w-5xl">
+            <AreaChart data={data} height={visualHeight} onDataPointClick={onDataPointClick} />
           </div>
         </figure>
       );
     
     case 'scatter':
       return (
-        <figure aria-label={data.config?.title || 'Scatter Chart'} className={`h-full flex justify-center ${className}`}>
-          <div className="w-full max-w-4xl">
-            <ScatterChart data={data} height="100%" onDataPointClick={onDataPointClick} />
+        <figure aria-label={data.config?.title || 'Scatter Chart'} className={`flex w-full justify-center ${className}`}>
+          <div className="w-full max-w-5xl">
+            <ScatterChart data={data} height={visualHeight} onDataPointClick={onDataPointClick} />
           </div>
         </figure>
       );

@@ -60,7 +60,7 @@ const PieChart: React.FC<PieChartProps> = ({ data, height = 400, width = '100%',
       </div>
 
       {/* Chart */}
-      <figure className="flex justify-center items-center" style={{ width: width, height: chartHeight, minHeight: '300px' }}>
+      <figure className="flex justify-center items-center" style={{ width: width, height: chartHeight, minHeight: '240px' }}>
         <ResponsiveContainer width="100%" height="100%">
           <RechartsPieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
             <Pie

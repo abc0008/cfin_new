@@ -998,17 +998,17 @@ export function PDFViewer({
   };
 
   return (
-    <div className="relative flex h-full flex-col bg-background">
+    <div className="relative flex h-full min-h-0 w-full flex-col bg-background">
       {document && (
-        <div className="workspace-panel-bar border-b border-border p-4">
-          <h2 className="text-lg font-medium text-foreground">{document.metadata.filename}</h2>
-          <div className="mt-1 flex flex-col sm:flex-row sm:flex-wrap sm:mt-0 sm:space-x-6">
-            <div className="mt-2 flex items-center text-sm text-muted-foreground">
-              <File className="mr-1.5 h-5 w-5 flex-shrink-0 text-muted-foreground/80" />
+        <div className="workspace-panel-bar flex-shrink-0 border-b border-border px-4 py-3">
+          <h2 className="truncate text-base font-avenir-pro-demi text-foreground">{document.metadata.filename}</h2>
+          <div className="mt-1 flex flex-col sm:flex-row sm:flex-wrap sm:space-x-6">
+            <div className="mt-1 flex items-center text-xs text-muted-foreground">
+              <File className="mr-1.5 h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
               {document.metadata.mimeType}
             </div>
             {document.confidenceScore !== undefined && (
-              <div className="mt-2 flex items-center text-sm text-muted-foreground">
+              <div className="mt-1 flex items-center text-xs text-muted-foreground">
                 <span className="mr-1.5">Confidence:</span>
                 {Math.round(document.confidenceScore * 100)}%
               </div>
@@ -1018,7 +1018,7 @@ export function PDFViewer({
       )}
       
       {pdfUrl && (
-        <div className="flex-1 overflow-auto">
+        <div className="relative min-h-0 flex-1 overflow-hidden">
           <PdfLoader 
             url={pdfUrl} 
             beforeLoad={<div className="p-4">Loading PDF...</div>}

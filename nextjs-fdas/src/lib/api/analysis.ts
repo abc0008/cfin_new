@@ -2,10 +2,17 @@ import type { AnalysisResult } from '@/validation/schemas';
 import { apiService } from './apiService';
 import { AnalysisResultSchema, ConversationAnalysisResponseSchema } from '@/validation/schemas';
 import { EnhancedAnalysisResult, ConversationAnalysisResponse } from '@/types/enhanced';
+import { ApiError } from '@/lib/errors/ApiError';
 
 // Function to handle API errors
 const handleApiError = (error: any): never => {
   console.error('API Error:', error);
+  if (error instanceof ApiError) {
+    throw new Error(error.message);
+  }
+  if (error instanceof Error && error.message) {
+    throw new Error(error.message);
+  }
   if (error.response && error.response.data && error.response.data.detail) {
     throw new Error(error.response.data.detail);
   }
@@ -59,7 +66,9 @@ export const analysisApi = {
 
       const response = await apiService.post<AnalysisResult>(
         '/api/analysis/run',
-        payload
+        payload,
+        undefined,
+        { maxAttempts: 1 }
       );
       console.log('Raw analysis response from backend:', response);
 

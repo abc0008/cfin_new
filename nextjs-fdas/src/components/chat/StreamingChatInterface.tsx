@@ -41,6 +41,7 @@ export function StreamingChatInterface({
   const [useStreaming, setUseStreaming] = useState(true); // Toggle for streaming mode
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const submitInFlightRef = useRef(false);
 
   // Build document map from active documents
   const documentMap = useCallback(() => {
@@ -102,9 +103,10 @@ export function StreamingChatInterface({
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
-    if (!inputValue.trim() || isSubmitting) return;
+    if (!inputValue.trim() || isSubmitting || submitInFlightRef.current) return;
     
     try {
+      submitInFlightRef.current = true;
       setIsSubmitting(true);
       
       console.log(`Submit conditions: useStreaming=${useStreaming}, conversationId=${conversationId}, isConnected=${isConnected}`);
@@ -147,6 +149,7 @@ export function StreamingChatInterface({
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
+      submitInFlightRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -280,6 +283,9 @@ export function StreamingChatInterface({
   // Render streaming message if we have streaming text (even if streaming has completed)
   const renderStreamingMessage = useCallback(() => {
     if (!streamingText) return null;
+    if (streamingMessageId && messages.some((message) => message.id === streamingMessageId)) {
+      return null;
+    }
 
     // Always show streaming text if it exists - it represents the current message
     
@@ -292,7 +298,7 @@ export function StreamingChatInterface({
         onCitationClick={handleCitationClick}
       />
     );
-  }, [streamingText, toolsInProgress, isStreaming, streamingCitations, handleCitationClick]);
+  }, [streamingText, streamingMessageId, messages, toolsInProgress, isStreaming, streamingCitations, handleCitationClick]);
 
   return (
     <div className="workspace-chat-shell flex h-full flex-col bg-background">

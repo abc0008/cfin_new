@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -25,10 +25,9 @@ interface AnalysisControlsProps {
 
 const analysisTypes = [
   { value: 'basic_financial', label: 'Basic Financial Analysis' },
-  { value: 'comprehensive', label: 'Comprehensive Analysis' },
-  { value: 'ratio_analysis', label: 'Financial Ratios' },
-  { value: 'trend_analysis', label: 'Trend Analysis' },
-  { value: 'benchmarking', label: 'Industry Benchmarking' },
+  { value: 'comprehensive_tools', label: 'Comprehensive Analysis' },
+  { value: 'financial_template', label: 'Template-Driven Financial Analysis' },
+  { value: 'sentiment_analysis', label: 'Sentiment Analysis' },
 ];
 
 export const AnalysisControls: React.FC<AnalysisControlsProps> = ({ 
@@ -42,7 +41,15 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
 
   const advancedOptionsFilled = knowledgeBase.trim() !== '' || userQuery.trim() !== '';
 
+  useEffect(() => {
+    if (!analysisTypes.some((type) => type.value === analysisType)) {
+      setAnalysisType(analysisTypes[0].value);
+    }
+  }, [analysisType]);
+
   const handleRunAnalysis = () => {
+    if (isLoading) return;
+
     onRunAnalysis(
       analysisType,
       knowledgeBase.trim() || undefined,
@@ -134,6 +141,7 @@ export const AnalysisControls: React.FC<AnalysisControlsProps> = ({
 
           <div className="flex-shrink-0">
             <Button
+              type="button"
               onClick={handleRunAnalysis}
               disabled={isLoading}
               className="workspace-primary-btn"
