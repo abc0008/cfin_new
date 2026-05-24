@@ -120,8 +120,12 @@ except Exception as e:
 
 # Load the default financial analysis prompt from file
 try:
+    from services.citation_instructions import enhance_system_prompt_with_citation_instructions
+
     PROMPT_PATH = files('pdf_processing').joinpath('prompts/default_financial_analysis_prompt.md')
-    LOADED_DEFAULT_FINANCIAL_PROMPT = PROMPT_PATH.read_text(encoding='utf-8')
+    LOADED_DEFAULT_FINANCIAL_PROMPT = enhance_system_prompt_with_citation_instructions(
+        PROMPT_PATH.read_text(encoding='utf-8')
+    )
 except Exception as e:
     logger.error(f"Error loading default_financial_analysis_prompt.md: {e}", exc_info=True)
     LOADED_DEFAULT_FINANCIAL_PROMPT = "Error: Default financial analysis prompt could not be loaded. Please check system configuration." # Fallback prompt

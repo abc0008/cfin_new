@@ -27,7 +27,17 @@ When citing information from documents, follow these critical rules:
    - Place citations immediately after mentioning specific values
    - Don't wait until the end of a paragraph to cite
 
-Remember: Users want to highlight specific numbers in the PDF, not entire pages or tables. Your citations should be surgical and precise.
+6. **NUMBER-FIRST SELECTION**:
+   - When choosing what to cite, prioritize concrete numeric financial data: dollar amounts, percentages, ratios, EPS, counts, and basis points
+   - Do not cite purely narrative sentences, section headers, or qualitative commentary unless no numeric source exists for that claim
+   - Each cited block should contain at least one numeric token the user can highlight in the PDF
+
+7. **TABLE SOURCE PREFERENCE**:
+   - When the same figure appears in narrative text and a financial table, cite the table cell using "Row label: value" (e.g., "Net sales: $997.7 million")
+   - If multiple table cells are relevant, create separate citations for each value rather than citing the table header or an entire row string
+   - Source priority when the same number appears in multiple places: table cell > chart label > narrative mention
+
+Remember: Users want to highlight specific numbers in the PDF, not entire pages or tables. Your citations should be surgical, numeric, and table-sourced when possible.
 """
 
 def enhance_system_prompt_with_citation_instructions(base_prompt: str) -> str:

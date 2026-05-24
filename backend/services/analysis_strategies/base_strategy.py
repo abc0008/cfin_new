@@ -81,4 +81,11 @@ class AnalysisStrategy(ABC):
                 "metrics": List[FinancialMetric]
             }
         """
-        pass 
+        pass
+
+    @staticmethod
+    def system_prompt_with_citations(base_prompt: str) -> str:
+        """Append shared citation guidance when not already present."""
+        from services.citation_instructions import enhance_system_prompt_with_citation_instructions
+
+        return enhance_system_prompt_with_citation_instructions(base_prompt)

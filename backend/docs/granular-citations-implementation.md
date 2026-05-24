@@ -57,7 +57,19 @@ CITATION GUIDELINES:
 5. CITATION PLACEMENT:
    - Place citations immediately after mentioning specific values
    - Don't wait until the end of a paragraph to cite
+
+6. NUMBER-FIRST SELECTION:
+   - Prioritize concrete numeric financial data when choosing what to cite
+   - Avoid citing purely narrative sentences unless no numeric source exists
+
+7. TABLE SOURCE PREFERENCE:
+   - When the same figure appears in narrative text and a table, cite the table cell
+   - Source priority: table cell > chart label > narrative mention
 ```
+
+### Single source of truth
+
+Citation rules live in `/backend/services/citation_instructions.py` and are injected at runtime via `enhance_system_prompt_with_citation_instructions()`. The default financial analysis markdown prompt no longer duplicates this block; it is appended when loaded in `api_service.py`. Prebuilt analysis strategies and LangGraph citation nodes use the same helper.
 
 ## Testing
 

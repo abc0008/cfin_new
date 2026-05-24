@@ -110,7 +110,9 @@ class SentimentAnalysisStrategy(AnalysisStrategy):
                     }
 
                 api_response: Message = await self.claude_service.execute_tool_interaction_turn(
-                    system_prompt=SentimentAnalysisStrategy.LOADED_PROMPT,
+                    system_prompt=SentimentAnalysisStrategy.system_prompt_with_citations(
+                        SentimentAnalysisStrategy.LOADED_PROMPT
+                    ),
                     messages=current_messages,
                     tools=self.claude_service.tools_for_api # ClaudeService provides available tools
                 )
