@@ -5,6 +5,7 @@ import logging
 import json
 import asyncio
 import re
+import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.message import ConversationCreateRequest, MessageRequest, MessageResponse
@@ -46,19 +47,31 @@ def _normalize_message_citations_for_markers(citations: List[Any], content: str)
     if markers:
         highest_marker = max(markers)
         if highest_marker > 0:
-            marker_citations = [
-                citation for citation in citations
-                if 0 < _citation_marker_index(citation) <= highest_marker
-            ]
-            if marker_citations:
-                marker_citations.sort(key=_citation_marker_index)
-                selected_citations = marker_citations[:highest_marker]
-            else:
-                # Older stored messages can have duplicate citation rows without
-                # persisted marker indexes. Preserve ordered duplicates here so
-                # marker [2] gets its own citation object and the rect finder can
-                # use marker-local answer context.
-                selected_citations = list(citations[:highest_marker])
+            marker_slots = [None] * highest_marker
+            remaining_citations: List[Any] = []
+
+            for citation in citations:
+                marker_index = _citation_marker_index(citation)
+                if 0 < marker_index <= highest_marker and marker_slots[marker_index - 1] is None:
+                    marker_slots[marker_index - 1] = citation
+                else:
+                    remaining_citations.append(citation)
+
+            # Some older rows have marker indexes for only the first few
+            # citations. Fill the missing marker slots from the remaining rows
+            # instead of returning a partial list and leaving visible markers
+            # such as [10]...[25] non-clickable.
+            selected_citations = []
+            remaining_iter = iter(remaining_citations)
+            for slot in marker_slots:
+                if slot is not None:
+                    selected_citations.append(slot)
+                    continue
+
+                try:
+                    selected_citations.append(next(remaining_iter))
+                except StopIteration:
+                    break
 
             for marker_index, citation in enumerate(selected_citations, start=1):
                 setattr(citation, "_marker_index_hint", marker_index)
@@ -741,6 +754,7 @@ async def get_message(
         
         # Get citations for this message
         citations = await conversation_service.conversation_repository.get_message_citations(message.id)
+        citations = _normalize_message_citations_for_markers(citations, message.content or "")
         
         # Convert citations to frontend-ready payloads, preserving backend IDs,
         # document IDs, and computed PDF rects for citation jump navigation.
@@ -811,63 +825,76 @@ async def send_message_streaming(
     
     async def generate_stream():
         """Generate streaming response as Server-Sent Events."""
+        event_queue = asyncio.Queue()
+        stream_message_id = str(uuid.uuid4())
+
+        async def emit_callback(event: Dict[str, Any]):
+            await event_queue.put(event)
+
+        async def run_processing():
+            try:
+                await emit_callback({
+                    "type": "message_start",
+                    "message_id": stream_message_id,
+                })
+
+                result = await conversation_service.process_user_message_streaming(
+                    conversation_id=session_id,
+                    content=message.content,
+                    citation_ids=message.citation_links,
+                    referenced_documents=message.referenced_documents,
+                    referenced_analyses=message.referenced_analyses,
+                    emit_callback=emit_callback,
+                    message_id=stream_message_id,
+                )
+
+                await emit_callback({
+                    "type": "message_complete",
+                    "success": result.get("success", True),
+                    "message_id": stream_message_id,
+                })
+
+            except ValueError as e:
+                await emit_callback({
+                    "type": "error",
+                    "error": "validation_error",
+                    "message": str(e),
+                    "message_id": stream_message_id,
+                })
+            except asyncio.TimeoutError:
+                logger.warning("Streaming message processing timed out for session %s", session_id)
+                await emit_callback({
+                    "type": "error",
+                    "error": "timeout_error",
+                    "message": "Streaming request timed out. Please retry with a narrower question.",
+                    "message_id": stream_message_id,
+                })
+            except Exception as e:
+                logger.exception(f"Error in streaming message processing: {str(e)}")
+                await emit_callback({
+                    "type": "error",
+                    "error": "server_error",
+                    "message": f"An error occurred while processing the message: {str(e)}",
+                    "message_id": stream_message_id,
+                })
+            finally:
+                await event_queue.put(None)
+
+        processing_task = asyncio.create_task(run_processing())
+
         try:
-            # Define callback for streaming events
-            async def emit_callback(event: Dict[str, Any]):
-                # Format as Server-Sent Event
-                event_data = json.dumps(event)
-                yield f"data: {event_data}\n\n"
-            
-            # Process the message with streaming
-            result = await conversation_service.process_user_message_streaming(
-                conversation_id=session_id,
-                content=message.content,
-                citation_ids=message.citation_links,
-                referenced_documents=message.referenced_documents,
-                referenced_analyses=message.referenced_analyses,
-                emit_callback=emit_callback
-            )
-            
-            # Send final completion event
-            message_obj = result.get("message", {})
-            message_id = None
-            if message_obj and hasattr(message_obj, 'id'):
-                message_id = str(message_obj.id)
-            elif message_obj and isinstance(message_obj, dict):
-                message_id = str(message_obj.get("id")) if message_obj.get("id") else None
-            
-            completion_event = {
-                "type": "message_complete",
-                "success": result.get("success", True),
-                "message_id": message_id
-            }
-            
-            yield f"data: {json.dumps(completion_event)}\n\n"
-            
-        except ValueError as e:
-            error_event = {
-                "type": "error",
-                "error": "validation_error",
-                "message": str(e)
-            }
-            yield f"data: {json.dumps(error_event)}\n\n"
-        except asyncio.TimeoutError:
-            logger.warning("Streaming message processing timed out for session %s", session_id)
-            error_event = {
-                "type": "error",
-                "error": "timeout_error",
-                "message": "Streaming request timed out. Please retry with a narrower question."
-            }
-            yield f"data: {json.dumps(error_event)}\n\n"
-            
-        except Exception as e:
-            logger.exception(f"Error in streaming message processing: {str(e)}")
-            error_event = {
-                "type": "error", 
-                "error": "server_error",
-                "message": f"An error occurred while processing the message: {str(e)}"
-            }
-            yield f"data: {json.dumps(error_event)}\n\n"
+            while True:
+                event = await event_queue.get()
+                if event is None:
+                    break
+                yield f"data: {json.dumps(event, default=str)}\n\n"
+        finally:
+            if not processing_task.done():
+                processing_task.cancel()
+                try:
+                    await processing_task
+                except asyncio.CancelledError:
+                    pass
     
     # Return streaming response with SSE headers
     return StreamingResponse(
