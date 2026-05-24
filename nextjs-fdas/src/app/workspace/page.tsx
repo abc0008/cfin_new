@@ -88,7 +88,7 @@ export default function Workspace() {
           setIsLoading(true);
           const params = new URLSearchParams(window.location.search);
           const requestedConversationId = params.get('conversationId') || params.get('sessionId');
-          const requestedDocumentId = params.get('documentId');
+          const requestedDocumentId = params.get('documentId') || params.get('document');
 
           if (requestedConversationId) {
             const conversationId = requestedConversationId;
@@ -123,12 +123,23 @@ export default function Workspace() {
             return;
           }
 
-          // Create a new conversation session
-          const response = await conversationApi.createConversation('New Conversation');
+          // Create a new conversation session, preserving a document deep-link if present.
+          const [response, document] = await Promise.all([
+            conversationApi.createConversation(
+              'New Conversation',
+              requestedDocumentId ? [requestedDocumentId] : [],
+            ),
+            requestedDocumentId
+              ? documentsApi.getDocument(requestedDocumentId)
+              : Promise.resolve(null),
+          ]);
           if (isCurrentRun()) {
             // The backend returns sessionId in camelCase due to alias_generator
             const sessionIdValue = response.sessionId || response.session_id;
             setSessionId(sessionIdValue);
+            if (document) {
+              setSelectedDocument(document);
+            }
             console.log('Created conversation session:', sessionIdValue);
           }
         } catch (error) {
@@ -772,7 +783,7 @@ export default function Workspace() {
   }, [addCitations]);
 
   return (
-    <div className="workspace-page flex h-[calc(100dvh-72px)] min-h-0 flex-col overflow-hidden">
+    <div className="workspace-page flex min-h-[calc(100dvh-72px)] flex-col overflow-x-hidden overflow-y-auto">
       <section className="workspace-overview">
         <p className="workspace-eyebrow">OP_APRT · CFIN WORKSPACE</p>
         <h1 className="workspace-title">Aperture Analysis Workspace</h1>

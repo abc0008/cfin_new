@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/streaming-indicators';
 import { formatTimestamp } from '@/utils/formatters';
 import { useCitation } from '@/context/CitationContext';
+import { ENABLE_WEBSOCKET_STREAMING } from '@/lib/api/baseUrl';
 
 interface StreamingChatInterfaceProps {
   messages: Message[];
@@ -111,8 +112,7 @@ export function StreamingChatInterface({
       
       console.log(`Submit conditions: useStreaming=${useStreaming}, conversationId=${conversationId}, isConnected=${isConnected}`);
       
-      if (useStreaming && conversationId && isConnected) {
-        console.log('Using WebSocket streaming for message submission');
+      if (useStreaming && conversationId) {
         // Add user message to chat immediately for streaming
         const userMessage: Message = {
           id: `user-${Date.now()}`,
@@ -128,11 +128,16 @@ export function StreamingChatInterface({
         };
         onMessageUpdate?.(userMessage);
         
-        // Use streaming chat
-        try {
-          await sendStreamingMessage(inputValue);
-        } catch (streamingError) {
-          console.warn('WebSocket streaming failed, falling back to HTTP streaming:', streamingError);
+        if (ENABLE_WEBSOCKET_STREAMING && isConnected) {
+          console.log('Using WebSocket streaming for message submission');
+          try {
+            await sendStreamingMessage(inputValue);
+          } catch (streamingError) {
+            console.warn('WebSocket streaming failed, falling back to HTTP streaming:', streamingError);
+            await sendStreamingMessageHTTP(inputValue);
+          }
+        } else {
+          console.log('Using HTTP streaming for message submission');
           await sendStreamingMessageHTTP(inputValue);
         }
       } else {
@@ -307,8 +312,11 @@ export function StreamingChatInterface({
           <h2 className="text-base font-avenir-pro-demi text-foreground">Claude Assistant</h2>
           {conversationId && (
             <div className="flex items-center space-x-2">
-              <ConnectionStatus isConnected={isConnected} isStreaming={isStreaming} />
-              {useStreaming && !isConnected && (
+              <ConnectionStatus
+                isConnected={ENABLE_WEBSOCKET_STREAMING ? isConnected : useStreaming}
+                isStreaming={isStreaming}
+              />
+              {useStreaming && ENABLE_WEBSOCKET_STREAMING && !isConnected && (
                 <span className="text-xs text-muted-foreground">Connecting...</span>
               )}
               <button
@@ -399,9 +407,14 @@ export function StreamingChatInterface({
           </div>
           <button
             type="submit"
-            disabled={!inputValue.trim() || isSubmitting || (isStreaming && useStreaming) || (useStreaming && !isConnected)}
+            disabled={
+              !inputValue.trim() ||
+              isSubmitting ||
+              (isStreaming && useStreaming) ||
+              (useStreaming && ENABLE_WEBSOCKET_STREAMING && !isConnected)
+            }
             className="flex h-[44px] w-[44px] items-center justify-center rounded-full bg-primary p-3 text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            title={useStreaming && !isConnected ? "Connecting to real-time chat..." : ""}
+            title={useStreaming && ENABLE_WEBSOCKET_STREAMING && !isConnected ? "Connecting to real-time chat..." : ""}
           >
             {isSubmitting || (isStreaming && useStreaming) ? (
               <Loader2 className="h-5 w-5 animate-spin" />

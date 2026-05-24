@@ -14,6 +14,7 @@ import {
 } from "react-pdf-highlighter";
 import { documentsApi, cleanupBlobUrls } from '@/lib/api/documents';
 import { convertCitationToHighlight, convertHighlightToCitation } from '@/lib/pdf/citationService';
+import { searchMultiplePages } from '@/lib/pdf/textSearch';
 
 // Add PDF.js type declaration
 declare global {
@@ -52,7 +53,6 @@ export function PDFViewer({
   onCitationsLoaded,
   pdfUrl: propsPdfUrl,
   highlightId,
-  renderingQuality = 'medium',
   pageBufferSize = 5,
   extraCitations = []
 }: PDFViewerProps) {
@@ -62,13 +62,11 @@ export function PDFViewer({
   const [errorState, setErrorState] = useState<string | null>(error || null);
   const [loadingState, setLoadingState] = useState<string | null>(null);
   const [documentCitations, setDocumentCitations] = useState<Citation[]>([]);
+  const [searchResolvedCitations, setSearchResolvedCitations] = useState<Citation[]>([]);
   const [totalPages, setTotalPages] = useState<number>(0);
   const [visiblePages, setVisiblePages] = useState<number[]>([]);
   const [loadedPages, setLoadedPages] = useState<Set<number>>(new Set());
-  const [renderScale, setRenderScale] = useState<number>(
-    renderingQuality === 'low' ? 1.0 : 
-    renderingQuality === 'medium' ? 1.5 : 2.0
-  );
+  const [renderScale, setRenderScale] = useState<string>('page-fit');
   const [isBrowser, setIsBrowser] = useState(false);
   
   const [currentPdfDocument, setCurrentPdfDocument] = useState<any>(null);
@@ -209,7 +207,7 @@ export function PDFViewer({
   // Merge backend citations with any extra ones from props
   const combinedCitations = React.useMemo(() => {
     const byId = new Map<string, Citation>();
-    [...documentCitations, ...extraCitations].forEach((citation) => {
+    [...documentCitations, ...extraCitations, ...searchResolvedCitations].forEach((citation) => {
       const existing = byId.get(citation.id);
       if (!existing) {
         byId.set(citation.id, citation);
@@ -236,7 +234,7 @@ export function PDFViewer({
       });
     });
     return Array.from(byId.values());
-  }, [extraCitations, documentCitations]);
+  }, [extraCitations, documentCitations, searchResolvedCitations]);
 
   // Convert to react-pdf-highlighter format once
   const citationHighlights = React.useMemo(() => {
@@ -276,6 +274,83 @@ export function PDFViewer({
   useEffect(() => {
     combinedCitationsRef.current = combinedCitations;
   }, [combinedCitations]);
+
+  useEffect(() => {
+    if (!currentPdfDocument) return;
+    const transport = currentPdfDocument._transport || currentPdfDocument.transport;
+    if (transport && transport.messageHandler === null) return;
+
+    const candidates = combinedCitations.filter(
+      citation => !(citation.rects?.length > 0) && (citation.searchableText || citation.citedText)
+    );
+    if (candidates.length === 0) return;
+
+    let cancelled = false;
+
+    const buildSearchTerms = (citation: Citation) => {
+      const citedText = citation.citedText || '';
+      const numericTerms = Array.from(citedText.matchAll(/\$?\d[\d,]*(?:\.\d+)?/g))
+        .map(match => match[0].replace(/^\$/, ''))
+        .filter(term => term.length > 1 && !/^20\d{2}$/.test(term));
+
+      const textTerms = [
+        citation.searchableText,
+        citation.displayText,
+        citedText.split(/\r?\n/).find(line => line.trim().length > 0 && line.trim().length <= 120),
+        citedText,
+      ].filter((term): term is string => !!term && term.trim().length > 1);
+
+      return Array.from(new Set([...numericTerms, ...textTerms].map(term => term.trim()))).slice(0, 8);
+    };
+
+    const resolveMissingRects = async () => {
+      const resolved: Citation[] = [];
+
+      for (const citation of candidates) {
+        const startPage = citation.startPageNumber || 1;
+        const endPage = citation.endPageNumber || startPage;
+        const terms = buildSearchTerms(citation);
+
+        for (const term of terms) {
+          try {
+            const results = await searchMultiplePages(currentPdfDocument, term, startPage, endPage);
+            const result = results[0];
+            if (!result?.rects?.length) continue;
+
+            const rects = result.rects.map(rect => ({
+              ...rect,
+              width: rect.x2 - rect.x1,
+              height: rect.y2 - rect.y1,
+              pageNumber: rect.pageNumber,
+            }));
+
+            resolved.push({
+              ...citation,
+              searchableText: term,
+              rects,
+            });
+            break;
+          } catch (error) {
+            console.warn('[PDFViewer] Citation text search failed:', { citationId: citation.id, term, error });
+          }
+        }
+      }
+
+      if (cancelled || resolved.length === 0) return;
+
+      setSearchResolvedCitations(prev => {
+        const byId = new Map(prev.map(citation => [citation.id, citation]));
+        resolved.forEach(citation => byId.set(citation.id, citation));
+        return Array.from(byId.values());
+      });
+    };
+
+    resolveMissingRects();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [combinedCitations, currentPdfDocument]);
   
   // Memory management: Page visibility tracking
   const onVisiblePagesChanged = useCallback((pages?: number[]) => {
@@ -840,14 +915,11 @@ export function PDFViewer({
     };
   }, [highlightId, scrollToHighlight, highlightScrollVersion, getHighlightElement, isElementVisibleInViewport]);
   
-  // Update render scale when renderingQuality changes
+  // Reset each newly loaded PDF to fit one full page inside the viewer.
   useEffect(() => {
     if (!isBrowser) return;
-    setRenderScale(
-      renderingQuality === 'low' ? 1.0 : 
-      renderingQuality === 'medium' ? 1.5 : 2.0
-    );
-  }, [renderingQuality, isBrowser]);
+    setRenderScale('page-fit');
+  }, [document?.metadata.id, propsPdfUrl, isBrowser]);
   
   // Cleanup on unmount
   useEffect(() => {
@@ -1100,7 +1172,7 @@ export function PDFViewer({
                   }}
                   highlights={allHighlights}
                   highlightTransform={renderHighlight as any}
-                  pdfScaleValue={renderScale.toString()}
+                  pdfScaleValue={renderScale}
                 />
               );
             }}
@@ -1114,20 +1186,26 @@ export function PDFViewer({
           <div className="mb-1 font-medium text-foreground">Performance Options</div>
           <div className="flex space-x-2">
             <button 
-              className={`rounded-full px-3 py-1 ${renderingQuality === 'low' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
-              onClick={() => setRenderScale(1.0)}
+              className={`rounded-full px-3 py-1 ${renderScale === 'page-fit' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+              onClick={() => setRenderScale('page-fit')}
+            >
+              Fit
+            </button>
+            <button 
+              className={`rounded-full px-3 py-1 ${renderScale === '1' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+              onClick={() => setRenderScale('1')}
             >
               Low
             </button>
             <button 
-              className={`rounded-full px-3 py-1 ${renderingQuality === 'medium' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
-              onClick={() => setRenderScale(1.5)}
+              className={`rounded-full px-3 py-1 ${renderScale === '1.5' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+              onClick={() => setRenderScale('1.5')}
             >
               Medium
             </button>
             <button 
-              className={`rounded-full px-3 py-1 ${renderingQuality === 'high' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
-              onClick={() => setRenderScale(2.0)}
+              className={`rounded-full px-3 py-1 ${renderScale === '2' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+              onClick={() => setRenderScale('2')}
             >
               High
             </button>

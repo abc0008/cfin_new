@@ -2,7 +2,7 @@
 const rawBackendApiUrl =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.API_BASE_URL ||
-  "https://cfin-api.aceanalytics.dev";
+  "https://cfin-backend.vercel.app";
 const backendApiBaseUrl = rawBackendApiUrl.replace(/\/+$/, "").replace(/\/api$/, "");
 
 const nextConfig = {
@@ -104,8 +104,12 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: "/api/citations/:path*",
-        destination: `${backendApiBaseUrl}/api/citations/:path*`,
+        source: "/api/:path*",
+        destination: `${backendApiBaseUrl}/api/:path*`,
+      },
+      {
+        source: "/ws/:path*",
+        destination: `${backendApiBaseUrl}/ws/:path*`,
       },
     ];
   },

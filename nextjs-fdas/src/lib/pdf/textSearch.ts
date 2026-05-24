@@ -129,7 +129,7 @@ export async function searchMultiplePages(
         results.push(result);
       }
     } catch (error) {
-      console.error(`Error searching page ${pageNum}:`, error);
+      console.warn(`Error searching page ${pageNum}:`, error);
     }
   }
 
