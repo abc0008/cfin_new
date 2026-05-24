@@ -3,8 +3,7 @@
  */
 
 import { VisualizationData, ChartData, TableData } from '@/types/visualization';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { apiUrl } from '@/lib/api/baseUrl';
 
 /**
  * Fetch all visualizations for an analysis
@@ -13,7 +12,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
  */
 export async function fetchVisualizations(analysisId: string): Promise<VisualizationData> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/analysis/${analysisId}/visualizations`);
+    const response = await fetch(apiUrl(`/api/analysis/${analysisId}/visualizations`));
     
     if (!response.ok) {
       throw new Error(`Error fetching visualizations: ${response.statusText}`);
@@ -34,7 +33,7 @@ export async function fetchVisualizations(analysisId: string): Promise<Visualiza
  */
 export async function fetchChart(chartId: string): Promise<ChartData> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/charts/${chartId}`);
+    const response = await fetch(apiUrl(`/api/charts/${chartId}`));
     
     if (!response.ok) {
       throw new Error(`Error fetching chart: ${response.statusText}`);
@@ -55,7 +54,7 @@ export async function fetchChart(chartId: string): Promise<ChartData> {
  */
 export async function fetchTable(tableId: string): Promise<TableData> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/tables/${tableId}`);
+    const response = await fetch(apiUrl(`/api/tables/${tableId}`));
     
     if (!response.ok) {
       throw new Error(`Error fetching table: ${response.statusText}`);
@@ -76,7 +75,7 @@ export async function fetchTable(tableId: string): Promise<TableData> {
  */
 export async function fetchFinancialMetrics(analysisId: string) {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/analysis/${analysisId}/metrics`);
+    const response = await fetch(apiUrl(`/api/analysis/${analysisId}/metrics`));
     
     if (!response.ok) {
       throw new Error(`Error fetching metrics: ${response.statusText}`);
@@ -97,7 +96,7 @@ export async function fetchFinancialMetrics(analysisId: string) {
  */
 export async function fetchPeriodData(analysisId: string) {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/analysis/${analysisId}/periods`);
+    const response = await fetch(apiUrl(`/api/analysis/${analysisId}/periods`));
     
     if (!response.ok) {
       throw new Error(`Error fetching period data: ${response.statusText}`);

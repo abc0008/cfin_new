@@ -11,6 +11,129 @@ interface MessageRendererProps {
   onCitationClick?: (citation: Citation) => void;
 }
 
+function uniqueTexts(values: Array<string | undefined>): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  values.forEach((value) => {
+    const normalized = (value || '').replace(/\s+/g, ' ').trim();
+    if (!normalized || seen.has(normalized.toLowerCase())) return;
+    seen.add(normalized.toLowerCase());
+    result.push(normalized);
+  });
+
+  return result;
+}
+
+function getCitationCandidates(citation: Citation): string[] {
+  const sourceTexts = uniqueTexts([
+    citation.displayText,
+    citation.citedText,
+    citation.searchableText,
+  ]);
+
+  const numericCandidates: string[] = [];
+  const numericPattern = /\$?\s?\d[\d,]*(?:\.\d+)?\s*(?:million|billion|thousand|basis points|bps|%)?/gi;
+
+  sourceTexts.forEach((text) => {
+    Array.from(text.matchAll(numericPattern)).forEach((match) => {
+      const candidate = match[0].replace(/\s+/g, ' ').replace(/^\$\s+/, '$').trim();
+      if (candidate.length < 2) return;
+      numericCandidates.push(candidate);
+      if (candidate.startsWith('$')) numericCandidates.push(candidate.slice(1));
+      if (candidate.includes(',')) numericCandidates.push(candidate.replace(/,/g, ''));
+    });
+  });
+
+  const nonYearNumeric = numericCandidates.filter(candidate => !/^20\d{2}$/.test(candidate));
+  const candidates = uniqueTexts([
+    ...nonYearNumeric,
+    ...sourceTexts.filter(text => text.length >= 4 && text.length <= 120),
+    ...numericCandidates,
+  ]);
+
+  return candidates.sort((a, b) => b.length - a.length);
+}
+
+function findCitationInsertionPoint(content: string, citation: Citation, startAt: number): number {
+  const lowerContent = content.toLowerCase();
+  const candidates = getCitationCandidates(citation);
+
+  const findFrom = (offset: number) => {
+    const matches = candidates
+      .map(candidate => {
+        const index = lowerContent.indexOf(candidate.toLowerCase(), offset);
+        return index >= 0 ? { index, length: candidate.length } : null;
+      })
+      .filter((match): match is { index: number; length: number } => Boolean(match));
+
+    if (!matches.length) return -1;
+    matches.sort((a, b) => (a.index - b.index) || (b.length - a.length));
+    return matches[0].index + matches[0].length;
+  };
+
+  const forwardMatch = findFrom(Math.max(0, startAt - 20));
+  if (forwardMatch >= 0) return forwardMatch;
+
+  return findFrom(0);
+}
+
+function reflowCitationMarkers(content: string, citations: Citation[]): string {
+  if (!content || citations.length === 0) return content;
+
+  const trailingMatch = content.match(/((?:\s*\[\d+\])+\s*)$/);
+  let body = trailingMatch && trailingMatch.index !== undefined
+    ? content.slice(0, trailingMatch.index).trimEnd()
+    : content;
+
+  const existingMarkers = new Set(
+    Array.from(body.matchAll(/\[(\d+)\]/g), match => Number(match[1]))
+  );
+  const trailingMarkers = trailingMatch
+    ? Array.from(trailingMatch[0].matchAll(/\[(\d+)\]/g), match => Number(match[1]))
+    : [];
+  const allCitationMarkers = citations.map((_, index) => index + 1);
+  const markersToPlace = Array.from(new Set([
+    ...trailingMarkers,
+    ...allCitationMarkers.filter(markerNumber => !existingMarkers.has(markerNumber)),
+  ])).sort((a, b) => a - b);
+
+  if (markersToPlace.length === 0) return content;
+
+  const insertions = new Map<number, string>();
+  const leftovers: string[] = [];
+  let searchFrom = 0;
+
+  markersToPlace.forEach((markerNumber) => {
+    const citation = citations[markerNumber - 1];
+    if (!citation) {
+      leftovers.push(`[${markerNumber}]`);
+      return;
+    }
+
+    const insertionPoint = findCitationInsertionPoint(body, citation, searchFrom);
+    if (insertionPoint < 0) {
+      leftovers.push(`[${markerNumber}]`);
+      return;
+    }
+
+    insertions.set(insertionPoint, `${insertions.get(insertionPoint) || ''}[${markerNumber}]`);
+    searchFrom = Math.max(searchFrom, insertionPoint);
+  });
+
+  const orderedInsertions = Array.from(insertions.entries()).sort((a, b) => b[0] - a[0]);
+  let reflowed = body;
+  orderedInsertions.forEach(([position, markerText]) => {
+    reflowed = `${reflowed.slice(0, position)}${markerText}${reflowed.slice(position)}`;
+  });
+
+  if (leftovers.length > 0) {
+    reflowed = `${reflowed} ${leftovers.join(' ')}`;
+  }
+
+  return reflowed;
+}
+
 // Custom equality function to prevent unnecessary re-renders
 function areEqual(prevProps: MessageRendererProps, nextProps: MessageRendererProps): boolean {
   const prevMsg = prevProps.message;
@@ -151,6 +274,7 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
   // the markers that were appended later in the stream.
 
   let processedContent = message.content;
+  processedContent = reflowCitationMarkers(processedContent, message.citations || []);
   const hasCitationMarkers = /\[\d+\]/.test(processedContent);
   
   // Handle the case where formatted content is followed by unformatted duplicate
