@@ -68,6 +68,7 @@ from repositories.document_repository import DocumentRepository
 from repositories.analysis_repository import AnalysisRepository
 from pdf_processing.api_service import ClaudeService
 from models.database_models import Message, Conversation, Citation
+import settings
 
 logger = logging.getLogger(__name__)
 
@@ -979,6 +980,26 @@ class ConversationService:
             nonlocal has_good_content, last_good_content, tool_start_processed_in_current_stream, initial_message_completed, waiting_for_citations, pending_citation_markers, highest_citation_marker, received_citation_markers, citation_completion_task
             
             event_type = event.get("type")
+            app_message_id = message_id if message_id else (
+                str(assistant_message_placeholder.id) if assistant_message_placeholder else "unknown"
+            )
+
+            # The transport layer already emits the app/database message_start.
+            # Passing through Anthropic's raw msg_* start event causes the client to
+            # split one assistant response across two IDs.
+            if event_type == "message_start" and not event.get("is_post_visualization"):
+                logger.info("Blocking nested Claude message_start; app message_start already emitted")
+                return
+
+            # Normalize initial-answer stream events to the database/app message id.
+            # Post-visualization and synthetic tool messages keep their own IDs.
+            if (
+                app_message_id
+                and event_type != "new_message_start"
+                and not event.get("is_post_visualization")
+                and not event.get("is_tools_message")
+            ):
+                event = {**event, "message_id": app_message_id}
 
             # Block early message_stop/message_complete events - we'll send our own when ready
             if (event_type in ["message_stop", "message_complete"]) and not event.get("is_post_tools") and not tool_start_processed_in_current_stream:
@@ -1366,25 +1387,18 @@ class ConversationService:
         # Skip citation injection if we already added markers during streaming
         if accumulated_citations:
             logger.info(f"Found {len(accumulated_citations)} citations")
-            
+
             # Check if markers were already injected during streaming
             has_streaming_markers = any(f"[{i+1}]" in final_content for i in range(len(accumulated_citations)))
-            
+
             if has_streaming_markers:
                 logger.info("✅ Citation markers already injected during streaming")
             else:
-                # Fallback: Add citations post-streaming (for non-streaming responses)
-                logger.info("Adding citation markers post-streaming (fallback)")
-                citation_summary = "\n\nSources:"
-                for idx, citation in enumerate(accumulated_citations):
-                    citation_summary += f"\n[{idx + 1}] {citation.get('document_title', 'Document')} - Page {citation.get('start_page_number', 'Page ?')}"
-                
-                final_content += citation_summary
-                
-                # Update the message with citation markers
-                assistant_message_placeholder.content = final_content
-                assistant_message = await self.conversation_repository.update_message(assistant_message_placeholder)
-                logger.info(f"✅ Updated content with citation markers: {len(final_content)} chars")
+                # Do not append a trailing "Sources:" marker block. The
+                # frontend renders every persisted citation inline beside
+                # matching facts; a backend-only marker list can drift from
+                # the saved citation count and create non-clickable markers.
+                logger.info("Leaving content marker-free; frontend will reflow persisted citations inline")
         
         logger.info(f"✅ Database updated with final content: {len(final_content)} chars")
         
@@ -1592,7 +1606,9 @@ class ConversationService:
                     visualizations=items_for_analysis_blocks
                 )
                 
-                # NOW send message_complete event after analysis blocks are stored atomically unless we already sent it earlier
+                # NOW send message_complete for the initial answer after analysis blocks
+                # are stored atomically unless we already sent it earlier. The tools
+                # carrier message is completed separately below.
                 if initial_message_completed:
                     logger.info(
                         "Skipping duplicate message_complete for initial message; it was already sent at first tool_start"
@@ -1620,6 +1636,17 @@ class ConversationService:
                     logger.warning(f"Failed to serialize analysis blocks for message_complete event: {ser_err}")
 
                 if emit_callback:
+                    if not initial_message_completed:
+                        await emit_callback({
+                            "type": "message_complete",
+                            "message_id": str(assistant_message.id),
+                            "timestamp": datetime.utcnow().isoformat() + 'Z',
+                            "citations": accumulated_citations,
+                            "is_post_tools": False,
+                            "is_post_visualization": False
+                        })
+                        initial_message_completed = True
+
                     # Send message_complete for the tools message
                     await emit_callback({
                         "type": "message_complete",
@@ -1985,14 +2012,14 @@ Conversation context:{document_context}
 
 Generate exactly {limit} follow-up questions, each on a new line, without numbering or bullet points. Make them conversational and specific to the context discussed."""
 
-            # Use Haiku 3.5 for fast, cost-effective follow-up generation
+            # Use the configured fast model for cost-effective follow-up generation.
             try:
                 follow_up_response_raw = await self._await_with_timeout(
                     "claude follow-up question generation",
                     self.claude_service.generate_response(
                         system_prompt="You are a financial analysis assistant that generates relevant follow-up questions for financial document discussions. Always provide exactly the requested number of questions, each on a separate line.",
                         messages=[{"role": "user", "content": follow_up_prompt}],
-                        model="claude-3-5-haiku-20241022",  # Use Haiku 3.5 as specified
+                        model=settings.MODEL_HAIKU,
                         max_tokens=500,  # Limit tokens since we only need a few questions
                         temperature=0.7,  # Slightly creative for varied questions
                     ),

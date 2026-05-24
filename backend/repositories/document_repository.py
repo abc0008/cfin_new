@@ -2171,7 +2171,13 @@ class DocumentRepository:
             if hasattr(document, 'binary_data') and document.binary_data:
                 return document.binary_data
             
-            # If we don't have binary data in the DB, try to read from file
+            # If we don't have binary data in the DB, read it from the configured
+            # storage backend. This covers Supabase/S3 as well as local storage.
+            stored_file = await self.storage_service.get_file(f"{document_id}.pdf")
+            if stored_file:
+                return stored_file
+
+            # Fall back to direct filesystem reads for legacy local paths.
             file_path = self.get_document_file_path(document_id)
             if os.path.exists(file_path):
                 with open(file_path, 'rb') as f:
