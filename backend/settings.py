@@ -10,8 +10,8 @@ ANTHROPIC_BETA = ",".join([
 
 # Claude model IDs
 # Keep overridable via environment so model rotations don't break local/dev runs.
-MODEL_HAIKU = os.getenv("MODEL_HAIKU", "claude-3-5-haiku-20241022")
-MODEL_SONNET = os.getenv("MODEL_SONNET", "claude-3-7-sonnet-20250219")
+MODEL_HAIKU = os.getenv("MODEL_HAIKU", "claude-haiku-4-5-20251001")
+MODEL_SONNET = os.getenv("MODEL_SONNET", "claude-sonnet-4-6")
 
 # Processing mode: 'fast' uses Haiku, 'detailed' uses Sonnet
 # Can be overridden by CLAUDE_PROCESSING_MODE environment variable
