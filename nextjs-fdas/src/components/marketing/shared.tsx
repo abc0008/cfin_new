@@ -123,6 +123,9 @@ export function MarketingNav() {
         <Link href="/product" aria-current={pathname.startsWith('/product') ? 'page' : undefined}>
           Products
         </Link>
+        <Link href="/news" aria-current={pathname.startsWith('/news') ? 'page' : undefined}>
+          Industry News
+        </Link>
         <Link href="/about" aria-current={pathname === '/about' ? 'page' : undefined}>
           About Me
         </Link>

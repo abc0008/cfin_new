@@ -31,6 +31,15 @@ vercel project ls --scope alex-cardells-projects
 
 Expected scope/team: `alex-cardells-projects`
 
+## Required Env Vars (`nextjs-fdas`)
+
+Set these in the `nextjs-fdas` Vercel project before deploying the marketing news routes:
+
+- `NEXT_PUBLIC_ACE_NEWS_API_BASE` → base URL for the Industry News FastAPI service (for example `https://<news-api-domain>`).
+- `ACE_NEWS_API_BASE` (optional fallback) → server-side fallback if the public var is not set.
+
+If neither value is configured, the app falls back to `http://localhost:8000`, which is only valid for local development.
+
 ## Deploy Sequence (Recommended)
 
 ### 1) Deploy Main Site (`nextjs-fdas`)
