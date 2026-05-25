@@ -118,9 +118,9 @@ export function FeedView({ initial }: FeedViewProps) {
   return (
     <main className="news-page">
       <div className="news-shell">
-        <div style={{ marginBottom: 24 }}>
-          <Link className="news-back-link" href="/news">
-            ← News Desk
+        <div className="news-back-row">
+          <Link className="news-back-link news-console-back-link" href="/news">
+            ← Back to Industry News Console
           </Link>
         </div>
 

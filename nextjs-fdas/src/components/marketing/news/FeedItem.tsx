@@ -43,8 +43,8 @@ export function FeedItem({ item, isNew, categoryLookup }: FeedItemProps) {
         ) : null}
 
         <div className="news-item-why">
-          <span className="news-muted">Why it matters</span>
-          <span>{item.why || "...will generate on next refresh"}</span>
+          <span className="news-muted news-item-why-label">Why it matters</span>
+          <span className="news-item-why-copy">{item.why || "...will generate on next refresh"}</span>
         </div>
       </div>
     </article>
