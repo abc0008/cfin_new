@@ -1,9 +1,7 @@
 import { Message, Citation } from '@/types';
 import { MessageRequestSchema, ConversationCreateRequestSchema } from '@/validation/schemas';
 import { validateRequest } from '../../lib/validation/api-validation';
-
-// API base URL - would be configured based on environment
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+import { apiUrl } from './baseUrl';
 
 /**
  * Conversation API service
@@ -24,10 +22,7 @@ class ConversationApiService {
       endpoint = '/' + endpoint;
     }
     
-    // Fixed URL construction to prevent duplicated /api
-    const finalUrl = API_BASE_URL.endsWith('/api') 
-      ? `${API_BASE_URL}${endpoint}`
-      : `${API_BASE_URL}/api${endpoint}`;
+    const finalUrl = apiUrl(endpoint);
       
     console.log(`Sending ${method} request to ${finalUrl}`);
     

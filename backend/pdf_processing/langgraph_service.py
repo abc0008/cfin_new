@@ -176,11 +176,11 @@ class LangGraphService:
         
         The final response should maintain academic-level citation quality."""
 
-        from services.citation_instructions import GRANULAR_CITATION_INSTRUCTIONS
+        from services.citation_instructions import FINANCIAL_AGENT_INSTRUCTIONS
 
-        self.document_processor_prompt += "\n\n" + GRANULAR_CITATION_INSTRUCTIONS
-        self.response_generator_prompt += "\n\n" + GRANULAR_CITATION_INSTRUCTIONS
-        self.citation_processor_prompt += "\n\n" + GRANULAR_CITATION_INSTRUCTIONS
+        self.document_processor_prompt += "\n\n" + FINANCIAL_AGENT_INSTRUCTIONS
+        self.response_generator_prompt += "\n\n" + FINANCIAL_AGENT_INSTRUCTIONS
+        self.citation_processor_prompt += "\n\n" + FINANCIAL_AGENT_INSTRUCTIONS
     
     def _create_conversation_graph(self) -> StateGraph:
         """Create the conversation state graph."""

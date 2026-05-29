@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Message } from '@/types';
 import { conversationApi } from '@/lib/api/conversation';
+import { ENABLE_WEBSOCKET_STREAMING, apiUrl, websocketUrl } from '@/lib/api/baseUrl';
 
 export interface StreamingEvent {
   type: 'message_start' | 'text_delta' | 'tool_start' | 'tool_complete' | 
@@ -602,6 +603,13 @@ export function useStreamingChat({
 
   // WebSocket streaming
   const connectWebSocket = useCallback(async (shouldReconnect = true) => {
+    if (!ENABLE_WEBSOCKET_STREAMING) {
+      console.log('WebSocket streaming disabled for this backend; using HTTP streaming fallback');
+      setIsConnected(false);
+      isConnectingRef.current = false;
+      return;
+    }
+
     // Don't try to connect if no conversationId
     if (!conversationId) {
       console.warn('Cannot connect WebSocket without conversation ID');
@@ -640,15 +648,7 @@ export function useStreamingChat({
         isConnectingRef.current = false;
         return;
       }
-      // Get the backend URL from environment or use default
-      const backendHost = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const backendUrl = new URL(backendHost);
-      
-      // Determine WebSocket protocol based on backend protocol
-      const protocol = backendUrl.protocol === 'https:' ? 'wss:' : 'ws:';
-      
-      // Construct WebSocket URL pointing to the backend server
-      const wsUrl = `${protocol}//${backendUrl.hostname}:${backendUrl.port || (backendUrl.protocol === 'https:' ? '443' : '8000')}/ws/conversation/${conversationId}`;
+      const wsUrl = websocketUrl(`/ws/conversation/${conversationId}`);
       
       console.log('Starting WebSocket connection to:', wsUrl);
       console.log('Current isConnected state before connection:', isConnected);
@@ -718,7 +718,7 @@ export function useStreamingChat({
     }
 
     try {
-      const sseUrl = `/api/conversation/${conversationId}/message/stream`;
+      const sseUrl = apiUrl(`/api/conversation/${conversationId}/message/stream`);
       eventSourceRef.current = new EventSource(sseUrl);
 
       eventSourceRef.current.onopen = () => {
@@ -774,7 +774,7 @@ export function useStreamingChat({
   // Send streaming message via HTTP (fallback)
   const sendStreamingMessageHTTP = useCallback(async (content: string) => {
     try {
-      const response = await fetch(`/api/conversation/${conversationId}/message/stream`, {
+      const response = await fetch(apiUrl(`/api/conversation/${conversationId}/message/stream`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -832,7 +832,7 @@ export function useStreamingChat({
     let mounted = true;
     let connectTimeout: NodeJS.Timeout | null = null;
 
-    if (conversationId && mounted) {
+    if (conversationId && mounted && ENABLE_WEBSOCKET_STREAMING) {
       // Add a small delay to debounce rapid re-renders
       connectTimeout = setTimeout(() => {
         if (mounted) {

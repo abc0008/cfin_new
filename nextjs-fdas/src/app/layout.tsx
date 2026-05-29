@@ -1,17 +1,18 @@
 import type { Metadata } from 'next'
 import './globals.css'
 
-const ICON_VERSION = '20260526d'
+const ICON_VERSION = '20260526f'
+const HUB_FAVICON_PATH = '/ace-card-favicon-v2.ico'
 
 export const metadata: Metadata = {
   title: 'ACEAnalytics | AI Project Hub',
   description: 'Launch and manage ACEAnalytics applications for financial analysis and automation.',
   icons: {
     icon: [
-      { url: `/favicon.ico?v=${ICON_VERSION}`, type: 'image/x-icon', sizes: 'any' },
+      { url: HUB_FAVICON_PATH, type: 'image/x-icon', sizes: 'any' },
       { url: `/icon.png?v=${ICON_VERSION}`, type: 'image/png', sizes: '512x512' },
     ],
-    shortcut: [{ url: `/favicon.ico?v=${ICON_VERSION}`, type: 'image/x-icon' }],
+    shortcut: [{ url: HUB_FAVICON_PATH, type: 'image/x-icon' }],
     apple: [{ url: `/apple-icon.png?v=${ICON_VERSION}`, sizes: '180x180', type: 'image/png' }],
   },
 }
@@ -24,8 +25,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="icon" href={`/favicon.ico?v=${ICON_VERSION}`} sizes="any" />
-        <link rel="shortcut icon" href={`/favicon.ico?v=${ICON_VERSION}`} />
+        <link rel="icon" href={HUB_FAVICON_PATH} sizes="any" />
+        <link rel="shortcut icon" href={HUB_FAVICON_PATH} />
         <link rel="apple-touch-icon" href={`/apple-icon.png?v=${ICON_VERSION}`} sizes="180x180" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

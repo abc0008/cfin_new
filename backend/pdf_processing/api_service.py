@@ -448,6 +448,18 @@ class ClaudeService:
         citation_counter = 0
         citation_positions = {}  # Map citation index to text position
         pending_citation_markers = []  # Queue for markers to inject
+        seen_citation_identities = set()
+
+        def _citation_identity(citation_data: Dict[str, Any]) -> tuple:
+            return (
+                citation_data.get("document_index"),
+                citation_data.get("document_title"),
+                citation_data.get("start_page_number"),
+                citation_data.get("end_page_number"),
+                citation_data.get("start_char_index"),
+                citation_data.get("end_char_index"),
+                (citation_data.get("cited_text") or "").strip()[:300],
+            )
         
         try:
             async with stream_manager as stream:
@@ -499,15 +511,27 @@ class ClaudeService:
                             # Citations need to be processed to extract searchable_text
                             # but markers will be added post-processing when citations are fully ready with rect data
                             process_citations_during_stream = True  # Enable citation processing
-                            inject_markers_during_stream = False    # But don't inject markers yet
+                            inject_markers_during_stream = True
                             
                             if inject_markers_during_stream:
                                 # Check if we have pending citation markers to inject
                                 # Always inject citations regardless of tool state
                                 if pending_citation_markers:
-                                    # Inject all pending markers at the end of this text chunk
+                                    # Claude emits citation_delta immediately after the cited span.
+                                    # Prepending pending markers to the next text chunk keeps the
+                                    # marker attached to the fact/value that came just before it.
+                                    markers_text = "".join(
+                                        marker_info['marker'] for marker_info in pending_citation_markers
+                                    )
+                                    joiner = (
+                                        " "
+                                        if text_delta
+                                        and not text_delta[0].isspace()
+                                        and text_delta[0] not in ".,;:)]}"
+                                        else ""
+                                    )
+                                    text_delta = f"{markers_text}{joiner}{text_delta}"
                                     for marker_info in pending_citation_markers:
-                                        text_delta += f" {marker_info['marker']}"
                                         logger.info(f"💉 Injected citation marker {marker_info['marker']} into stream")
                                         
                                         # Now emit the citation event with processed data
@@ -522,11 +546,11 @@ class ClaudeService:
                                             
                                             # Also emit citation delta with processed citation
                                             await emit_callback({
-                                            "type": "citations_delta",
-                                            "citation": marker_info['citation'],
-                                            "block_index": 0,
-                                            "message_id": message_id
-                                        })
+                                                "type": "citations_delta",
+                                                "citation": marker_info['citation'],
+                                                "block_index": 0,
+                                                "message_id": message_id
+                                            })
                                 
                                 # Clear pending markers
                                 pending_citation_markers.clear()
@@ -562,8 +586,18 @@ class ClaudeService:
                                 # Track post-tool text separately
                                 # Also check for pending markers in post-tool text
                                 if pending_citation_markers:
+                                    markers_text = "".join(
+                                        marker_info['marker'] for marker_info in pending_citation_markers
+                                    )
+                                    joiner = (
+                                        " "
+                                        if text_delta
+                                        and not text_delta[0].isspace()
+                                        and text_delta[0] not in ".,;:)]}"
+                                        else ""
+                                    )
+                                    text_delta = f"{markers_text}{joiner}{text_delta}"
                                     for marker_info in pending_citation_markers:
-                                        text_delta += f" {marker_info['marker']}"
                                         logger.info(f"💉 Injected citation marker {marker_info['marker']} into post-tool stream")
                                         
                                         # Emit events for post-tool citations
@@ -618,6 +652,7 @@ class ClaudeService:
                                 from utils.citation_processor import process_citation_for_granularity
                                 processed_citation = process_citation_for_granularity(citation_data)
                                 
+                                seen_citation_identities.add(_citation_identity(citation_data))
                                 citations.append(processed_citation)
                                 logger.info(f"📚 Citation {citation_index} processed during streaming: {processed_citation['type']} - '{processed_citation.get('cited_text', '')[:50]}...'")
                                 
@@ -634,11 +669,12 @@ class ClaudeService:
                                 
                                 # Don't emit citation_marker event yet - wait until text is ready
                                 
-                                # Still emit the original citation delta for compatibility
+                                # Emit the processed citation delta for compatibility. The
+                                # marker itself will be inserted into the next text delta.
                                 if emit_callback:
                                     await emit_callback({
                                         "type": "citations_delta",
-                                        "citation": citation_data,
+                                        "citation": processed_citation,
                                         "block_index": chunk.index if hasattr(chunk, 'index') else 0,
                                         "message_id": message_id
                                     })
@@ -765,11 +801,7 @@ class ClaudeService:
                                 # Process citations and inject markers into the text
                                 citation_markers_to_add = []
                                 for idx, citation in enumerate(content_block.citations):
-                                    # Increment citation counter
-                                    citation_counter += 1
-                                    citation_index = citation_counter
-                                    
-                                    citation_data = {
+                                    candidate_citation_data = {
                                         "type": citation.type,
                                         "cited_text": citation.cited_text,
                                         "document_index": citation.document_index,
@@ -780,8 +812,22 @@ class ClaudeService:
                                         "end_char_index": getattr(citation, 'end_char_index', None),
                                         "start_block_index": getattr(citation, 'start_block_index', None),
                                         "end_block_index": getattr(citation, 'end_block_index', None),
+                                        "citation_index": None
+                                    }
+
+                                    citation_identity = _citation_identity(candidate_citation_data)
+                                    if citation_identity in seen_citation_identities:
+                                        logger.info("⏩ Skipping duplicate final_message citation already seen during streaming")
+                                        continue
+
+                                    # Increment citation counter only for genuinely new citations.
+                                    citation_counter += 1
+                                    citation_index = citation_counter
+                                    citation_data = {
+                                        **candidate_citation_data,
                                         "citation_index": citation_index
                                     }
+                                    seen_citation_identities.add(citation_identity)
                                     
                                     # Process the citation immediately to extract specific values
                                     from utils.citation_processor import process_citation_for_granularity
@@ -814,24 +860,16 @@ class ClaudeService:
                                             "message_id": message_id
                                         })
                                 
-                                # Send citation markers as a text_delta to append to the streamed text
+                                # Do not emit a marker-only text_delta. The frontend attaches the
+                                # saved citations to the completed message and reflows missing
+                                # markers inline next to the matching facts. Emitting only
+                                # "[n] [n+1] ..." here creates a separate assistant bubble after
+                                # tool runs and makes citation jumps hard to follow.
                                 if citation_markers_to_add and emit_callback:
-                                    markers_text = " " + " ".join(citation_markers_to_add)
-                                    
-                                    # Send as text_delta to append to the initial streamed text
-                                    # IMPORTANT: Don't include accumulated_text to prevent content duplication
-                                    await emit_callback({
-                                        "type": "text_delta",
-                                        "text": markers_text,
-                                        "message_id": message_id
-                                    })
-                                    logger.info(f"💉 Sent {len(citation_markers_to_add)} citation markers as text_delta: {markers_text}")
-                                    
-                                    # Don't add citation markers to concluding_text - they belong to the pre-tool message
-                                    # concluding_text should only contain post-tool insights
-                                    
-                                    # Update accumulated_text to include the markers
-                                    accumulated_text += markers_text
+                                    logger.info(
+                                        "Processed %s final_message citations without emitting marker-only text_delta",
+                                        len(citation_markers_to_add),
+                                    )
                             elif hasattr(content_block, 'citations') and content_block.citations and len(citations) > 0:
                                 logger.info(f"Skipping {len(content_block.citations)} citations from final_message (already collected {len(citations)} during streaming)")
 
@@ -1026,7 +1064,7 @@ class ClaudeService:
             messages: List of message dictionaries with 'role' and 'content' keys
             temperature: Temperature for generation (0.0 to 1.0)
             max_tokens: Maximum number of tokens to generate
-            model: Optional model override (e.g., "claude-3-5-haiku-20241022")
+            model: Optional model override (e.g., settings.MODEL_HAIKU)
             stream: Whether to stream the response
             emit_callback: Optional callback for streaming events
             documents: Optional list of documents with claude_file_id for citation support
@@ -1479,7 +1517,7 @@ class ClaudeService:
             doc_type_str = document_type.value if document_type else "financial document"
             
             # Import citation instructions
-            from services.citation_instructions import GRANULAR_CITATION_INSTRUCTIONS
+            from services.citation_instructions import FINANCIAL_AGENT_INSTRUCTIONS
             
             system_prompt = """You are a specialized financial document analysis assistant. Extract structured financial data from the document accurately using Claude's native PDF support.
 
@@ -1490,7 +1528,7 @@ Follow these guidelines:
 4. Provide citations for extracted data points when possible.
 5. Any textual narrative should be brief and clearly separated from the JSON structure.
 
-""" + GRANULAR_CITATION_INSTRUCTIONS
+""" + FINANCIAL_AGENT_INSTRUCTIONS
             
             messages = [
                 {
@@ -1602,7 +1640,7 @@ Follow these guidelines:
             doc_type_str = document_type.value if document_type else "financial document"
             
             # Import citation instructions
-            from services.citation_instructions import GRANULAR_CITATION_INSTRUCTIONS
+            from services.citation_instructions import FINANCIAL_AGENT_INSTRUCTIONS
             
             system_prompt = """You are a specialized financial document analysis assistant. Extract structured financial data from the document accurately using Claude's native PDF support.
 
@@ -1613,7 +1651,7 @@ Follow these guidelines:
 4. Provide citations for extracted data points when possible.
 5. Any textual narrative should be brief and clearly separated from the JSON structure.
 
-""" + GRANULAR_CITATION_INSTRUCTIONS
+""" + FINANCIAL_AGENT_INSTRUCTIONS
             
             # Upload to Files API for Claude's native PDF support
             from pdf_processing.claude_file_client import upload_pdf
@@ -2473,12 +2511,15 @@ Follow these guidelines:
                     logger.info(f"📝 Generating auto-summary with {len(accumulated_charts)} charts, "
                                 f"{len(accumulated_tables)} tables, {len(accumulated_metrics)} metrics (prompt: {len(summary_prompt)} chars)")
 
+                    from services.citation_instructions import BANKING_METRIC_FORMAT_INSTRUCTIONS
+
                     summary_text_raw = await self.generate_response(
                         system_prompt=(
                             "You are a financial analyst generating a wrap-up narrative for visualizations just created. "
                             "You HAVE the actual data — it is provided below. Do NOT say you cannot see the data. "
                             "Write a clear, precise summary that references specific numbers and trends from the data provided. "
-                            "Do NOT apologize or say you lack information. The data is right here."
+                            "Do NOT apologize or say you lack information. The data is right here.\n\n"
+                            + BANKING_METRIC_FORMAT_INSTRUCTIONS.strip()
                         ),
                         messages=[{"role": "user", "content": summary_prompt}],
                         model=settings.MODEL_HAIKU,
@@ -2520,8 +2561,23 @@ Follow these guidelines:
                 logger.info(f"📚 Adding {len(streaming_citations)} streaming citations to accumulated citations")
                 accumulated_citations.extend(streaming_citations)
 
+            deduped_accumulated_citations = []
+            seen_citation_keys = set()
+            for citation in accumulated_citations:
+                key = (
+                    citation.get("citation_index"),
+                    citation.get("document_index"),
+                    citation.get("start_page_number"),
+                    citation.get("end_page_number"),
+                    citation.get("cited_text"),
+                )
+                if key in seen_citation_keys:
+                    continue
+                seen_citation_keys.add(key)
+                deduped_accumulated_citations.append(citation)
+
             # Process citations for better granularity
-            processed_citations = process_citations_list(accumulated_citations)
+            processed_citations = process_citations_list(deduped_accumulated_citations)
             
             # Return structured result with initial text only
             result = {

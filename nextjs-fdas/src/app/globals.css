@@ -427,10 +427,12 @@ body.workspace-theme-active[data-direction='B'] {
 }
 
 .workspace-theme-shell .workspace-page {
-  height: calc(100dvh - 72px);
+  height: auto;
   min-height: calc(100vh - 72px);
   min-height: calc(100dvh - 72px);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   background:
     radial-gradient(1000px 420px at 8% -2%, color-mix(in srgb, hsl(var(--primary)) 14%, transparent), transparent 62%),
     radial-gradient(900px 380px at 92% 108%, color-mix(in srgb, hsl(var(--secondary)) 14%, transparent), transparent 58%),
@@ -479,15 +481,19 @@ body.workspace-theme-active[data-direction='B'] {
 }
 
 .workspace-theme-shell .workspace-grid {
+  flex: 0 0 auto;
   max-width: 1360px;
   width: 100%;
-  min-height: 0;
+  height: clamp(918px, calc(135dvh - 297px), 1069px);
+  max-height: 1069px;
+  min-height: 918px;
   margin: 0 auto;
   padding: 10px 24px 24px;
 }
 
 .workspace-theme-shell .workspace-panel {
   min-height: 0;
+  max-height: 100%;
   border: 1px solid var(--ws-line);
   border-radius: 18px;
   background: var(--ws-panel);
@@ -776,6 +782,12 @@ body.workspace-theme-active .fdas-textarea::placeholder {
   .workspace-theme-shell .workspace-grid {
     padding-left: 18px;
     padding-right: 18px;
+  }
+
+  .workspace-theme-shell .workspace-grid {
+    height: auto;
+    max-height: none;
+    min-height: 0;
   }
 }
  
