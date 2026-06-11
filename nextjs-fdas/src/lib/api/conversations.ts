@@ -23,6 +23,27 @@ interface ConversationListResponse {
   pageSize: number;
 }
 
+/** Summary entry returned by GET /api/conversation for the history sidebar. */
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  documentCount: number;
+  lastMessage?: {
+    content: string;
+    role: string;
+    timestamp: string;
+  } | null;
+}
+
+/** Lightweight document descriptor attached to a conversation. */
+export interface ConversationDocumentSummary {
+  id: string;
+  filename: string;
+  documentType?: string;
+}
+
 interface ConversationCreateResponse {
   session_id: string;
   id?: string;
@@ -106,6 +127,55 @@ export const conversationsApi = {
     }
   },
   
+  /**
+   * List recent conversations for the session-history sidebar.
+   * Maps the backend list shape (camelCase via response aliasing) into
+   * ConversationSummary, newest first.
+   */
+  async listRecentConversations(limit: number = 50): Promise<ConversationSummary[]> {
+    try {
+      const response = await apiService.get<any[]>(`/conversation?limit=${Math.min(limit, 50)}`);
+      if (!Array.isArray(response)) return [];
+      return response.map((item) => ({
+        id: item.id || item.sessionId || '',
+        title: item.title || 'Untitled conversation',
+        createdAt: item.createdAt || item.created_at || new Date().toISOString(),
+        updatedAt: item.updatedAt || item.updated_at || new Date().toISOString(),
+        documentCount: item.documentCount ?? item.document_count ?? 0,
+        lastMessage: item.lastMessage || item.last_message || null,
+      }));
+    } catch (error) {
+      console.error('Error listing recent conversations:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Fetch conversation metadata; throws if the conversation does not exist.
+   * Used to validate a resumable session before loading it.
+   */
+  async getConversationMetadata(conversationId: string): Promise<Record<string, any>> {
+    return apiService.get<Record<string, any>>(`/conversation/${conversationId}`);
+  },
+
+  /**
+   * Get the documents associated with a conversation (for session resume).
+   */
+  async getConversationDocuments(conversationId: string): Promise<ConversationDocumentSummary[]> {
+    try {
+      const response = await apiService.get<any[]>(`/conversation/${conversationId}/document`);
+      if (!Array.isArray(response)) return [];
+      return response.map((doc) => ({
+        id: doc.id,
+        filename: doc.filename || 'Document',
+        documentType: doc.documentType || doc.document_type,
+      }));
+    } catch (error) {
+      console.error('Error getting conversation documents:', error);
+      return [];
+    }
+  },
+
   /**
    * Get conversation history
    */

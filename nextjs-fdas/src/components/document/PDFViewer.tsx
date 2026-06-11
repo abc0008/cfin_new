@@ -161,6 +161,27 @@ export function PDFViewer({
     [escapeForAttributeSelector]
   );
 
+  // Pulse the highlight rect(s) after a jump so the analyst's eye lands on the
+  // exact cited value instead of hunting through the page.
+  const flashHighlight = useCallback((targetHighlightId: string) => {
+    const safeId = escapeForAttributeSelector(targetHighlightId);
+    const wrappers = Array.from(
+      globalThis.document?.querySelectorAll(`.PdfHighlighter [data-highlight-id="${safeId}"]`) || []
+    ) as HTMLElement[];
+    wrappers.forEach((wrapper) => {
+      const parts = wrapper.querySelectorAll('.Highlight__part, .AreaHighlight__part');
+      const targets: HTMLElement[] =
+        parts.length > 0 ? (Array.from(parts) as HTMLElement[]) : [wrapper];
+      targets.forEach((el) => {
+        el.classList.remove('cfin-citation-flash');
+        // Force reflow so re-adding the class restarts the animation on repeat jumps.
+        void el.offsetWidth;
+        el.classList.add('cfin-citation-flash');
+        globalThis.window?.setTimeout(() => el.classList.remove('cfin-citation-flash'), 2600);
+      });
+    });
+  }, [escapeForAttributeSelector]);
+
   const isElementVisibleInViewport = useCallback((element: HTMLElement) => {
     const rect = element.getBoundingClientRect();
     const viewportHeight = globalThis.window?.innerHeight ?? globalThis.document?.documentElement?.clientHeight ?? 0;
@@ -729,13 +750,21 @@ export function PDFViewer({
     }
   }, [document, propsPdfUrl, isBrowser]);
   
-  // Fetch citations when document changes
+  // Keep the latest onCitationsLoaded in a ref so the fetch effect below only
+  // re-runs when the document actually changes (inline callbacks from parents
+  // would otherwise retrigger the expensive citations fetch on every render).
+  const onCitationsLoadedRef = useRef(onCitationsLoaded);
+  useEffect(() => {
+    onCitationsLoadedRef.current = onCitationsLoaded;
+  }, [onCitationsLoaded]);
+
+  // Fetch citations when document changes. Runs in the background — it must
+  // never blank out an already-rendered PDF (citation enrichment can be slow).
   useEffect(() => {
     if (!isBrowser || !document) return;
-    
+
     const fetchCitations = async () => {
       try {
-        setLoadingState("Loading document citations...");
         const incoming = await documentsApi.getDocumentCitations(document.metadata.id);
 
         // Merge with existing citations, keyed by a signature so we can
@@ -806,20 +835,18 @@ export function PDFViewer({
 
         // Convert citations to highlights and notify parent
         const highlightsFromCitations = merged.map(convertCitationToHighlight);
-        if (onCitationsLoaded) {
-          onCitationsLoaded(highlightsFromCitations);
+        if (onCitationsLoadedRef.current) {
+          onCitationsLoadedRef.current(highlightsFromCitations);
         }
-        
-        setLoadingState(null);
       } catch (error) {
         console.error("Error fetching document citations:", error);
         // Don't set error state here as we still want to show the document even if citations fail
-        setLoadingState(null);
       }
     };
-    
+
     fetchCitations();
-  }, [document, onCitationsLoaded, isBrowser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [document?.metadata?.id, isBrowser]);
   
   // After setting allHighlights in useEffect([citations, extraCitations]):
   useEffect(() => {
@@ -896,6 +923,7 @@ export function PDFViewer({
         lastScrollRefKickTargetRef.current = null;
         scrollSessionRef.current = null;
         scheduleVisibilityChecks(target);
+        flashHighlight(target);
         return;
       }
 
@@ -913,7 +941,7 @@ export function PDFViewer({
       }
       visibilityCheckTimeouts.forEach(clearTimeout);
     };
-  }, [highlightId, scrollToHighlight, highlightScrollVersion, getHighlightElement, isElementVisibleInViewport]);
+  }, [highlightId, scrollToHighlight, highlightScrollVersion, getHighlightElement, isElementVisibleInViewport, flashHighlight]);
   
   // Reset each newly loaded PDF to fit one full page inside the viewer.
   useEffect(() => {

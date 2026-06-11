@@ -708,12 +708,24 @@ class DocumentRepository:
             file_size=document.file_size
         )
     
+    # Process-lifetime cache of computed citation payloads. Auto-bbox rect
+    # search is expensive (PyMuPDF scan per citation), and the same citations
+    # are re-requested every time a document's citation list loads — cache the
+    # final payload after the first computation.
+    _citation_payload_cache: Dict[str, Dict[str, Any]] = {}
+    _CITATION_PAYLOAD_CACHE_MAX = 4000
+
     def citation_to_api_schema(self, citation: Citation) -> Dict[str, Any]:
         """Convert a database Citation to an API schema."""
         # Import here to avoid circular imports
         from models.citation import CitationPayload, CitationType, CitationRect
         import json
         import re
+
+        cache_key = str(citation.id)
+        cached_payload = DocumentRepository._citation_payload_cache.get(cache_key)
+        if cached_payload is not None:
+            return cached_payload
         
         # Parse rects from JSON if stored as string. If none found, attempt to
         # compute bounding box automatically for page_location citations.
@@ -730,6 +742,10 @@ class DocumentRepository:
             return (r.width == 0 or r.height == 0)  # any dimension zero -> fallback rectangle
 
         has_only_zero_area = rects and all(_is_zero_area(r) for r in rects)
+
+        # Provenance of the selected highlight rect ("table" | "text" | None).
+        # Set when the auto-bbox search below picks a match; None for stored rects.
+        citation_source_type: Optional[str] = None
 
         # Determine citation type value (handles both Enum and plain string)
         citation_type_val: str
@@ -1887,7 +1903,7 @@ class DocumentRepository:
                     variant: str,
                     page_words: List[Dict[str, Any]],
                     page_number: int,
-                ) -> float:
+                ) -> Tuple[float, Dict[str, Any]]:
                     rect_mid_y = (float(rect["y1"]) + float(rect["y2"])) / 2.0
                     rect_mid_x = (float(rect["x1"]) + float(rect["x2"])) / 2.0
                     rect_h = max(float(rect["height"]), 1.0)
@@ -2014,7 +2030,28 @@ class DocumentRepository:
                     if message_hint_numeric_keys and not candidate.get("numeric"):
                         score -= 24.0
 
-                    return score
+                    # ── Table-source preference ───────────────────────────────
+                    # FP&A users want highlights anchored to financial-table
+                    # cells, not the narrative sentence that repeats the same
+                    # figure. Rows containing several aligned numeric cells are
+                    # table rows; long alpha-heavy rows with at most one number
+                    # are prose. Boost the former, penalize the latter, so when
+                    # the same value matches in both places the table cell wins.
+                    row_numeric_count = len(row_numeric_words)
+                    row_alpha_words = [w for w in row_words if re.search(r"[A-Za-z]{2,}", w["norm"])]
+                    if row_numeric_count >= 2:
+                        # Up to +7.0 for dense table rows (e.g., multi-period columns).
+                        score += min(row_numeric_count, 5) * 1.4
+                    elif len(row_alpha_words) >= 10 and row_numeric_count <= 1:
+                        # Sentence-like line: many words, lone embedded figure.
+                        score -= 4.0
+
+                    rect_meta = {
+                        "row_numeric_count": row_numeric_count,
+                        "row_word_count": len(row_words),
+                        "row_alpha_count": len(row_alpha_words),
+                    }
+                    return score, rect_meta
 
                 best_match: Optional[Dict[str, Any]] = None
                 tried_pages = set(p for p in pages_to_try if p >= 1)
@@ -2053,7 +2090,7 @@ class DocumentRepository:
                                             continue
                                         page_words = _load_page_words(doc_tmp, pg)
                                         for r in rect_hits:
-                                            score = _score_rect(r, candidate, variant, page_words, pg)
+                                            score, rect_meta = _score_rect(r, candidate, variant, page_words, pg)
                                             if best_match is None or score > best_match["score"]:
                                                 best_match = {
                                                     "rect": r,
@@ -2061,6 +2098,7 @@ class DocumentRepository:
                                                     "page": pg,
                                                     "variant": variant,
                                                     "candidate": candidate,
+                                                    "meta": rect_meta,
                                                 }
                             # If we found any numeric match, do not allow phrase-only
                             # candidates to override it.
@@ -2089,13 +2127,21 @@ class DocumentRepository:
                                 page_height = float(doc_height.load_page(selected_page - 1).rect.height)
                     selected_rect = _to_pdfjs_rect(selected_rect, page_height)
                     rects = [CitationRect(**selected_rect)]
+                    match_meta = best_match.get("meta") or {}
+                    citation_source_type = (
+                        "table"
+                        if int(match_meta.get("row_numeric_count") or 0) >= 2
+                        else "text"
+                    )
                     logger.info(
-                        "✅ Auto-bbox selected rect for citation %s via '%s' (source=%s, score=%.2f, page=%s)",
+                        "✅ Auto-bbox selected rect for citation %s via '%s' (source=%s, score=%.2f, page=%s, source_type=%s, row_numeric_count=%s)",
                         citation.id,
                         best_match["variant"],
                         best_match["candidate"]["source"],
                         best_match["score"],
                         best_match["page"],
+                        citation_source_type,
+                        match_meta.get("row_numeric_count"),
                     )
                 else:
                     logger.warning(
@@ -2129,13 +2175,23 @@ class DocumentRepository:
             page=citation.page,  # Legacy field
             section=citation.section,
             message_id=str(citation.message_id) if hasattr(citation, 'message_id') and citation.message_id else None,
-            analysis_id=str(citation.analysis_id) if hasattr(citation, 'analysis_id') and citation.analysis_id else None
+            analysis_id=str(citation.analysis_id) if hasattr(citation, 'analysis_id') and citation.analysis_id else None,
+            source_type=citation_source_type
         )
         
         # Return as dict with camelCase keys
         logger.info("↩️ Returning citation %s with %d rect(s)", citation.id, len(payload.rects))
         # Dump to a plain JSON-serialisable dict (including nested CitationRect models)
-        return payload.model_dump(mode="json", by_alias=True)
+        result = payload.model_dump(mode="json", by_alias=True)
+
+        # Cache the computed payload so subsequent loads skip the expensive
+        # auto-bbox search (hit or miss — repeated failed searches are just as
+        # costly as successful ones).
+        if len(DocumentRepository._citation_payload_cache) >= DocumentRepository._CITATION_PAYLOAD_CACHE_MAX:
+            DocumentRepository._citation_payload_cache.clear()
+        DocumentRepository._citation_payload_cache[cache_key] = result
+
+        return result
         
     def get_document_file_path(self, document_id: str) -> str:
         """

@@ -356,7 +356,27 @@ class ConversationService:
                 citation = await self.document_repository.get_citation(citation_id)
                 if not citation:
                     logger.warning(f"Citation {citation_id} not found when adding message")
-        
+
+        # Auto-title: name the conversation after the first user question so the
+        # session history sidebar shows meaningful titles instead of "New Conversation".
+        try:
+            default_titles = {"", "new conversation", "untitled", "untitled conversation"}
+            if (
+                role == "user"
+                and content
+                and (conversation.title or "").strip().lower() in default_titles
+            ):
+                auto_title = " ".join(content.split())
+                if len(auto_title) > 60:
+                    auto_title = auto_title[:57].rstrip() + "…"
+                if auto_title:
+                    await self.conversation_repository.update_conversation(
+                        conversation_id, {"title": auto_title}
+                    )
+                    logger.info(f"Auto-titled conversation {conversation_id}: {auto_title!r}")
+        except Exception as title_err:  # Never block message writes on titling
+            logger.warning(f"Conversation auto-title failed for {conversation_id}: {title_err}")
+
         return await self.conversation_repository.add_message(
             conversation_id=conversation_id,
             content=content,

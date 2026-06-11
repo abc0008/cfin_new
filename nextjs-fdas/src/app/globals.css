@@ -1126,3 +1126,97 @@ body.workspace-theme-active .fdas-textarea::placeholder {
     transform: translateX(100%);
   }
 }
+
+/* ── Citation jump flash ─────────────────────────────────────────────────────
+   Applied to react-pdf-highlighter parts right after a jump-to-citation so the
+   exact cited value pulses and the analyst's eye lands on it immediately. */
+@keyframes cfin-citation-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.85);
+    filter: brightness(1.2);
+  }
+  60% {
+    box-shadow: 0 0 0 12px rgba(245, 158, 11, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+    filter: none;
+  }
+}
+
+.cfin-citation-flash {
+  animation: cfin-citation-pulse 0.85s ease-out 3;
+  outline: 2px solid rgba(245, 158, 11, 0.9);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* ── Inline citation marker + hover preview card ──────────────────────────── */
+.cfin-citation-marker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  vertical-align: top;
+}
+
+.cfin-citation-tooltip {
+  z-index: 9999;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--popover, var(--background)));
+  color: hsl(var(--foreground));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  display: none;
+  pointer-events: none;
+  text-align: left;
+  white-space: normal;
+}
+
+.cfin-citation-tooltip--visible {
+  display: block;
+}
+
+.cfin-citation-tooltip-quote {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: hsl(var(--foreground));
+}
+
+.cfin-citation-tooltip-meta {
+  margin-top: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.62rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.cfin-citation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+  padding: 0.06rem 0.34rem;
+  border-radius: 9999px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.cfin-citation-badge--table {
+  background: rgba(16, 185, 129, 0.14);
+  color: rgb(5, 122, 85);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.cfin-citation-badge--text {
+  background: rgba(100, 116, 139, 0.12);
+  color: rgb(71, 85, 105);
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}

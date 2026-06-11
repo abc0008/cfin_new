@@ -155,20 +155,25 @@ export function formatTimestamp(
   }
 ): string {
   try {
-    // Ensure we have a Date object
-    const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
-    
+    // Ensure we have a Date object. Tolerate malformed strings from older
+    // backends that emit both an offset and a Z suffix (e.g. "…+00:00Z").
+    let normalized = timestamp;
+    if (typeof normalized === 'string' && /[+-]\d{2}:\d{2}Z$/.test(normalized)) {
+      normalized = normalized.slice(0, -1);
+    }
+    const date = normalized instanceof Date ? normalized : new Date(normalized);
+
     // Check if the date is valid
     if (isNaN(date.getTime())) {
       console.warn('Invalid timestamp provided:', timestamp);
-      return 'Invalid time';
+      return '';
     }
-    
+
     // Use toLocaleTimeString to format in user's local timezone
     return date.toLocaleTimeString([], options);
   } catch (error) {
     console.error('Error formatting timestamp:', error, timestamp);
-    return 'Invalid time';
+    return '';
   }
 }
 

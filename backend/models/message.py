@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from pydantic import BaseModel, Field, UUID4, field_serializer, field_validator, AliasChoices, ConfigDict
 import logging
@@ -39,11 +39,10 @@ class Message(BaseModel):
 
     @field_serializer('timestamp', when_used='always')
     def serialize_timestamp(self, timestamp: datetime) -> str:
-        """Ensure timestamp is serialized as UTC with Z suffix"""
-        if timestamp.tzinfo is None:
-            # Assume it's UTC if no timezone info
-            timestamp = timestamp.replace(tzinfo=None)
-        return timestamp.isoformat() + 'Z' if not timestamp.isoformat().endswith('Z') else timestamp.isoformat()
+        """Serialize as UTC ISO-8601 with a single 'Z' suffix (never '+00:00Z')."""
+        if timestamp.tzinfo is not None:
+            timestamp = timestamp.astimezone(timezone.utc).replace(tzinfo=None)
+        return timestamp.isoformat() + 'Z'
 
 
 class ConversationState(BaseModel):
@@ -59,10 +58,10 @@ class ConversationState(BaseModel):
 
     @field_serializer('last_updated', when_used='always')
     def serialize_last_updated(self, timestamp: datetime) -> str:
-        """Ensure timestamp is serialized as UTC with Z suffix"""
-        if timestamp.tzinfo is None:
-            timestamp = timestamp.replace(tzinfo=None)
-        return timestamp.isoformat() + 'Z' if not timestamp.isoformat().endswith('Z') else timestamp.isoformat()
+        """Serialize as UTC ISO-8601 with a single 'Z' suffix (never '+00:00Z')."""
+        if timestamp.tzinfo is not None:
+            timestamp = timestamp.astimezone(timezone.utc).replace(tzinfo=None)
+        return timestamp.isoformat() + 'Z'
 
 
 class MessageRequest(BaseModel):

@@ -15,6 +15,10 @@ import Canvas from '@/components/visualization/Canvas'
 import { AnalysisControls } from '@/components/analysis/AnalysisControls'
 import { AnalysisResultSchema } from '@/validation/schemas'
 import { useCitation } from '@/context/CitationContext'
+import { ConversationSidebar } from '@/components/workspace/ConversationSidebar'
+
+// localStorage key used to resume the most recent session across visits.
+const LAST_SESSION_STORAGE_KEY = 'cfin:lastSessionId'
 
 // Import CitationEnabledPDFViewer component with dynamic import to avoid SSR issues
 const PDFViewer = dynamic(
@@ -50,6 +54,7 @@ export default function Workspace() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [showReflectionsDialog, setShowReflectionsDialog] = useState(false);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const processedAnalysisMessageIdsRef = useRef<Set<string>>(new Set());
   const analysisRequestInFlightRef = useRef<Set<string>>(new Set());
   const initSessionRunRef = useRef(0);
@@ -73,95 +78,177 @@ export default function Workspace() {
     return `msg-${role}-${contentHash}-${timestamp}`;
   }, []);
 
-  // Initialize conversation session when component mounts
+  // ── Session lifecycle (multi-session memory) ──────────────────────────────
+
+  const persistLastSession = useCallback((conversationId: string | null) => {
+    try {
+      if (conversationId) {
+        window.localStorage.setItem(LAST_SESSION_STORAGE_KEY, conversationId);
+      } else {
+        window.localStorage.removeItem(LAST_SESSION_STORAGE_KEY);
+      }
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+
+  const syncWorkspaceUrl = useCallback((conversationId: string | null) => {
+    try {
+      const url = conversationId
+        ? `/workspace?conversationId=${encodeURIComponent(conversationId)}`
+        : '/workspace';
+      window.history.replaceState({}, '', url);
+    } catch {
+      /* no-op */
+    }
+  }, []);
+
+  const resetWorkspaceState = useCallback(() => {
+    setMessagesMap({});
+    setAnalysisResults([]);
+    setAnalysisError(null);
+    setHighlightId(null);
+    processedAnalysisMessageIdsRef.current = new Set();
+    analysisRequestInFlightRef.current = new Set();
+  }, []);
+
+  // Load an existing conversation (history + attached documents) into the workspace.
+  const loadConversation = useCallback(
+    async (conversationId: string, preferredDocumentId?: string | null) => {
+      setIsLoading(true);
+      try {
+        const [history, conversationDocs] = await Promise.all([
+          conversationsApi.getConversationHistory(conversationId, 100),
+          conversationsApi.getConversationDocuments(conversationId),
+        ]);
+
+        let documentToShow: ProcessedDocument | null = null;
+        const docIdToLoad =
+          preferredDocumentId ||
+          (conversationDocs.length > 0
+            ? conversationDocs[conversationDocs.length - 1].id
+            : null);
+        if (docIdToLoad) {
+          try {
+            documentToShow = await documentsApi.getDocument(docIdToLoad);
+          } catch (docErr) {
+            console.warn('Could not load conversation document:', docIdToLoad, docErr);
+          }
+        }
+
+        resetWorkspaceState();
+        setSessionId(conversationId);
+        setSelectedDocument(documentToShow);
+        setMessagesMap(
+          history.reduce<Record<string, Message>>((acc, message) => {
+            acc[message.id] = message;
+            return acc;
+          }, {})
+        );
+        persistLastSession(conversationId);
+        syncWorkspaceUrl(conversationId);
+
+        console.log('Loaded workspace session:', {
+          conversationId,
+          documentId: documentToShow?.metadata?.id,
+          messageCount: history.length,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [persistLastSession, resetWorkspaceState, syncWorkspaceUrl]
+  );
+
+  // Create a brand-new conversation; keeps the current document attached so an
+  // analyst can spin up a fresh thread on the same filing in one click.
+  const createNewConversation = useCallback(
+    async (documentId?: string | null) => {
+      setIsLoading(true);
+      try {
+        const [response, document] = await Promise.all([
+          conversationApi.createConversation(
+            'New Conversation',
+            documentId ? [documentId] : []
+          ),
+          documentId ? documentsApi.getDocument(documentId) : Promise.resolve(null),
+        ]);
+        const sessionIdValue =
+          (response as any).sessionId || (response as any).session_id;
+        resetWorkspaceState();
+        setSessionId(sessionIdValue);
+        setSelectedDocument(document);
+        persistLastSession(sessionIdValue);
+        syncWorkspaceUrl(sessionIdValue);
+        setHistoryRefreshKey((k) => k + 1);
+        console.log('Created conversation session:', sessionIdValue);
+        return sessionIdValue as string;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [persistLastSession, resetWorkspaceState, syncWorkspaceUrl]
+  );
+
+  // Initialize the workspace session on mount:
+  // 1. A deep link (?conversationId=…) wins.
+  // 2. Otherwise resume the most recent session from localStorage.
+  // 3. Otherwise create a fresh conversation.
   useEffect(() => {
-    let sessionInitialized = false;
     const runId = ++initSessionRunRef.current;
     let cancelled = false;
     const isCurrentRun = () => !cancelled && runId === initSessionRunRef.current;
 
     const initSession = async () => {
-      // Only create a session if we don't have one and haven't tried to initialize yet
-      if (!sessionId && !sessionInitialized) {
-        sessionInitialized = true;
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const requestedConversationId =
+          params.get('conversationId') || params.get('sessionId');
+        const requestedDocumentId = params.get('documentId') || params.get('document');
+
+        if (requestedConversationId) {
+          await loadConversation(requestedConversationId, requestedDocumentId);
+          return;
+        }
+
+        // Resume the analyst's last session if it still exists.
+        let lastSessionId: string | null = null;
         try {
-          setIsLoading(true);
-          const params = new URLSearchParams(window.location.search);
-          const requestedConversationId = params.get('conversationId') || params.get('sessionId');
-          const requestedDocumentId = params.get('documentId') || params.get('document');
+          lastSessionId = window.localStorage.getItem(LAST_SESSION_STORAGE_KEY);
+        } catch {
+          /* storage unavailable */
+        }
 
-          if (requestedConversationId) {
-            const conversationId = requestedConversationId;
-
-            const [history, document] = await Promise.all([
-              conversationsApi.getConversationHistory(conversationId, 100),
-              requestedDocumentId
-                ? documentsApi.getDocument(requestedDocumentId)
-                : Promise.resolve(null),
-            ]);
-
-            if (isCurrentRun()) {
-              setSessionId(conversationId);
-
-              if (document) {
-                setSelectedDocument(document);
-              }
-
-              setMessagesMap(
-                history.reduce<Record<string, Message>>((acc, message) => {
-                  acc[message.id] = message;
-                  return acc;
-                }, {})
-              );
-
-              console.log('Loaded existing workspace session:', {
-                conversationId,
-                documentId: document?.metadata.id,
-                messageCount: history.length,
-              });
-            }
+        if (lastSessionId && !requestedDocumentId) {
+          try {
+            await conversationsApi.getConversationMetadata(lastSessionId);
+            if (!isCurrentRun()) return;
+            await loadConversation(lastSessionId);
             return;
-          }
-
-          // Create a new conversation session, preserving a document deep-link if present.
-          const [response, document] = await Promise.all([
-            conversationApi.createConversation(
-              'New Conversation',
-              requestedDocumentId ? [requestedDocumentId] : [],
-            ),
-            requestedDocumentId
-              ? documentsApi.getDocument(requestedDocumentId)
-              : Promise.resolve(null),
-          ]);
-          if (isCurrentRun()) {
-            // The backend returns sessionId in camelCase due to alias_generator
-            const sessionIdValue = response.sessionId || response.session_id;
-            setSessionId(sessionIdValue);
-            if (document) {
-              setSelectedDocument(document);
-            }
-            console.log('Created conversation session:', sessionIdValue);
-          }
-        } catch (error) {
-          console.error('Error initializing session:', error);
-          const errorId = `system-${Date.now()}`;
-          setMessagesMap(prev => ({
-            ...prev,
-            [errorId]: {
-              id: errorId,
-              sessionId: '',
-              role: 'system',
-              content: 'Error initializing chat session. Please refresh the page.',
-              timestamp: new Date().toISOString(),
-              referencedDocuments: [],
-              referencedAnalyses: []
-            }
-          }));
-        } finally {
-          if (isCurrentRun()) {
-            setIsLoading(false);
+          } catch (resumeError) {
+            console.warn('Could not resume last session, starting new one:', resumeError);
+            persistLastSession(null);
           }
         }
+
+        if (!isCurrentRun()) return;
+        await createNewConversation(requestedDocumentId);
+      } catch (error) {
+        if (!isCurrentRun()) return;
+        console.error('Error initializing session:', error);
+        const errorId = `system-${Date.now()}`;
+        setMessagesMap(prev => ({
+          ...prev,
+          [errorId]: {
+            id: errorId,
+            sessionId: '',
+            role: 'system',
+            content: 'Error initializing chat session. Please refresh the page.',
+            timestamp: new Date().toISOString(),
+            referencedDocuments: [],
+            referencedAnalyses: []
+          }
+        }));
       }
     };
 
@@ -170,7 +257,25 @@ export default function Workspace() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Sidebar interactions
+  const handleSelectConversation = useCallback(
+    (conversationId: string) => {
+      if (!conversationId || conversationId === sessionId) return;
+      loadConversation(conversationId).catch((err) => {
+        console.error('Failed to switch conversation:', err);
+      });
+    },
+    [sessionId, loadConversation]
+  );
+
+  const handleNewConversation = useCallback(() => {
+    createNewConversation(selectedDocument?.metadata?.id || null).catch((err) => {
+      console.error('Failed to create conversation:', err);
+    });
+  }, [createNewConversation, selectedDocument]);
 
   // Define handleAnalysisResult first, potentially wrap with useCallback if needed later
   const handleAnalysisResult = (
@@ -659,6 +764,11 @@ export default function Workspace() {
 
   // Memoize the message update callback to prevent re-renders
   const handleMessageUpdate = useCallback((message: Message) => {
+    // A new user message kicks off backend auto-titling; refresh the sidebar
+    // so the session list reflects the new title/ordering.
+    if (message.role === 'user') {
+      setHistoryRefreshKey((k) => k + 1);
+    }
     // Add streaming message to the messages map
     setMessagesMap(prev => {
       const existingMessage = prev[message.id];
@@ -793,7 +903,15 @@ export default function Workspace() {
         </p>
       </section>
 
-      <div className="workspace-grid grid min-h-0 flex-1 grid-cols-1 gap-4 pb-6 md:grid-cols-3">
+      <div className="flex min-h-0 flex-1 gap-4 pb-6">
+        <ConversationSidebar
+          currentSessionId={sessionId}
+          onSelectConversation={handleSelectConversation}
+          onNewConversation={handleNewConversation}
+          refreshKey={historyRefreshKey}
+        />
+
+        <div className="workspace-grid grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-3">
         <div className="workspace-panel col-span-1 flex min-h-0 flex-col overflow-hidden">
           <div className="workspace-panel-bar flex-shrink-0 px-4 py-3">
             <h2 className="flex items-center text-base font-avenir-pro-demi text-foreground">
@@ -806,6 +924,7 @@ export default function Workspace() {
           </div>
           <div className="min-h-0 flex-1 overflow-hidden">
             <StreamingChatInterface
+              key={sessionId || 'no-session'}
               messages={messages}
               onSendMessage={handleSendMessage}
               activeDocuments={selectedDocument ? [selectedDocument.metadata.id] : []}
@@ -946,6 +1065,7 @@ export default function Workspace() {
               </div>
             </TabsContent>
           </Tabs>
+        </div>
         </div>
       </div>
     </div>

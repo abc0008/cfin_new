@@ -5,6 +5,7 @@ import { Message, Citation } from '@/types';
 import { ExternalLink } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { CopyToClipboard, MessageActions } from './InteractiveElements';
+import { CitationMarker } from './CitationMarker';
 
 interface MessageRendererProps {
   message: Message;
@@ -191,22 +192,16 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
         );
       }
 
-      // Add clickable citation
+      // Add clickable citation with hover preview
       if (citations[citationIndex]) {
         const citation = citations[citationIndex];
         parts.push(
-          <a
-            href={`#citation-${encodeURIComponent(citation.id)}`}
+          <CitationMarker
             key={`cite-${citation.id}-${match.index}`}
-            className="citation-link inline-flex items-center px-1 py-0.5 mx-0.5 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-200 cursor-pointer text-xs align-top"
-            onClick={(event) => {
-              event.preventDefault();
-              onCitationClick?.(citation);
-            }}
-            aria-label={`Citation ${citationIndex + 1}: ${(citation.displayText || citation.citedText).substring(0, 50)}...`}
-          >
-            <sup className="font-medium">{citationIndex + 1}</sup>
-          </a>
+            citation={citation}
+            index={citationIndex + 1}
+            onClick={onCitationClick}
+          />
         );
       } else {
         // Fallback if citation not found
@@ -428,19 +423,14 @@ function MessageRendererBase({ message, onCitationClick }: MessageRendererProps)
       <div className="message-content">
         <MarkdownRenderer content={processedContent} />
         <div className="mt-2 inline-flex flex-wrap items-center gap-1 align-top">
+          <span className="mr-1 text-[10px] uppercase tracking-wide text-gray-500">Sources</span>
           {message.citations.map((citation, idx) => (
-            <a
-              href={`#citation-${encodeURIComponent(citation.id)}`}
+            <CitationMarker
               key={`cite-strip-${citation.id}-${idx}`}
-              className="citation-link inline-flex items-center px-1 py-0.5 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-200 cursor-pointer text-xs"
-              onClick={(event) => {
-                event.preventDefault();
-                onCitationClick?.(citation);
-              }}
-              aria-label={`Citation ${idx + 1}: ${(citation.displayText || citation.citedText).substring(0, 50)}...`}
-            >
-              <sup className="font-medium">{idx + 1}</sup>
-            </a>
+              citation={citation}
+              index={idx + 1}
+              onClick={onCitationClick}
+            />
           ))}
         </div>
       </div>
