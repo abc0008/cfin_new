@@ -8,6 +8,7 @@ import {
   BOOK_DEMO_URL,
   CFIN_WORKSPACE_URL,
   CREDIT_SPREAD_URL,
+  REGIONAL_FORECASTING_URL,
   RM_PRO_FORMA_URL,
 } from '@/lib/app-urls'
 
@@ -531,6 +532,300 @@ function ApertureBeam() {
         </div>
       </div>
     </section>
+  )
+}
+
+export function ForecastingProductDetailPage() {
+  return (
+    <main className="pp pp-rm">
+      <ProductSubnav />
+
+      <section className="pp-hero">
+        <div className="wrap pp-hero-grid">
+          <div className="pp-hero-copy">
+            <div className="pp-eyebrow">
+              <span className="op" style={{ color: 'var(--accent-plum)' }}>
+                OP_FCST
+              </span>
+              <span className="pill">aceanalytics.dev / forecasting</span>
+            </div>
+            <h1 className="pp-h1">
+              The Forecast tool
+              <br />
+              <span className="ital" style={{ color: 'var(--accent-plum)' }}>
+                you&apos;ve dreamed of
+              </span>
+            </h1>
+            <p className="pp-lede">
+              Forecast with governance, lineage &amp; guardrails, with AI-assistance at every
+              level. Start with review of baseline (actuals pulled from GL database), layer on
+              macro scenarios, input existing workforce assumptions, producer hiring, expense
+              controls, and regulatory guardrails into a governed scenario version.
+            </p>
+            <div className="pp-hero-actions">
+              <a
+                className="btn btn-primary"
+                style={{ background: 'var(--accent-plum)', color: '#fff' }}
+                href={REGIONAL_FORECASTING_URL}
+              >
+                Open Forecasting Module →
+              </a>
+              <a className="btn btn-ghost" href="https://bankanalysis.aceanalytics.dev/forecasting/guide">
+                See Forecasting Guide
+              </a>
+            </div>
+            <div className="pp-hero-tags">
+              {[
+                ['60 months', 'monthly planning horizon'],
+                ['GL_Fact', 'baseline and forecast target'],
+                ['Lineage', 'user-input audit trail'],
+              ].map(([a, b], i) => (
+                <div key={i} className="pp-tag" style={{ '--tc': 'var(--accent-plum)' } as React.CSSProperties}>
+                  <div className="t">{a}</div>
+                  <div className="s">{b}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="pp-hero-art">
+            <ForecastingMockLive />
+          </div>
+        </div>
+      </section>
+
+      <section className="pp-strip" id="methods">
+        <div className="wrap">
+          <CapCard
+            ix="01"
+            title="Base forecast review"
+            body="Actuals load from GL_Fact, entity, and account dimensions into a monthly executive review surface."
+            accent="var(--accent-plum)"
+          />
+          <CapCard
+            ix="02"
+            title="Macro scenario layer"
+            body="Rates, GDP, deposit runoff, credit stress, and inflation toggles show annual divergence from base."
+            accent="var(--accent-slate)"
+          />
+          <CapCard
+            ix="03"
+            title="Top-down control meets bottoms-up input"
+            body="Finance liaisons collect market hiring, attrition, ramp, and controllable spend assumptions with user lineage."
+            accent="var(--accent-2)"
+          />
+          <CapCard
+            ix="04"
+            title="Governed writeback"
+            body="Validated rows replace the selected scenario, data source, planning entity, and forecast periods in GL_Fact."
+            accent="var(--accent-orange)"
+          />
+        </div>
+      </section>
+
+      <section className="pp-video" style={{ padding: '0 0 80px' }}>
+        <div className="wrap">
+          <div
+            style={{
+              border: '1px solid var(--line)',
+              borderRadius: 16,
+              overflow: 'hidden',
+              background: '#000',
+            }}
+          >
+            <video
+              controls
+              preload="metadata"
+              playsInline
+              poster="https://bankanalysis.aceanalytics.dev/media/forecasting-module-launch-poster.jpg"
+              style={{ display: 'block', width: '100%', height: 'auto' }}
+            >
+              <source
+                src="https://bankanalysis.aceanalytics.dev/media/forecasting-module-launch.mp4"
+                type="video/mp4"
+              />
+              Your browser does not support embedded video.{' '}
+              <a href="https://bankanalysis.aceanalytics.dev/media/forecasting-module-launch.mp4">
+                Download the walkthrough
+              </a>
+              .
+            </video>
+          </div>
+        </div>
+      </section>
+
+      <PPFlow
+        op="OP_FCST_03"
+        title={
+          <>
+            Baseline.{' '}
+            <span className="ital" style={{ color: 'var(--accent-plum)' }}>
+              Adjust.
+            </span>{' '}
+            Load.
+          </>
+        }
+        steps={[
+          {
+            n: '01',
+            t: 'Source baseline',
+            b: 'Read GL actuals by region and market, then project the base forecast monthly across the planning horizon.',
+          },
+          {
+            n: '02',
+            t: 'Layer assumptions',
+            b: 'Apply macro toggles, existing workforce levers, producer hiring economics, and controllable spend changes.',
+          },
+          {
+            n: '03',
+            t: 'Commit scenario',
+            b: 'Stage the forecast, validate row status, and write a governed scenario version back to GL_Fact.',
+          },
+        ]}
+        accent="var(--accent-plum)"
+      />
+
+      <PPCta
+        title={
+          <>
+            Forecast from the market.
+            <br />
+            Govern from the <span className="ital">center.</span>
+          </>
+        }
+        sub="Forecast gives FP&A a live operating surface for market-owned assumptions, centralized controls, and audit-ready forecast loads."
+        primary="Open Forecasting Module"
+        primaryHref={REGIONAL_FORECASTING_URL}
+        secondary="Read the methods"
+        secondaryHref="/product/forecasting#methods"
+        accent="var(--accent-plum)"
+      />
+    </main>
+  )
+}
+
+function ForecastingMockLive() {
+  const planRows = [
+    ['FY2027', '$431M', '$444M', '+$12.8M'],
+    ['FY2028', '$462M', '$479M', '+$17.1M'],
+    ['FY2029', '$491M', '$510M', '+$19.3M'],
+  ]
+  const guardrails = [
+    ['LCR', '119.2%', '78%'],
+    ['CET1', '11.3%', '64%'],
+    ['Loan / Deposit', '91.5%', '58%'],
+  ]
+
+  return (
+    <div className="prx-mock">
+      <div className="prx-chrome">
+        <span className="dot" />
+        <span className="dot" />
+        <span className="dot" />
+        <div className="url">forecast.ace / Southeast · FY2027 PLAN</div>
+        <div className="tag" style={{ color: 'var(--accent-plum)' }}>
+          ● SCENARIO · STAGED
+        </div>
+      </div>
+      <div className="prx-body">
+        <div className="prx-head">
+          <div>
+            <div className="k">BASELINE VS MODIFIED</div>
+            <div className="v" style={{ color: 'var(--accent-plum)' }}>
+              +$12.8M
+            </div>
+            <div className="sub">FY2027 net income variance</div>
+          </div>
+          <div className="prx-pills">
+            <span>BASE</span>
+            <span className="on">PLAN</span>
+            <span>STRESS</span>
+          </div>
+        </div>
+
+        <div
+          style={{
+            border: '1px solid var(--line)',
+            display: 'grid',
+            gridTemplateColumns: '0.8fr 1fr 1fr 1fr',
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 11,
+          }}
+        >
+          {['Year', 'Baseline', 'Modified', 'Variance'].map((header) => (
+            <div
+              key={header}
+              style={{
+                color: 'var(--ink-3)',
+                letterSpacing: '0.12em',
+                padding: '10px 12px',
+                borderBottom: '1px solid var(--line)',
+                textTransform: 'uppercase',
+              }}
+            >
+              {header}
+            </div>
+          ))}
+          {planRows.flatMap((row) =>
+            row.map((cell, index) => (
+              <div
+                key={`${row[0]}-${index}`}
+                style={{
+                  padding: '11px 12px',
+                  borderBottom: row[0] === 'FY2029' ? '0' : '1px solid var(--line)',
+                  color: index === 3 ? 'var(--accent-2)' : 'var(--ink)',
+                  fontWeight: index === 0 || index === 3 ? 600 : 400,
+                }}
+              >
+                {cell}
+              </div>
+            )),
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gap: 12, marginTop: 20 }}>
+          {guardrails.map(([metric, value, position]) => (
+            <div key={metric} style={{ display: 'grid', gridTemplateColumns: '96px 1fr 56px', gap: 12, alignItems: 'center' }}>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--ink-2)' }}>{metric}</div>
+              <div
+                style={{
+                  height: 12,
+                  position: 'relative',
+                  background:
+                    'linear-gradient(90deg, rgba(119,151,106,.35) 0 60%, rgba(255,172,3,.32) 60% 82%, rgba(216,93,57,.32) 82% 100%)',
+                }}
+              >
+                <span
+                  style={{
+                    position: 'absolute',
+                    left: position,
+                    top: -4,
+                    width: 8,
+                    height: 20,
+                    background: 'var(--accent-plum)',
+                  }}
+                />
+              </div>
+              <div style={{ fontWeight: 600, color: 'var(--ink)' }}>{value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="prx-kpis">
+          {[
+            ['Rows', '960', 'var(--accent-plum)'],
+            ['Markets', '24', 'var(--accent-slate)'],
+            ['Status', 'Ready', 'var(--accent-2)'],
+            ['Load', 'GL_Fact', 'var(--accent-orange)'],
+          ].map(([k, v, c], i) => (
+            <div key={i} className="k" style={{ '--c': c } as React.CSSProperties}>
+              <div className="l">{k}</div>
+              <div className="n">{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 
