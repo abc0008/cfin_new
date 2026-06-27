@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Alex Cardell — Head of FP&A</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@1,9..144,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --navy:#111111; --navy2:#2A2A2A; --navy3:#3A3A3A;
+  --amber:#FFAC03; --amber-soft:#EFE6D2; --amber-line:#FFAC03;
+  --bg:#EBEBEB; --card:#F3F3F3; --ink:#111111; --muted:#606060; --faint:#8C8C8C;
+  --line:#D4D4D4; --green:#2F7D5B; --green-soft:#E5ECE4; --red:#C5543A; --red-soft:#F3E2DA;
+  --blue-soft:#E6E6E6; --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:'Inter Tight',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:15px;-webkit-font-smoothing:antialiased}
+a{color:var(--navy3);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Layout */
+.layout{display:flex;min-height:100vh}
+.sidebar{width:248px;flex:0 0 248px;background:var(--navy);color:#fff;position:sticky;top:54px;height:calc(100vh - 54px);overflow-y:auto;padding:0 0 30px}
+.brand{padding:20px 20px 14px;border-bottom:1px solid rgba(255,255,255,.12)}
+.brand .ttl{font-weight:700;font-size:15px;letter-spacing:.2px}
+.brand .sub{font-size:11.5px;color:#B8B8B8;margin-top:3px;text-transform:uppercase;letter-spacing:1px}
+.nav{padding:12px 10px}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:0;color:#C9C9C9;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13.5px;font-family:inherit;margin-bottom:2px;transition:background .15s,color .15s}
+.nav button:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav button.active{background:var(--amber);color:#1a1a1a;font-weight:600}
+.nav button .n{font-size:11px;opacity:.6;width:16px;text-align:center}
+.nav button.active .n{opacity:.8}
+.sidefoot{padding:14px 20px;font-size:11px;color:#8C8C8C;border-top:1px solid rgba(255,255,255,.12);margin-top:8px}
+
+.main{flex:1;min-width:0;padding:0 0 80px}
+.topbar{background:var(--navy);color:#fff;padding:26px 40px 24px}
+.topbar h1{margin:0;font-size:22px;font-weight:700}
+.topbar .meta{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-block;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);padding:4px 10px;border-radius:20px;font-size:12px;color:#E6E6E6}
+.chip b{color:#fff}
+.wrap{padding:28px 40px;max-width:1080px}
+
+/* Views */
+.view{display:none;animation:fade .25s ease}
+.view.show{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+h2.sec{font-size:19px;margin:0 0 4px;color:var(--navy)}
+.lead{color:var(--muted);font-size:13.5px;margin:0 0 20px;max-width:760px}
+h3.blk{font-size:14px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink);margin:30px 0 12px;border-bottom:2px solid var(--amber);padding-bottom:6px}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:18px 20px;margin-bottom:16px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:1fr 1fr 1fr}
+.g4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:880px){.g2,.g3,.g4{grid-template-columns:1fr}}
+
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+.kpi .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint)}
+.kpi .val{font-size:20px;font-weight:700;color:var(--navy);margin-top:2px}
+.kpi .note{font-size:12px;color:var(--muted);margin-top:2px}
+
+.thesis{background:var(--navy);color:#fff;border-radius:14px;padding:22px 24px;box-shadow:var(--shadow)}
+.thesis .q{font-size:18px;font-weight:600;line-height:1.45}
+.thesis .q .hl{font-family:'Fraunces',Georgia,serif;font-style:italic;color:var(--amber-line)}
+.thesis .cap{font-size:11.5px;text-transform:uppercase;letter-spacing:1px;color:#B8B8B8;margin-bottom:8px}
+
+.pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.tag{font-size:11.5px;padding:3px 9px;border-radius:6px;background:var(--blue-soft);color:var(--navy2);border:1px solid #D3E2F0;font-weight:500}
+.tag.green{background:var(--green-soft);color:#1d5e42;border-color:#BFE0CF}
+.tag.amber{background:var(--amber-soft);color:#8a5a16;border-color:#E8CFA0}
+.tag.red{background:var(--red-soft);color:#8a3220;border-color:#E9C7BC}
+
+.pillar{border-left:4px solid var(--amber-line)}
+.pillar h4{margin:0 0 4px;font-size:14.5px;color:var(--navy)}
+.pillar p{margin:0;font-size:12.5px;color:var(--muted)}
+
+/* Tables */
+.tbl{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+.tbl th{background:var(--navy);color:#fff;text-align:left;padding:10px 12px;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.tbl td{padding:11px 12px;border-top:1px solid var(--line);vertical-align:top}
+.tbl tr:nth-child(even) td{background:#ECECEC}
+.tbl .say{color:var(--navy2)}
+.tbl .say::before{content:"“"}
+.tbl .say::after{content:"”"}
+.tbl .proof{color:#27553f}
+.theme-row td{background:var(--amber-soft)!important;font-weight:700;color:#7a4f12;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px}
+
+/* Accordions */
+.acc{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:10px;box-shadow:var(--shadow);overflow:hidden}
+.acc>summary{cursor:pointer;list-style:none;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;font-weight:600;color:var(--navy);font-size:14px}
+.acc>summary::-webkit-details-marker{display:none}
+.acc>summary .qn{flex:0 0 auto;background:var(--navy);color:#fff;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.acc>summary .arw{margin-left:auto;color:#8A5A16;transition:transform .2s;font-size:13px}
+.acc[open]>summary .arw{transform:rotate(90deg)}
+.acc[open]>summary{background:#ECECEC;border-bottom:1px solid var(--line)}
+.acc .body{padding:14px 16px 16px 52px}
+.lab{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;padding:2px 7px;border-radius:5px;margin-right:6px;display:inline-block}
+.lab.test{background:var(--blue-soft);color:var(--navy2)}
+.lab.say{background:var(--green-soft);color:#1d5e42}
+.lab.proof{background:#EFEAF7;color:#553a8a}
+.lab.trap{background:var(--red-soft);color:#8a3220}
+.block{margin:0 0 12px}
+.block p{margin:5px 0 0}
+.spoken{background:#ECEFEA;border-left:3px solid var(--green);padding:10px 14px;border-radius:0 8px 8px 0;font-size:13.5px;color:#27412f}
+.spoken em{color:var(--navy2);font-style:normal;background:#F4F4F4;border-bottom:1px dashed var(--amber-line)}
+.trap{font-size:12.5px;color:#7a3120}
+
+/* Mermaid frames */
+.diagram{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:var(--shadow);overflow-x:auto;text-align:center;margin:8px 0 6px}
+.mermaid{font-size:13px!important}
+.usefor{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+.usefor b{color:#8A5A16}
+ul.pts{margin:10px 0 0;padding-left:18px}
+ul.pts li{margin-bottom:6px;font-size:13px}
+ul.pts li b{color:var(--navy)}
+
+.callout{border:1px solid var(--amber-line);background:#F7EFDD;border-radius:10px;padding:14px 16px;font-size:13px}
+.callout .h{font-weight:700;color:#8a5a16;margin-bottom:4px}
+
+.qlist{counter-reset:q}
+.qitem{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--navy3);border-radius:10px;padding:12px 16px;margin-bottom:10px;box-shadow:var(--shadow)}
+.qitem .qq{font-weight:600;color:var(--navy)}
+.qitem .why{font-size:12.5px;color:var(--muted);margin-top:3px}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:880px){.two-col{grid-template-columns:1fr}}
+.do h4,.dont h4{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.5px}
+.do h4{color:var(--green)} .dont h4{color:var(--red)}
+.do li,.dont li{font-size:13px;margin-bottom:6px}
+
+.miniflow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.step{flex:1;min-width:150px;background:#ECECEC;border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+.step .sn{font-size:11px;color:#8A5A16;font-weight:700}
+.step .st{font-weight:600;font-size:13px;color:var(--navy);margin:2px 0}
+.step .sd{font-size:12px;color:var(--muted)}
+
+.disc{font-size:11.5px;color:var(--faint);margin-top:24px;border-top:1px solid var(--line);padding-top:12px}
+
+/* CSS flow diagrams — no JS, no network */
+.fwrap{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;box-shadow:var(--shadow);margin:8px 0 6px}
+.fband{border:1px dashed var(--line);border-radius:10px;padding:12px;margin:8px 0}
+.fband.today{background:#F3E7E2;border-color:#E1C8BF}
+.fband.target{background:#E9EFE7;border-color:#C7D6C2}
+.fband .bl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+.fband.today .bl{color:#8a3220}.fband.target .bl{color:#1d5e42}
+.frow{display:flex;align-items:center;flex-wrap:wrap;gap:8px;justify-content:center}
+.fnode{background:#EDEDED;border:1px solid #C6C6C6;color:#111111;border-radius:9px;padding:8px 12px;font-size:12.5px;font-weight:500;text-align:center;min-width:118px;line-height:1.35}
+.fnode small{display:block;font-weight:400;color:#606060;font-size:11px;margin-top:2px}
+.fnode.head{background:var(--navy);color:#fff;border-color:var(--navy)}
+.fnode.head small{color:#B8B8B8}
+.fnode.amber{background:#FBEFD6;border-color:var(--amber);color:#7a4f12}.fnode.amber small{color:#8a6224}
+.fnode.green{background:#E3F1EA;border-color:#2E7D5B;color:#1d5e42}.fnode.green small{color:#2c6a4d}
+.fnode.red{background:#F7E6E1;border-color:#B4472F;color:#8a3220}.fnode.red small{color:#9a4634}
+.farr{color:var(--muted);font-size:16px;font-weight:700;flex:0 0 auto}
+.farr.dn{width:100%;text-align:center;font-size:13px;letter-spacing:.5px}
+.fgrp{flex:1;min-width:160px;background:#ECECEC;border:1px solid var(--line);border-radius:10px;padding:10px}
+.fgrp .gh{font-size:11.5px;font-weight:700;color:var(--navy);text-align:center;margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px}
+.fgrp .fnode{width:100%;margin-bottom:6px;min-width:0}.fgrp .fnode:last-child{margin-bottom:0}
+.ffoot{background:var(--navy);color:#fff;border-radius:9px;padding:10px 12px;font-size:12px;text-align:center;margin-top:10px;line-height:1.45}
+.ffoot b{color:var(--amber-line)}
+.fback{display:inline-block;background:#F7EFDD;border:1px dashed var(--amber-line);color:#8a5a16;border-radius:20px;padding:3px 12px;font-size:11.5px;margin-top:8px}
+.fcap{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+.fpoint{font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 10px}
+.fpoint.red{background:#F7E6E1;color:#8a3220;border:1px solid #E9C7BC}
+.fpoint.green{background:#E3F1EA;color:#1d5e42;border:1px solid #BFE0CF}
+.fsublabel{font-size:13px;font-weight:700;color:var(--navy);margin:18px 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fsublabel span{font-weight:400;color:var(--muted);font-size:11.5px}
+.fsublabel::before{font-size:10px;color:#fff;padding:2px 8px;border-radius:5px;letter-spacing:.6px;font-weight:700}
+.fsublabel.std::before{content:"STANDARD";background:#606060}
+.fsublabel.led{color:#8a5a16}
+.fsublabel.led::before{content:"YOU LED";background:var(--amber);color:#1a1a1a}
+.fwrap-led{border-color:var(--amber);box-shadow:0 0 0 2px rgba(255,172,3,.3)}
+/* F7 maturity ladder */
+.mtop{display:flex;gap:8px;margin-bottom:6px}
+.mtag{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center;border-bottom:2px dotted var(--line);padding-bottom:3px}
+.mtag.world{color:#1d5e42;border-bottom-color:#BFE0CF}
+.mrow{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.mcol{flex:1;min-width:142px;background:#ECECEC;border:1px solid var(--line);border-radius:9px;overflow:hidden;padding-bottom:8px}
+.mcol .mbar{width:100%}
+.mcol .mh{font-size:11.5px;font-weight:700;color:var(--navy);padding:8px 10px 0;text-align:center;line-height:1.25}
+.mcol .mrole{font-size:11px;font-weight:600;color:#606060;text-align:center;margin:2px 0 6px}
+.mcol ul{margin:0;padding:0 8px 0 20px}
+.mcol li{font-size:10.8px;color:var(--muted);margin-bottom:4px;line-height:1.3}
+.mcol.world{background:#EAF6EF;border-color:#2E7D5B}
+.mcol.world .mh{color:#1d5e42}
+.maxis{margin-top:10px;background:var(--navy);color:#fff;font-size:11px;font-weight:600;text-align:right;padding:5px 12px;border-radius:6px;letter-spacing:.3px}
+.mnote{font-size:11.5px;color:#1d5e42;background:#EAF6EF;border:1px solid #BFE0CF;border-radius:7px;padding:7px 10px;margin-top:8px;text-align:center}
+.mnote b{color:#15543b}
+/* F7 value-commitment pyramid */
+.vcap{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;text-align:center;margin-bottom:6px}
+.vcom{display:flex;flex-direction:column;align-items:center;gap:6px}
+.vtier{color:#fff;border-radius:8px;padding:9px 14px;text-align:center;font-size:12px;line-height:1.35}
+.vtier.v4{background:#5E7F62;width:64%}
+.vtier.v3{background:#444444;width:78%}
+.vtier.v2{background:#2A2A2A;width:90%}
+.vtier.v1{background:#111111;width:100%}
+.vtier b{color:var(--amber-line)}
+.vhow{width:100%;background:#F4EEE0;border:1px solid #DDCBA6;color:#7a4f12;border-radius:8px;padding:8px 12px;text-align:center;font-size:11.5px;margin-top:6px;line-height:1.45}
+.vhow b{color:#8a5a16}
+@media(max-width:760px){.vtier{width:100%!important}.mtag{font-size:10px}}
+@media print{.sidebar{display:none}.view{display:block!important}.topbar{background:var(--navy)!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.acc .body{padding-left:16px}}
+h1,h2,h4{font-family:'Inter Tight',system-ui,sans-serif}.brand .sub,.kpi .lbl,.lab,.tbl th,.theme-row td,h3.blk,.thesis .cap,.fband .bl,.fgrp .gh,.mtag,.vcap,.fsublabel,.fsublabel span,.chip,.step .sn,.usefor b,.disc{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,monospace}
+.tbl .req{color:var(--muted)}.tbl .deliver{color:var(--ink);font-weight:500}
+.blk{scroll-margin-top:16px}.reflinks{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}.reflinks .rl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--faint)}.reflinks a{font-size:11.5px;font-weight:600;text-decoration:none;border-radius:99px;padding:4px 11px;border:1px solid var(--line);background:var(--card);color:var(--navy);cursor:pointer}.reflinks a.fjump{border-color:#E0CFA0;background:#FBEFD6;color:#7a4f12}.reflinks a.exlink{border-color:#C6C6C6;color:var(--navy)}.reflinks a:hover{border-color:var(--amber);color:#111}.reflinks a .ar{color:var(--amber);font-weight:700}
+.sitenav{position:sticky;top:0;z-index:200;display:flex;align-items:center;gap:18px;height:54px;padding:0 22px;background:var(--navy);color:#fff;border-bottom:1px solid rgba(255,255,255,.12);font-family:'Inter Tight',system-ui,sans-serif}
+.sitenav a{color:#fff;text-decoration:none}
+.sn-brand{font-weight:700;font-size:14px;letter-spacing:.2px;white-space:nowrap}
+.sn-links{display:flex;gap:18px;font-size:13px;margin-left:6px}
+.sn-links a{color:#CFCFCF}
+.sn-links a:hover{color:#fff}
+.sn-links a.on{color:var(--amber)}
+.sn-cta{margin-left:auto;display:flex;align-items:center;gap:12px}
+.sn-status{font-size:11px;color:#B8B8B8;display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',ui-monospace,monospace;white-space:nowrap}
+.sn-status .dot{width:7px;height:7px;border-radius:50%;background:#5E7F62;display:inline-block}
+.sn-demo{font-size:12.5px;font-weight:600;background:var(--amber);color:#111!important;padding:6px 14px;border-radius:99px;white-space:nowrap}
+.sn-demo:hover{background:#fff}
+@media(max-width:820px){.sn-links,.sn-status{display:none}}
+.fxin{display:inline-block;margin-top:6px;font-size:11px;font-weight:600;color:#8A5A16;text-decoration:none;border-bottom:1px dashed #E0CFA0;cursor:pointer}.fxin:hover{color:#111;border-bottom-color:var(--amber)}
+</style>
+<meta name="robots" content="noindex,nofollow"/>
+<style id="gate-style">
+#gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#111111;font-family:'Inter Tight',system-ui,-apple-system,sans-serif;padding:20px}
+body:not(.locked) #gate{display:none}
+body.locked{overflow:hidden}
+body.locked .layout{display:none}
+body.locked .sitenav{display:none}
+.gatecard{background:#F3F3F3;border:1px solid #D4D4D4;border-radius:16px;padding:34px 30px;width:100%;max-width:380px;text-align:center}
+.gatebrand{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#8A5A16;font-weight:600;margin-bottom:14px}
+.gatebrand::before{content:"\25CF ";color:#FFAC03}
+.gatecard h1{margin:0 0 6px;font-size:24px;color:#111111;letter-spacing:-0.02em;font-family:'Inter Tight',system-ui,sans-serif}
+.gatecard p{margin:0 0 18px;font-size:13px;color:#606060;line-height:1.45}
+.gatecard input{width:100%;padding:12px 14px;border:1px solid #D4D4D4;border-radius:99px;font-size:15px;margin-bottom:12px;outline:none;box-sizing:border-box;background:#fff;font-family:inherit}
+.gatecard input:focus{border-color:#111111;box-shadow:0 0 0 3px rgba(17,17,17,.10)}
+.gatecard button{width:100%;padding:12px;background:#111111;color:#fff;border:0;border-radius:99px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s,color .15s}
+.gatecard button:hover{background:#FFAC03;color:#111111}
+.gateerr{color:#C5543A;font-size:12.5px;margin-top:12px}
+</style>
+</head>
+<body class="locked">
+
+<div id="gate">
+  <form id="gateForm" class="gatecard" autocomplete="off">
+    <div class="gatebrand">ACE Analytics</div>
+    <h1>Candidate Profile</h1>
+    <p>This section is private. Please enter the password to continue.</p>
+    <input id="gatePw" type="password" autocomplete="off" placeholder="Password" aria-label="Password" autofocus/>
+    <button type="submit">Unlock</button>
+    <div id="gateErr" class="gateerr" hidden>Incorrect password &mdash; please try again.</div>
+  </form>
+</div>
+
+<header class="sitenav">
+  <a class="sn-brand" href="https://aceanalytics.dev/">Ace Analytics</a>
+  <nav class="sn-links">
+    <a href="https://aceanalytics.dev/">Home</a>
+    <a href="https://aceanalytics.dev/product">Projects</a>
+    <a href="https://aceanalytics.dev/news">Industry News</a>
+    <a href="https://aceanalytics.dev/about">About Me</a>
+    <a class="on" href="https://aceanalytics.dev/candidate-profile.html">Candidate Profile</a>
+  </nav>
+  <div class="sn-cta">
+    <span class="sn-status"><span class="dot"></span> Status · All systems</span>
+    <a class="sn-demo" href="https://cal.aceanalytics.dev/demo">Book a demo</a>
+  </div>
+</header>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="ttl">Alex Cardell</div>
+      <div class="sub">Head of FP&amp;A · Candidate Profile</div>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-view="dashboard" class="active"><span class="n">1</span> Overview</button>
+      <button data-view="fitmap"><span class="n">2</span> How I Fit the Role</button>
+      <button data-view="qa"><span class="n">3</span> My Approach</button>
+      <button data-view="frameworks"><span class="n">4</span> Frameworks</button>
+      <button data-view="close"><span class="n">5</span> Closing</button>
+    </nav>
+    <div class="sidefoot">Regional-bank finance &amp; FP&amp;A transformation leader.<br/>Built for the journey from ~$28B to $40B and beyond.</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>Alex Cardell — Head of FP&amp;A</h1>
+      <div class="meta">
+        <span class="chip"><b>Focus:</b> FP&amp;A transformation</span>
+        <span class="chip"><b>Candidate for:</b> Head of FP&amp;A, Arvest Bank</span>
+        <span class="chip"><b>Based in:</b> Birmingham, AL</span>
+      </div>
+    </div>
+
+    <!-- ============ 1. DASHBOARD ============ -->
+    <section class="view show" id="dashboard">
+      <div class="wrap">
+        <h2 class="sec">Overview</h2>
+        <p class="lead">Who I am, the value I bring to this mandate, and how I'd start. I'm a regional-bank finance and FP&amp;A transformation leader — I help finance move from budget aggregation and reporting into a strategic decision engine.</p>
+
+        <div class="thesis">
+          <div class="cap">How I position myself</div>
+          <div class="q">I'm a regional-bank <span class="hl">finance transformation</span> leader who helps FP&amp;A move from budget aggregation and reporting into a <span class="hl">strategic decision engine</span> — built for the run from $28B to $40B and beyond.</div>
+        </div>
+
+        <h3 class="blk">The mandate I'm built for</h3>
+        <div class="grid g3">
+          <div class="card pillar"><h4>1 · Top-down decision engine</h4><p>Convert bottom-up/reactive budgeting into top-down planning with firm budgets, decision rights, and effective challenge.</p></div>
+          <div class="card pillar"><h4>2 · Public-standard segment reporting</h4><p>Consumer vs. commercial sub-segmentation (small biz, C&amp;I, CRE) at a public-bank standard for board &amp; leadership.</p></div>
+          <div class="card pillar"><h4>3 · Driver-based forecasting</h4><p>Scenario modeling for capital allocation, strategic investment, M&amp;A diligence, and the annual cycle.</p></div>
+          <div class="card pillar"><h4>4 · Tech/Ops finance &amp; ROI</h4><p>Project ROI tracking, investment prioritization, and "what can we afford" frameworks with the COO/CIO.</p></div>
+          <div class="card pillar"><h4>5 · M&amp;A readiness</h4><p>Diligence playbooks, target valuation, synergy &amp; integration models as the bank scales toward $50&ndash;100B+.</p></div>
+        </div>
+        <p class="lead" style="margin-top:12px">Around those five: an efficiency-ratio / ROA-ROE cadence, board &amp; owner reporting, capital-stress / ALCO support, a high-performance team build, and a "no jerks, no BS" culture.</p>
+
+        <h3 class="blk">What I bring</h3>
+        <div class="grid g2">
+          <div class="card">
+            <h4 style="margin:0 0 6px;color:var(--navy)">I build and lead high-performing teams</h4>
+            <p style="margin:0;font-size:13px;color:var(--muted)">A player-coach who sets direction and still gets in the work. I've twice taken reporting teams "from peer laggard to peer leader," consolidated four scattered analytics groups into one enterprise function, and I develop analysts into true business partners.</p>
+          </div>
+          <div class="card">
+            <h4 style="margin:0 0 6px;color:var(--navy)">A natural communicator and systems thinker</h4>
+            <p style="margin:0;font-size:13px;color:var(--muted)">I translate complex financial analysis into clear, decision-ready guidance, and I zoom out to connect strategy, drivers, and outcomes into a vision people can act on. I partner across the C-suite and the lines of business — running reviews, building trust, and giving honest, effective challenge.</p>
+          </div>
+          <div class="card">
+            <h4 style="margin:0 0 6px;color:var(--navy)">I turn strategy into a decision engine</h4>
+            <p style="margin:0;font-size:13px;color:var(--muted)">Transformation is my track record — I lead <b>Enterprise Analytics &amp; Finance Transformation</b> today. When it helps, I can build it myself: top-down, driver-based planning with governed AI and a project-ROI tool. The point is always better decisions, not the technology.</p>
+          </div>
+          <div class="card">
+            <h4 style="margin:0 0 6px;color:var(--navy)">Real scale and M&amp;A experience</h4>
+            <p style="margin:0;font-size:13px;color:var(--muted)">~15 years across Regions, First Horizon ($40B+ segment), Synovus &amp; Pinnacle — including capital and ALCO work (CCAR/DFAST), target valuation, and a <b>live merger-of-equals integration</b> now.</p>
+          </div>
+        </div>
+
+        <div class="callout" style="margin-top:18px">
+          <div class="h">How I'd start — first 12 months</div>
+          <span class="tag">1 · Listen &amp; map</span> current process, metric integrity, decision rights &nbsp;
+          <span class="tag">2 · Stand up cadence</span> monthly segment reviews + efficiency/ROA-ROE pack &nbsp;
+          <span class="tag">3 · Pilot top-down</span> driver-based model on one segment + DFW/Frisco proving ground &nbsp;
+          <span class="tag">4 · Make M&amp;A repeatable</span> diligence playbook before a deal is live
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 2. FIT MAP ============ -->
+    <section class="view" id="fitmap">
+      <div class="wrap">
+        <h2 class="sec">How I Fit the Role</h2>
+        <p class="lead">How my experience maps to what this mandate demands. Left: the requirement. Middle: how I deliver it. Right: the evidence behind it.</p>
+
+        <table class="tbl">
+          <thead><tr><th style="width:28%">What the role demands</th><th style="width:36%">How I deliver it</th><th style="width:36%">Evidence</th></tr></thead>
+          <tbody>
+            <tr class="theme-row"><td colspan="3">A · Top-down planning &amp; decision rights</td></tr>
+            <tr>
+              <td class="req">Bottom-up, reactive &rarr; top-down planning &amp; decision-making engine</td>
+              <td class="deliver">A top-down process starts with leadership's financial ambition, then forces clarity on the drivers — I've built the governance layer that makes that real.</td>
+              <td class="proof">Built a driver-based forecasting platform where every change is a reviewable proposal with attribution and second-order effects — governance bottom-up planning never had. Ran QBRs with the C-suite at Synovus.<br/><a class="fjump fxin" data-f="f1" href="#f1">&#8627; F1 · Top-down model</a></td>
+            </tr>
+            <tr>
+              <td class="req">Set firm, top-down budgets; enforce decision-rights frameworks and effective challenge</td>
+              <td class="deliver">Effective challenge only works when assumptions are transparent and business leaders feel heard — that's a process I build, not a posture.</td>
+              <td class="proof">Led expense-management identification and incentive-redesign efforts; trusted liaison to C-suite and LOB leads in a heavily matrixed org.<br/><a class="fjump fxin" data-f="f1" href="#f1">&#8627; F1 · Top-down model</a></td>
+            </tr>
+            <tr class="theme-row"><td colspan="3">B · Segment reporting at a public-bank standard</td></tr>
+            <tr>
+              <td class="req">Design &amp; implement segment reporting — consumer vs. commercial (small biz, C&amp;I, CRE)</td>
+              <td class="deliver">I've built the segment data spine — the hard part is consistent definitions and attribution, which is exactly what I govern.</td>
+              <td class="proof">Rebuilt Finance's enterprise data models spanning loans, deposits, fees, trust, securities, treasury mgmt &amp; householding; supported Wholesale ($25B loans), CIB ($700MM), TPS ($84MM rev) as distinct segments.<br/><a class="fjump fxin" data-f="f4" href="#f4">&#8627; F4 · Segment reporting</a></td>
+            </tr>
+            <tr>
+              <td class="req">Monthly segment reviews, quarterly strategic allocation checkpoints</td>
+              <td class="deliver">I run a monthly segment review and a quarterly capital/allocation checkpoint anchored on efficiency and ROA/ROE.</td>
+              <td class="proof">Led quarterly business reviews with C-suite and LOB leadership; built banker/segment profitability reporting from company level down to the advisor.<br/><a class="fjump fxin" data-f="f4" href="#f4">&#8627; F4 · Segment reporting</a></td>
+            </tr>
+            <tr class="theme-row"><td colspan="3">C · Driver-based forecasting &amp; scenarios</td></tr>
+            <tr>
+              <td class="req">Establish driver-based forecasting &amp; scenario modeling — capital allocation, M&amp;A, annual cycle</td>
+              <td class="deliver">My forecasts already encode how lines depend on each other, so a single lever surfaces what moves three lines downstream.</td>
+              <td class="proof">Forecasting platform links GL/ERP financials to driver data (loans, deposits, securities, profitability, employee tapes, external data); models second-order effects (deposits&rarr;interest expense &amp; fee income). Earlier: consolidated NII, balance-sheet forecast, deposit-beta, CCAR/DFAST.<br/><a class="fjump fxin" data-f="f3" href="#f3">&#8627; F3 · Driver-based + AI</a></td>
+            </tr>
+            <tr class="theme-row"><td colspan="3">D · Finance support for Ops &amp; Technology / Project ROI</td></tr>
+            <tr>
+              <td class="req">Project ROI tracking, investment prioritization, "what can we afford"</td>
+              <td class="deliver">"What can we afford" is a capacity question — I tie project demand to financial and people capacity, not just total spend.</td>
+              <td class="proof">Built a business-case&rarr;pro-forma tool: agentic extraction classifies recurring vs. non-recurring, marginal vs. sunk, capitalizable vs. expense, auto-spreads to templates with project ROI. Maps to a full capacity/prioritization &amp; business-case governance model (sizing, RAC/EIC).<br/><a class="fjump fxin" data-f="f5" href="#f5">&#8627; F5 · Capacity &amp; ROI</a></td>
+            </tr>
+            <tr>
+              <td class="req">Partner with COO/CIO; financial linkage to enterprise project management</td>
+              <td class="deliver">I'm finance's voice on the portfolio through clear governance — RAC (Resource Allocation Committee) for enterprise tradeoffs, EIC (Executive Investment Committee) for delegated and mandatory work — anchored in honest capacity transparency up front, then disciplined semi-annual post-mortems that track each project's realized ROI against its original business case.</td>
+              <td class="proof">Work from a RAC/EIC-style capacity &amp; prioritization governance model (initiative sizing, investment pools, decision rights); built a corporate-projects tool that turns a business case into a pro forma with project ROI.<br/><a class="fjump fxin" data-f="f5" href="#f5">&#8627; F5 · Capacity &amp; ROI</a></td>
+            </tr>
+            <tr class="theme-row"><td colspan="3">E · M&amp;A readiness &amp; due diligence</td></tr>
+            <tr>
+              <td class="req">Diligence playbooks, target valuation, synergy analysis, post-merger integration</td>
+              <td class="deliver">I led the finance diligence on a deal — revenue and workforce durability, normalized segment financials, and key-people retention — which is exactly FP&amp;A's role in M&amp;A.</td>
+              <td class="proof">Led the finance &amp; strategic-finance diligence on a bank acquisition — customer/employee New-Lost-Existing durability, comp-vs-revenue, normalized segment financials with transaction-level income attribution, and key-people retention design. Plus M&amp;A &amp; capital modeling at Regions and a live merger-of-equals integration now.<br/><a class="fjump fxin" data-f="f6" href="#f6">&#8627; F6 · M&amp;A diligence</a></td>
+            </tr>
+            <tr class="theme-row"><td colspan="3">F · EPM / BI / AI to drive FP&amp;A</td></tr>
+            <tr>
+              <td class="req">Enterprise performance management systems &amp; BI tools; technology for speed and accuracy</td>
+              <td class="deliver">I use technology to cut the mechanical work so the team spends its time on judgment — with explainability and audit kept intact.</td>
+              <td class="proof">Expert in Power BI / DAX / Power M; built the most-used Power BI dashboard at the bank ingesting 50M+ records; Databricks Genie agentic self-serve analytics; AI enablement across forecasting.<br/><a class="fjump fxin" data-f="f3" href="#f3">&#8627; F3 · Driver-based + AI</a></td>
+            </tr>
+            <tr class="theme-row"><td colspan="3">G · Leadership, player-coach, culture, talent</td></tr>
+            <tr>
+              <td class="req">Build/retain a high-performance team; player-coach; upgrade talent; development pathways</td>
+              <td class="deliver">I'm a player-coach — I set the operating model and still get in the model. I recently consolidated four scattered teams into one.</td>
+              <td class="proof">Built a team of 10; consolidated fragmented embedded LOB analytics into one enterprise function; long track record developing analysts from reporting into proactive profitability work.<br/><a class="fjump fxin" data-f="f7" href="#f7">&#8627; F7 · FP&amp;A maturity</a></td>
+            </tr>
+            <tr class="theme-row"><td colspan="3">H · Board / owner / regulator reporting · capital · ALCO</td></tr>
+            <tr>
+              <td class="req">Capital stress testing, ALCO support, balance-sheet analytics; board/owner/regulatory materials</td>
+              <td class="deliver">I've lived the capital and ALCO side — NII forecasting, stress testing, IR materials — so I speak the CFO's and the board's language.</td>
+              <td class="proof">ALM Forecasting &amp; Reporting (consolidated NII, balance-sheet forecast, risk simulation); CCAR/DFAST stress testing, capital planning; Investor Relations rotation (earnings, rating-agency &amp; conference materials).</td>
+            </tr>
+            <tr class="theme-row"><td colspan="3">I · Talent &amp; succession bench</td></tr>
+            <tr>
+              <td class="req">Develop the team and build a credible succession bench</td>
+              <td class="deliver">I build development pathways that turn reporting analysts into business partners, and grow the bench a scaling finance org needs.</td>
+              <td class="proof">Cross-functional finance breadth (FP&amp;A, ALM, IR, strategic finance, analytics); a track record of developing analysts into business partners.<br/><a class="fjump fxin" data-f="f7" href="#f7">&#8627; F7 · FP&amp;A maturity</a></td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="disc">Each item reflects work I've led or built directly.</p>
+      </div>
+    </section>
+
+    <!-- ============ 3. Q&A ============ -->
+    <section class="view" id="qa">
+      <div class="wrap">
+        <h2 class="sec">My Approach</h2>
+        <p class="lead">How I think about the core parts of this mandate — in my own words.</p>
+
+        <details class="acc open">
+          <summary><span class="qn">1</span> My background <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">My background is regional-bank finance, FP&amp;A, and finance transformation. I started in <em>core ALM, forecasting and capital work at Regions</em>, then spent seven years at <em>IberiaBank / First Horizon leading FP&amp;A for a $40B+ regional banking segment while building out a modern financial analytics platform</em>, taking reporting from peer laggard to peer leader. At Synovus I led <em>strategic finance for Wholesale, CIB and Treasury Payment Solutions</em> and ran QBRs with the C-suite. Today at Pinnacle I lead <em>Enterprise Analytics &amp; Finance Transformation</em> post-merger — a team of 10. The thread is that finance has to move beyond explaining what happened to helping leadership see what's likely to happen and which levers matter.</div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">2</span> Why Head of FP&amp;A is my next step <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">I view analytics and transformation as part of modern FP&amp;A, not separate from it. The highest-value FP&amp;A teams don't just consolidate budgets — they help executives see drivers, evaluate tradeoffs, and allocate resources. My career is that work: <em>ALM and capital forecasting, segment profitability, strategic finance, and the analytics spine underneath it</em>. I've carried both tracks at once — at <em>IberiaBank and First Horizon I led FP&amp;A and the analytics function I built out concurrently</em>, and more recently I kept indirect oversight of that analytics platform while serving as the <em>FP&amp;A director for the Wholesale, Corporate &amp; Investment Banking, and Treasury Payment Services segments</em>. This mandate takes that same skill set to a broader enterprise scope — bottom-up to top-down, tighter efficiency, stronger segment reporting. It's an extension of what I do, not a pivot.</div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">3</span> What sets me apart <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">A traditional FP&amp;A background is valuable and I respect the discipline. But this mandate isn't about running the existing budget process — it's about <em>transforming the function</em>: top-down planning, public-standard segment reporting, project-ROI governance, more automation and AI. That's my differentiation — regional-bank finance plus transformation plus hands-on BI and AI. I operate in the details and design the operating model for a bank getting larger and more complex.</div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">4</span> Why Arvest <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">This is a true FP&amp;A transformation mandate — improve profitability, tighten efficiency, move from bottom-up to top-down planning, and use automation to make finance more strategic. That's the work I do best and enjoy most, at a bank with real growth runway and an ownership structure that rewards long-term thinking. What draws me is the scope: broad enterprise reach and the authority to build the function.</div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">5</span> Running the planning &amp; forecasting process <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">Beyond the model, the value is in running the process well. I start from the top-down targets, then make the operating logistics explicit: <em>clear roles</em> for who in FP&amp;A owns each part of the forecast, the right <em>granularity</em> for each line and segment, and a published <em>forecast calendar</em> so everyone knows the cadence and deadlines. I build in structured <em>review and buy-in</em> with business-line leadership — the numbers land better when the people accountable for them have been heard and have signed off. And I close every cycle with a <em>narrative</em>: a clear story that explains the forecast results and the drivers behind them to executive management, so the conversation is about decisions, not reconciling versions.</div>
+            <div class="miniflow">
+              <div class="step"><div class="sn">1 · ROLES</div><div class="st">Clear FP&amp;A ownership</div><div class="sd">Who owns each part of the forecast.</div></div>
+              <div class="step"><div class="sn">2 · GRANULARITY</div><div class="st">Right level of detail</div><div class="sd">By line, driver, and segment.</div></div>
+              <div class="step"><div class="sn">3 · CALENDAR</div><div class="st">Published cadence</div><div class="sd">Deadlines the business plans around.</div></div>
+              <div class="step"><div class="sn">4 · BUY-IN</div><div class="st">Review with the business</div><div class="sd">Leaders are heard and sign off.</div></div>
+              <div class="step"><div class="sn">5 · NARRATIVE</div><div class="st">Explain results &amp; drivers</div><div class="sd">A clear story for executive management.</div></div>
+            </div>
+            <div class="reflinks"><span class="rl">Explore</span> <a class="fjump" data-f="f1" href="#f1">F1 · Top-down model</a><a class="fjump" data-f="f3" href="#f3">F3 · Driver-based + AI</a></div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">6</span> Moving FP&amp;A from bottom-up to top-down planning <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">A bottom-up process becomes an aggregation of requests. Top-down starts with enterprise objectives — profitability, efficiency ratio, growth, capital capacity, investment appetite — then translates those into business-line targets, driver assumptions, and decision rights. Practically: define enterprise targets, build driver-based models, establish decision rights, create a challenge process, then run a monthly/quarterly cadence comparing performance to <em>drivers, not just budget dollars</em>. The hard part is credibility — leaders must feel heard while finance makes the tradeoffs visible. I've built the governance layer for exactly this.</div>
+            <div class="block" style="margin-top:10px"><span class="lab proof">Evidence</span> My forecasting platform: the enterprise number is changed by many hands, with every change a reviewable proposal carrying attribution and second-order effects.</div>
+            <div class="reflinks"><span class="rl">Explore</span> <a class="fjump" data-f="f1" href="#f1">F1 · Top-down model</a><a class="exlink" href="https://aceanalytics.dev/product/forecasting" target="_blank" rel="noopener">Forecast Console <span class="ar">&#8599;</span></a></div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">7</span> Improving profitability and the efficiency ratio <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">I avoid treating the efficiency ratio as one blunt expense metric. I decompose it into the levers management can influence — revenue growth, NII trajectory, fee income, staffing, tech spend, branch/market productivity, ops capacity, support-function cost. Then a clean fact base: where are expenses outgrowing revenue, what's strategic vs. run-rate, where is cost carried without a growth or productivity link, where can automation reduce manual work. From there, a recurring profitability cadence with leadership — the goal isn't just cuts, it's <em>resource allocation</em>: fund growth, challenge low-return spend.</div>
+            <div class="block" style="margin-top:10px"><span class="lab proof">Evidence</span> Led expense-management identification and product-profitability research; built banker/segment profitability down to the individual.</div>
+            <div class="reflinks"><span class="rl">Explore</span> <a class="fjump" data-f="f8" href="#f8">F8 · Good to Great</a><a class="fjump" data-f="f2" href="#f2">F2 · Efficiency-ratio</a></div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">8</span> Using AI and automation without weakening control <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">My rule is that AI improves speed, consistency, and analytical leverage without weakening control — in banking, explainability and auditability matter. So I separate the author from the calculator: <em>the AI proposes a change in plain English, but a deterministic model does the math, and a human approves the merge</em>. Start with the mechanical work — data pulls, variance-commentary drafts, reporting refreshes, first-pass anomaly detection — where automation cuts cycle time. Outputs still get review, tie-out, documentation, and ownership. I've built this.</div>
+            <div class="block" style="margin-top:10px"><span class="lab proof">Evidence</span> Forecasting platform ("AI proposes, never does the math") plus a business-case&rarr;pro-forma agentic extraction with human-approved spreading.</div>
+            <div class="reflinks"><span class="rl">Explore</span> <a class="fjump" data-f="f3" href="#f3">F3 · Driver-based + AI</a><a class="exlink" href="https://aceanalytics.dev/product/forecasting" target="_blank" rel="noopener">Forecast Console <span class="ar">&#8599;</span></a></div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">9</span> Segment reporting at a public-bank standard <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">It's consumer vs. commercial, with commercial broken into small business, C&amp;I and CRE — each with its own revenue, direct expense, allocated overhead, credit cost, and capital usage, rolling to contribution and ROA/ROE. The discipline is public-company grade: consistent definitions, clean attribution, and the same numbers every month. I've <em>built the segment data spine — loans, deposits, fees, trust, securities, treasury, householding</em> — and supported Wholesale, CIB and TPS as distinct segments. The reporting is the easy part; governed definitions and attribution are the hard part, and that's what I do.</div>
+            <div class="reflinks"><span class="rl">Explore</span> <a class="fjump" data-f="f4" href="#f4">F4 · Segment reporting</a></div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">10</span> Driver-based forecasting <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">Two layers. Early in my career I did the balance-sheet side — <em>consolidated NII, balance-sheet forecasting, deposit-beta studies, MBS prepayment, CCAR/DFAST</em> in ALM. More recently I built a forecasting platform that connects GL/ERP financials to the actual drivers — loans, deposits, securities, profitability system, employee tapes, external data — so the model encodes dependencies. Raise commercial deposits and it automatically surfaces interest-expense and fee-income effects. That's driver-based forecasting with the second-order math built in, plus scenario capability for growth, margin, credit, and capital.</div>
+            <div class="reflinks"><span class="rl">Explore</span> <a class="fjump" data-f="f3" href="#f3">F3 · Driver-based + AI</a><a class="exlink" href="https://aceanalytics.dev/product/forecasting" target="_blank" rel="noopener">Forecast Console <span class="ar">&#8599;</span></a></div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">11</span> Finance partnership for Operations &amp; Technology <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">"What can we afford" is really a capacity question — I weigh project demand against financial <em>and</em> people/execution capacity, not just total dollars. I size and categorize initiatives (strategic, mandatory, regulatory, carryover) and route them through a two-tier committee model with clear decision rights. <em>RAC — the Resource Allocation Committee</em> — sets the enterprise investment pools and owns the top strategic, large, and unfunded calls; it delegates mandatory, infrastructure, and corporate-function decisions to <em>EIC — the Executive Investment Committee</em> — which prioritizes that spend and oversees execution, continuing, limiting, or stopping projects. A Business Case Review vets each case before it reaches either body. On the ROI side I built a tool that <em>takes a business case, extracts and classifies the economics — recurring vs. non-recurring, marginal vs. sunk, capitalizable vs. expense — and auto-spreads it into a pro forma with project ROI</em>. That's the linkage between finance and enterprise project management the role calls for.</div>
+            <div class="block" style="margin-top:10px"><span class="lab proof">Evidence</span> A two-tier capacity/prioritization &amp; business-case governance model (sizing tiers, BCR, RAC &amp; EIC) plus my business-case&rarr;pro-forma ROI tool.</div>
+            <div class="reflinks"><span class="rl">Explore</span> <a class="fjump" data-f="f5" href="#f5">F5 · Capacity &amp; ROI</a><a class="exlink" href="https://aceanalytics.dev/product/forecasting" target="_blank" rel="noopener">Forecast Console <span class="ar">&#8599;</span></a></div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">12</span> My M&amp;A experience <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">There are two parts — the process and my hands-on work. I understand the full diligence process: working groups across finance, risk and credit, HR, tech-ops and legal; the VDR and request cadence; a standardized diligence memo; and the five decision lenses — strategic fit, financial return, revenue durability, workforce durability, and integration executability. On <em>the acquisition where I led the finance and strategic-finance diligence</em>, I owned the analytical core. I hardened the two questions that actually protect a deal — <em>how durable is the revenue, and how durable is the workforce that holds it</em>. On revenue: <em>customer New/Lost/Existing analysis, concentration, and recurring-versus-one-time</em>. On workforce: <em>employee New/Lost/Existing, comp-versus-revenue, and incentive analysis by role</em>. I then built the <em>normalized segment financials — attributing transaction-level income to the right teams and stripping one-times to get to true run-rate earnings power</em> for the valuation, and I fed <em>key-people and incentive-structure recommendations</em> — who the thesis depended on and the retention economics — to protect revenue post-close. That's exactly FP&amp;A's role in M&amp;A, and it's repeatable.</div>
+            <div class="block" style="margin-top:10px"><span class="lab proof">Evidence</span> The full workstream I led is laid out in Framework F6 (Part B).</div>
+            <div class="reflinks"><span class="rl">Explore</span> <a class="fjump" data-f="f6" href="#f6">F6 · M&amp;A diligence</a></div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">13</span> How I build and develop a team <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">I build finance teams around clear roles and genuine development. Strong specialists own depth, process discipline, forecast mechanics, and day-to-day execution; I own the operating model, executive partnership, planning governance, and decision support — and I make the people around me more successful. I start by understanding each person's strengths, goals, and where they see the gaps, then set a structure with no ambiguity about ownership. The result is a complementary team with stronger executive alignment and a credible succession bench underneath it.</div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">14</span> Partnering with and challenging executives <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">Effective challenge works when the fact base is trusted and the tradeoffs are transparent — then the conversation is about choices, not credibility. I've spent my career as a <em>liaison to the C-suite and LOB leaders in heavily matrixed orgs</em>, running QBRs and profitability deep-dives. I challenge with data and options, not opinion, and I make sure leaders feel heard first. Intellectual honesty delivered respectfully is exactly the "no jerks, no BS" posture this culture values.</div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">15</span> My current scope and team <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">I lead Pinnacle's Enterprise Analytics &amp; Finance Transformation team — <em>10 analysts and developers</em> I built by consolidating fragmented embedded LOB analytics into one enterprise function. We own enterprise financial data models, banker KPI and profitability reporting from the company level to the advisor, AI enablement in forecasting, and the semantic layer the bank is standardizing on. Before this I led strategic finance for our largest commercial segments and ran QBRs with the C-suite. My span and executive exposure already mirror this role.</div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">16</span> Where I'd take the FP&amp;A function <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">I think of it as a maturity curve with five stages — from a passive <em>bookkeeper</em>, to directional support, to an operational business partner, to a <em>strategic driver</em>, and finally to <em>active value management</em>, which is world-class. Most finance functions plateau in the middle — consistent reporting and some challenge. World-class is the top: finance integrates business, financial and investor strategy and actively manages the value drivers. The opportunity here is to climb from a bottom-up, reactive base toward strategic driver and active value management. The engine for that climb is concrete — <em>fewer, higher-integrity metrics</em>, automation that kills manual reconciliation, much faster time-to-insight, and real business partnership. I've run exactly that 'before-to-now' shift: <em>I took a reporting team from peer laggard to peer leader and built the most-used dashboard at the bank</em>, and at Pinnacle I consolidated fragmented teams into one governed source of truth. The real unlock is talent — job-applied learning and coaching embedded in the forecast and review rhythm, so capability compounds every cycle.</div>
+            <div class="block" style="margin-top:10px"><span class="lab proof">Evidence</span> "Peer laggard to peer leader" plus the most-used Power BI dashboard (50M+ records); metric governance / single source of truth at Pinnacle; a Strategic-Finance value-commitment model — accurate reporting, end-to-end business-case support, driver-based forecasts, and long-range planning, rising to challenging the business as a trusted advisor.</div>
+            <div class="reflinks"><span class="rl">Explore</span> <a class="fjump" data-f="f7" href="#f7">F7 · FP&amp;A maturity</a></div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="qn">17</span> Improving profitability and positioning for scale <span class="arw">&#9656;</span></summary>
+          <div class="body">
+            <div class="spoken">I anchor it in a method I've run end to end — internally we called it 'Good to Great.' It started from a problem: total shareholder return was lagging the index and our peers. I helped run a <em>regression on the drivers of valuation</em> and confirmed investors were still pricing us on safety-and-soundness — liquidity, capital, perceived credit risk — and we traded at a discount to the return regression line. From there we <em>benchmarked the operating model against peers</em> on the metrics that move returns: efficiency ratio, ROAA, deposit cost and beta, and fee income to revenue. The winners clustered into two profiles — <em>highly efficient commercial-oriented banks, and higher-efficiency-ratio but low-funding-cost banks</em> — which pointed to one path: <em>capital recycling, relationship deepening, and expense optimization</em>. Then we went internal — NIR by component, and <em>operating efficiency by business unit against the returns each unit generated</em>, to separate the accretive units from the dilutive ones and see where we diverged from peers. The nuance that matters: efficiency ratio has to be read <em>within business type</em> — fee and wealth businesses structurally run far higher than commercial lending, so a blended number hides the story. Finally we translated the diagnosis into <em>three opportunity buckets — balance-sheet optimization, business reimagination, and corporate-service optimization</em>, each with its own targets, and a defined path to move ROAA and the efficiency ratio toward top quartile. That's exactly how I'd approach profitability and scale: diagnose where value leaks, benchmark by operating model, separate structural mix from controllable cost, and convert it into governed, quantified targets the businesses own.</div>
+            <div class="block" style="margin-top:12px"><span class="lab proof">The arc I led</span></div>
+            <div class="miniflow">
+              <div class="step"><div class="sn">1 · TRIGGER</div><div class="st">TSR lagging</div><div class="sd">Returns trailing the index &amp; proxy peers.</div></div>
+              <div class="step"><div class="sn">2 · DIAGNOSE</div><div class="st">Regression on drivers</div><div class="sd">Valuation still set by safety &amp; soundness; discount to the return regression line.</div></div>
+              <div class="step"><div class="sn">3 · BENCHMARK</div><div class="st">Peer operating models</div><div class="sd">Efficiency, ROAA, deposit cost/beta, fee/revenue → bucket peers by model.</div></div>
+              <div class="step"><div class="sn">4 · CONCLUDE</div><div class="st">Two winning profiles</div><div class="sd">Path = capital recycling + relationship deepening + expense optimization.</div></div>
+              <div class="step"><div class="sn">5 · GO INTERNAL</div><div class="st">BU efficiency vs returns</div><div class="sd">NIR by component; accretive vs dilutive units; gaps vs peers.</div></div>
+              <div class="step"><div class="sn">6 · TRANSLATE</div><div class="st">3 buckets &rarr; targets</div><div class="sd">Balance-sheet · business reimagination · corporate-service → top-quartile targets.</div></div>
+            </div>
+            <div class="reflinks"><span class="rl">Explore</span> <a class="fjump" data-f="f8" href="#f8">F8 · Good to Great</a></div>
+          </div>
+        </details>
+
+      </div>
+    </section>
+
+    <!-- ============ 4. FRAMEWORKS ============ -->
+    <section class="view" id="frameworks">
+      <div class="wrap">
+        <h2 class="sec">Framework Diagrams</h2>
+        <p class="lead">The frameworks I work from. When a question is open-ended, I answer with a structure — here are the ones I use, each with a short cue and a few points.</p>
+
+        <h3 class="blk" id="f1">F1 · Bottom-up &rarr; Top-down operating model</h3>
+        <p class="usefor"><b>How I approach it:</b> moving a planning process from bottom-up aggregation to a top-down operating model.</p>
+        <div class="fwrap">
+          <div class="fband today">
+            <div class="bl">Today · bottom-up</div>
+            <div class="frow">
+              <div class="fnode">LOBs submit requests</div><span class="farr">&rarr;</span>
+              <div class="fnode">Finance consolidates</div><span class="farr">&rarr;</span>
+              <div class="fnode">Leadership reacts</div>
+            </div>
+          </div>
+          <div class="farr dn">&darr;&ensp;transform&ensp;&darr;</div>
+          <div class="fband target">
+            <div class="bl">Target · top-down</div>
+            <div class="frow">
+              <div class="fnode green">Enterprise targets<small>profitability · efficiency · growth · capital</small></div><span class="farr">&rarr;</span>
+              <div class="fnode">Translate to LOB<small>driver assumptions</small></div><span class="farr">&rarr;</span>
+              <div class="fnode">Decision rights<small>+ effective challenge</small></div><span class="farr">&rarr;</span>
+              <div class="fnode">Monthly / quarterly cadence<small>vs. drivers, not just budget $</small></div>
+            </div>
+            <div style="text-align:center"><span class="fback">&#8635; variance feeds back into driver assumptions</span></div>
+          </div>
+        </div>
+        <ul class="pts">
+          <li><b>Start from ambition, not aggregation</b> — enterprise objectives set the envelope before any LOB number.</li>
+          <li><b>Translate targets into drivers</b> — loan growth, deposit mix/cost, fee income, credit, staffing, tech, branch economics.</li>
+          <li><b>Decision rights + challenge</b> — make tradeoffs visible; leaders feel heard, finance holds the line.</li>
+          <li><b>Compare to drivers</b> — the cadence tracks driver performance, which is where the real story lives.</li>
+        </ul>
+
+        <h3 class="blk" id="f2">F2 · Efficiency-ratio decomposition</h3>
+        <p class="usefor"><b>How I approach it:</b> improving profitability by decomposing the efficiency ratio into the levers management can actually move — then benchmarking each against the peer pack.</p>
+        <div class="fwrap">
+          <div class="frow"><div class="fnode head">Efficiency Ratio<small>= Noninterest Expense / (NII + Fee Income)</small></div></div>
+          <div class="farr dn">&darr;</div>
+          <div class="frow" style="align-items:stretch">
+            <div class="fgrp">
+              <div class="gh">Revenue side</div>
+              <div class="fnode">NII trajectory<small>balance growth · NIM · deposit cost</small></div>
+              <div class="fnode">Fee income<small>treasury · mortgage · cards</small></div>
+            </div>
+            <div class="fgrp">
+              <div class="gh">Expense side</div>
+              <div class="fnode">People<small>staffing · comp · productivity</small></div>
+              <div class="fnode">Technology<small>strategic vs. run-rate</small></div>
+              <div class="fnode">Branch / market<small>productivity · occupancy</small></div>
+              <div class="fnode">Support functions<small>+ automatable manual work</small></div>
+            </div>
+          </div>
+          <div class="farr dn">&darr;&ensp;benchmark every lever vs. the peer pack&ensp;&darr;</div>
+          <div class="frow"><div class="fnode amber">Peer benchmarking<small>pinpoint where each business diverges from the peer set — read within business type</small></div></div>
+          <div class="ffoot">Recurring profitability cadence: <b>fund growth · challenge low-return spend</b></div>
+        </div>
+        <ul class="pts">
+          <li><b>Decompose, don't generalize</b> — separate structural levers from temporary ones.</li>
+          <li><b>Strategic vs. run-rate</b> — protect investment that drives growth; challenge cost without a productivity link.</li>
+          <li><b>Allocation, not cuts</b> — the output is "fund / pause / automate / consolidate," not blunt expense reduction.</li>
+          <li><b>Benchmark against the pack</b> — I compare each lever to the peer set to find where a specific business diverges, reading the efficiency ratio within business type so mix doesn't mask the story.</li>
+        </ul>
+
+        <h3 class="blk" id="f3">F3 · Driver-based forecasting with governed AI ("forecast as a monorepo")</h3>
+        <p class="usefor"><b>How I approach it:</b> driver-based forecasting with governed AI — a system I built.</p>
+        <div class="fwrap">
+          <div class="frow">
+            <div class="fnode">Plain-English ask<small>"grow commercial deposits $120M H2"</small></div><span class="farr">&rarr;</span>
+            <div class="fnode amber">AI authors a change<small>proposes &mdash; never computes</small></div><span class="farr">&rarr;</span>
+            <div class="fnode head">Deterministic model<small>does the math</small></div><span class="farr">&rarr;</span>
+            <div class="fnode">Changeset / diff<small>+ second-order: int exp +$1.4M · fee +$310k</small></div><span class="farr">&rarr;</span>
+            <div class="fnode">Human review<small>accept · modify · reject</small></div><span class="farr">&rarr;</span>
+            <div class="fnode green">Versioned forecast<small>attribution + commentary captured</small></div>
+          </div>
+          <div style="text-align:center"><span class="fback">&#8635; captured commentary becomes institutional memory the AI reads next cycle</span></div>
+        </div>
+        <ul class="pts">
+          <li><b>Author vs. calculator</b> — the LLM proposes; the deterministic model computes; a human approves the merge. That's the control story banks need.</li>
+          <li><b>Second-order effects surfaced</b> — one lever shows what moves three lines downstream.</li>
+          <li><b>Commentary as first-class</b> — the "why" is captured, tagged, versioned — institutional memory that compounds instead of walking out the door.</li>
+        </ul>
+
+        <h3 class="blk" id="f4">F4 · Segment reporting architecture (public-bank standard)</h3>
+        <p class="usefor"><b>How I approach it:</b> segment reporting at a public-bank standard.</p>
+        <div class="fwrap">
+          <div class="frow"><div class="fnode head">Enterprise P&amp;L</div></div>
+          <div class="farr dn">&darr;</div>
+          <div class="frow" style="align-items:stretch">
+            <div class="fgrp">
+              <div class="gh">Consumer</div>
+              <div class="fnode">Retail / deposits</div>
+              <div class="fnode amber">+ Mortgage<small>~20% of revenue</small></div>
+            </div>
+            <div class="fgrp">
+              <div class="gh">Commercial</div>
+              <div class="fnode">Small Business</div>
+              <div class="fnode">C&amp;I</div>
+              <div class="fnode">CRE</div>
+            </div>
+          </div>
+          <div class="ffoot">Each segment: Revenue &minus; Direct exp &minus; Allocated OH &minus; Credit = <b>Contribution</b> · ROA / ROE · efficiency<br/><b>Governed definitions, attribution &amp; householding</b> &mdash; same numbers every month</div>
+        </div>
+        <ul class="pts">
+          <li><b>Sub-segment the commercial book</b> — small business, C&amp;I, CRE each behave differently on growth, margin, and credit.</li>
+          <li><b>Full segment economics</b> — direct + allocated cost, credit, and capital, not just revenue.</li>
+          <li><b>Attribution is the hard part</b> — every client has to land in the right segment, which means the householding work to roll accounts and relationships up to the correct entity before anything is bucketed. I've already built the segment data spine; governance makes it board-grade.</li>
+        </ul>
+
+        <h3 class="blk" id="f5">F5 · Capacity, prioritization &amp; project-ROI governance</h3>
+        <p class="usefor"><b>How I approach it:</b> "what can we afford" — project-ROI and investment governance through a two-tier committee model (RAC and EIC).</p>
+        <div class="fwrap">
+          <div class="frow">
+            <div class="fnode">Initiative demand<small>LOB · enterprise · mandatory · carryover</small></div><span class="farr">&rarr;</span>
+            <div class="fnode">Categorize &amp; size<small>strategic / mandatory / regulatory · $ · complexity</small></div><span class="farr">&rarr;</span>
+            <div class="fnode">Balance vs. capacity<small>financial + people + execution</small></div>
+          </div>
+          <div class="farr dn">&darr;</div>
+          <div class="frow">
+            <div class="fnode amber">Business case &rarr; pro forma + project ROI</div><span class="farr">&rarr;</span>
+            <div class="fnode">Business Case Review (BCR)<small>vets, aligns &amp; routes</small></div>
+          </div>
+          <div class="farr dn">&darr;&ensp;final approval — two lanes&ensp;&darr;</div>
+          <div class="frow" style="align-items:stretch">
+            <div class="fgrp"><div class="gh">RAC — Resource Allocation Committee</div>
+              <div class="fnode head">Top strategic &amp; enterprise calls<small>sets investment pools &amp; funding across portfolios</small></div>
+              <div class="fnode">Highly strategic, large, or unfunded initiatives</div>
+            </div>
+            <div class="fgrp"><div class="gh">EIC — Executive Investment Committee</div>
+              <div class="fnode">Delegated authority from RAC<small>mandatory, infrastructure &amp; corporate-function work</small></div>
+              <div class="fnode">Prioritizes spend &amp; oversees execution<small>continue · limit · stop</small></div>
+            </div>
+          </div>
+          <div class="farr dn">&darr;</div>
+          <div class="frow"><div class="fnode green">Approved &rarr; pipeline / kickoff</div></div>
+        </div>
+        <ul class="pts">
+          <li><b>Capacity constrains strategy</b> — the approved portfolio reflects what the organization can actually execute, across financial <em>and</em> people capacity. Project size sets the lane: small work stays in the line of business; larger or strategic spend escalates to committee.</li>
+          <li><b>Two lanes, one discipline</b> — <b>RAC</b> (Resource Allocation Committee) sets the enterprise investment pools and decides the top strategic, large, and unfunded initiatives; it <b>delegates</b> mandatory, infrastructure, and corporate-function decisions to the <b>EIC</b> (Executive Investment Committee), which prioritizes that spend and oversees execution — continue, limit, or stop.</li>
+          <li><b>My ROI tool plugs in here</b> — business case &rarr; classified economics (recurring/sunk/capitalizable) &rarr; pro forma with project ROI, ready for BCR and the right committee.</li>
+        </ul>
+
+        <h3 class="blk" id="f6">F6 · M&amp;A diligence &amp; readiness framework</h3>
+        <p class="usefor"><b>How I approach it:</b> M&amp;A from the FP&amp;A seat. <b>Two layers:</b> the standard diligence process, then the finance-diligence workstream I personally led.</p>
+
+        <div class="fsublabel std">A · The standard end-to-end process <span>how a disciplined diligence runs</span></div>
+        <div class="fwrap">
+          <div class="frow">
+            <div class="fnode">Working groups<small>Finance · Risk/Credit · HR · Tech/Ops · Legal · LOB</small></div><span class="farr">&rarr;</span>
+            <div class="fnode">VDR &amp; request trackers<small>weekly cadence · issue log</small></div><span class="farr">&rarr;</span>
+            <div class="fnode head">Durability analyses</div>
+          </div>
+          <div class="farr dn">&darr;</div>
+          <div class="frow">
+            <div class="fnode">Segment-level financials<small>normalize one-times · attribute income</small></div><span class="farr">&rarr;</span>
+            <div class="fnode">Synergies + integration cost<small>cost &amp; revenue · dis-synergies</small></div><span class="farr">&rarr;</span>
+            <div class="fnode">Decision-ready memo</div><span class="farr">&rarr;</span>
+            <div class="fnode green">5 lenses<small>fit · return · revenue · workforce · integration</small></div>
+          </div>
+        </div>
+        <ul class="pts">
+          <li><b>Working groups + cadence</b> — clear ownership, a VDR request tracker, weekly updates, and a standardized diligence memo so output is decision-ready.</li>
+          <li><b>Five decision lenses</b> — strategic fit, financial return (EPS, TBV earnback, ROIC), revenue durability, workforce durability, integration executability.</li>
+          <li><b>Readiness &gt; heroics</b> — the playbooks and models should exist <em>before</em> a deal is live, not be built under deal pressure.</li>
+        </ul>
+
+        <div class="fsublabel led">B · The workstream I owned <span>finance &amp; strategic-finance diligence on the deal I led</span></div>
+        <div class="fwrap fwrap-led">
+          <div class="frow"><div class="fnode head">Two questions that actually protect the deal:<small>how durable is the revenue? how durable is the workforce that holds it?</small></div></div>
+          <div class="farr dn">&darr;</div>
+          <div class="frow" style="align-items:stretch">
+            <div class="fgrp"><div class="gh">Revenue durability</div>
+              <div class="fnode">Customer Revenue NLE<small>New / Lost / Existing waterfall</small></div>
+              <div class="fnode">Concentration · recurring vs. one-time</div>
+              <div class="fnode">Revenue by RM / team / segment</div>
+            </div>
+            <div class="fgrp"><div class="gh">Workforce durability</div>
+              <div class="fnode">Employee NLE + distribution<small>where revenue &amp; risk concentrate</small></div>
+              <div class="fnode">Comp vs. revenue<small>per producer · fixed/variable</small></div>
+              <div class="fnode">Incentives by role &amp; area</div>
+            </div>
+          </div>
+          <div class="farr dn">&darr;</div>
+          <div class="frow" style="align-items:stretch">
+            <div class="fgrp"><div class="gh">Normalized segment financials</div>
+              <div class="fnode">Transaction-level income attribution<small>by team / segment</small></div>
+              <div class="fnode amber">Strip one-times &rarr; core operating profile<small>true run-rate earnings power</small></div>
+            </div>
+            <div class="fgrp"><div class="gh">Key people &amp; incentive structure</div>
+              <div class="fnode">Identify producers the thesis depends on</div>
+              <div class="fnode amber">Retention / stay / change-in-control<small>protect value · cut attrition</small></div>
+            </div>
+          </div>
+          <div class="ffoot">What my work drove: <b>normalized earnings power &amp; valuation inputs · retention &amp; incentive design · revenue dis-synergy assumptions · final-round diligence questions</b></div>
+        </div>
+        <ul class="pts">
+          <li><b>I owned the two durability questions</b> — revenue (customer New/Lost/Existing, concentration, recurring vs. one-time) and workforce (employee NLE, comp-vs-revenue, incentive analysis by role).</li>
+          <li><b>I built the normalized segment financials</b> — attributed transaction-level income to the right team/segment and stripped one-times to land on true run-rate earnings power and the defensible multiple.</li>
+          <li><b>I fed key-people &amp; incentive structure</b> — flagged the producers the deal thesis depended on and the retention / change-in-control economics to protect revenue post-close.</li>
+        </ul>
+
+        <h3 class="blk" id="f7">F7 · FP&amp;A maturity curve — where I'd take the function</h3>
+        <p class="usefor"><b>How I approach it:</b> my vision for the long-term FP&amp;A operating model.</p>
+
+        <div class="fsublabel std">A · The maturity curve <span>five levels of contribution to strategic decision-making</span></div>
+        <div class="fwrap">
+          <div class="mtop">
+            <div style="flex:1"></div>
+            <div class="mtag" style="flex:2">Most finance functions</div>
+            <div style="flex:1"></div>
+            <div class="mtag world" style="flex:1">World Class</div>
+          </div>
+          <div class="mrow">
+            <div class="mcol"><div class="mbar" style="height:6px;background:#C9D3DC"></div><div class="mh">Conventional finance function</div><div class="mrole">Passive "Bookkeeper"</div><ul><li>Manages traditional functions</li></ul></div>
+            <div class="mcol"><div class="mbar" style="height:13px;background:#AEBDC8"></div><div class="mh">Directional support</div><div class="mrole">"Platform Manager"</div><ul><li>Shares best practices</li><li>Maximizes synergies between BUs</li></ul></div>
+            <div class="mcol"><div class="mbar" style="height:22px;background:#8FA6B6"></div><div class="mh">Portfolio management</div><div class="mrole">"Operational Business Partner"</div><ul><li>Challenges operational dimensions of BUs</li><li>Engages in target-setting / planning</li></ul></div>
+            <div class="mcol"><div class="mbar" style="height:32px;background:#5B7C95"></div><div class="mh">Strategic driver</div><div class="mrole">"Strategic Business Partner"</div><ul><li>Challenges operational performance &amp; strategy</li><li>Engages in planning, resource &amp; capital allocation</li></ul></div>
+            <div class="mcol world"><div class="mbar" style="height:42px;background:#2E7D5B"></div><div class="mh">Active value management</div><div class="mrole">Proactive "Value Driver"</div><ul><li>Integrates business, financial &amp; investor strategy</li><li>Challenges BUs</li><li>Actively manages value-driver performance</li></ul></div>
+          </div>
+          <div class="maxis">Contribution to the company's strategic decision-making &rarr;</div>
+          <div class="mnote">Arvest's mandate: climb from a bottom-up, reactive base toward <b>Strategic driver</b> and <b>Active value management</b>.</div>
+        </div>
+
+        <div class="fsublabel led">B · Strategic-Finance value commitment <span>what "success" looks like climbing the curve — my operating creed</span></div>
+        <div class="fwrap fwrap-led">
+          <div class="vcap">Success progresses upward &uarr;</div>
+          <div class="vcom">
+            <div class="vtier v4">Trusted strategic advisor — proactively shares responsibility for overall efficiency &amp; effectiveness</div>
+            <div class="vtier v3">Unique leadership — properly challenges the business; effective enterprise partnering; influences operational decisions</div>
+            <div class="vtier v2">Analytical focus — a support level that enables results-based decision-making</div>
+            <div class="vtier v1"><b>Providing accurate:</b> actionable management reporting · E2E business-case support · driver-based comprehensive forecasts · long-term strategic planning linking objectives to financial goals</div>
+          </div>
+          <div class="vhow"><b>How we deliver:</b> intellectually curious · out-of-the-box · proactive · coach / coachable · team approach · communicate at all levels · confident / courageous · effective influence · prioritization</div>
+        </div>
+
+        <ul class="pts">
+          <li><b>The journey is the job</b> — from report production to active value management via metric integrity, automation, faster insight, and partnership.</li>
+          <li><b>Talent is the unlock</b> — job-applied learning, coaching, assessment, and upskilling (SQL, Power BI, DAX, AI) embedded in the forecast/review rhythm.</li>
+          <li><b>I've walked this curve twice</b> — "peer laggard to peer leader" at First Horizon; consolidation + governance at Pinnacle.</li>
+        </ul>
+
+        <h3 class="blk" id="f8">F8 · Profitability &amp; scale transformation — the "Good to Great" method</h3>
+        <p class="usefor"><b>How I approach it:</b> improving profitability and positioning for scale — the method end to end. <b>Figures are illustrative.</b></p>
+        <div class="fwrap">
+          <div class="frow"><div class="fnode head">Trigger: returns / TSR lagging peers</div></div>
+          <div class="farr dn">&darr;</div>
+          <div class="frow"><div class="fnode">Diagnose — regression on valuation drivers<small>what is the market actually pricing? safety &amp; soundness vs. returns</small></div></div>
+          <div class="farr dn">&darr;</div>
+          <div class="frow"><div class="fnode">Benchmark peers &amp; bucket operating models<small>efficiency ratio · ROAA · deposit cost &amp; beta · fee-income mix</small></div></div>
+          <div class="farr dn">&darr;</div>
+          <div class="frow"><div class="fnode green">Conclude — winning operating profiles &rarr; strategy<small>capital recycling + relationship deepening + expense optimization</small></div></div>
+          <div class="farr dn">&darr;</div>
+          <div class="frow" style="align-items:stretch">
+            <div class="fgrp"><div class="gh">Internal diagnostics</div>
+              <div class="fnode">BU operating efficiency vs. returns<small>accretive vs. dilutive units</small></div>
+              <div class="fnode">NIR by component · gaps vs. peers</div>
+            </div>
+            <div class="fgrp"><div class="gh">Read efficiency within business type</div>
+              <div class="fnode">Fee / wealth run structurally higher than commercial lending<small>benchmark inside the model, not blended</small></div>
+            </div>
+          </div>
+          <div class="farr dn">&darr;&ensp;translate into the opportunity set&ensp;&darr;</div>
+          <div class="frow" style="align-items:stretch">
+            <div class="fgrp"><div class="gh">Balance-sheet optimization</div><div class="fnode">Funding · spreads · fee-income generation</div></div>
+            <div class="fgrp"><div class="gh">Business reimagination</div><div class="fnode">Transform a business's operating model</div></div>
+            <div class="fgrp"><div class="gh">Corporate-service optimization</div><div class="fnode">Streamline delivery &amp; reduce cost</div></div>
+          </div>
+          <div class="ffoot">Translate to <b>governed, quantified targets the businesses own</b> &rarr; path to top-quartile ROAA &amp; efficiency</div>
+        </div>
+        <ul class="pts">
+          <li><b>Start where value leaks</b> — start from what the market is actually pricing before picking levers.</li>
+          <li><b>Benchmark by operating model, not the average</b> — peers cluster into winning profiles, and efficiency ratio only means something within a business type.</li>
+          <li><b>Diagnosis &rarr; owned targets</b> — three buckets (balance sheet · business reimagination · corporate service) become quantified goals the businesses are accountable for.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ 6. CLOSE ============ -->
+    <section class="view" id="close">
+      <div class="wrap">
+        <h2 class="sec">Closing</h2>
+        <p class="lead">Why this role and I fit, in one place.</p>
+        <div class="thesis">
+          <div class="cap">In short</div>
+          <div class="q" style="font-size:16px;font-weight:500">This role sits right at the intersection of the work I do best — regional-bank finance, FP&amp;A transformation, analytics and automation, and executive decision support. I've already built pieces of what it calls for: top-down, driver-based planning with governed AI; segment-level profitability; project-ROI governance; and the finance diligence behind an acquisition. I'd bring that directly to Arvest's move from $28B to $40B and beyond.</div>
+        </div>
+        <p class="disc">Alex Cardell · Head of FP&amp;A candidate · Birmingham, AL</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  // Sidebar navigation (no external dependencies)
+  var buttons = document.querySelectorAll('#nav button');
+  var views = document.querySelectorAll('.view');
+  function show(id){
+    views.forEach(function(v){ v.classList.toggle('show', v.id===id); });
+    buttons.forEach(function(b){ b.classList.toggle('active', b.dataset.view===id); });
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  buttons.forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.view); }); });
+  function jumpToFramework(fid){
+    views.forEach(function(v){ v.classList.toggle('show', v.id==='frameworks'); });
+    buttons.forEach(function(b){ b.classList.toggle('active', b.dataset.view==='frameworks'); });
+    setTimeout(function(){ var el=document.getElementById(fid); if(el){ el.scrollIntoView({behavior:'smooth',block:'start'}); } }, 50);
+  }
+  document.addEventListener('click', function(e){
+    var a = e.target.closest ? e.target.closest('a.fjump') : null;
+    if(a){ e.preventDefault(); jumpToFramework(a.getAttribute('data-f')); }
+  });
+</script>
+
+<script>
+(function(){
+  var KEY='ace_candidate_unlocked', PW='arvest';
+  function unlock(){document.body.classList.remove('locked');}
+  try{ if(sessionStorage.getItem(KEY)==='1'){unlock();} }catch(e){}
+  var form=document.getElementById('gateForm');
+  if(form){ form.addEventListener('submit',function(e){ e.preventDefault();
+    var inp=document.getElementById('gatePw'); var v=(inp.value||'').trim().toLowerCase();
+    if(v===PW){ try{sessionStorage.setItem(KEY,'1');}catch(e){} unlock(); }
+    else{ var er=document.getElementById('gateErr'); if(er) er.hidden=false; inp.value=''; inp.focus(); } }); }
+})();
+</script>
+</body>
+</html>
