@@ -74,6 +74,7 @@ export const transformClaudeCitation = (
       undefined,
     messageId: (claudeCitation as any).message_id || (claudeCitation as any).messageId,
     analysisId: (claudeCitation as any).analysis_id || (claudeCitation as any).analysisId,
+    sourceType: (claudeCitation as any).source_type || (claudeCitation as any).sourceType,
   };
 };
 

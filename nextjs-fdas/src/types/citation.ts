@@ -26,6 +26,8 @@ export interface Citation {
   endBlockIndex?: number;
   messageId?: string;
   analysisId?: string;
+  /** Provenance of the highlight rect: table cell vs narrative prose. */
+  sourceType?: 'table' | 'text';
 }
 
 export interface ClaudeCitation {
@@ -58,6 +60,8 @@ export interface CitationPayload {
   startBlockIndex?: number;
   endBlockIndex?: number;
   page?: number; // Legacy field for backward compatibility
+  /** Provenance of the highlight rect: table cell vs narrative prose. */
+  sourceType?: 'table' | 'text';
 }
 
 export interface CitationApiResponse {

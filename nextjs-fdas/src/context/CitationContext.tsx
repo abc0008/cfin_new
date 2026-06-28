@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 import { Citation, CitationPayload } from '@/types/citation';
 import { ProcessedDocument } from '@/types';
 import { getCitationCache } from '@/lib/cache/citationCache';
+import { apiUrl } from '@/lib/api/baseUrl';
 
 interface CitationContextType {
   citations: Map<string, Citation>;
@@ -57,9 +58,7 @@ export const CitationProvider: React.FC<CitationProviderProps> = ({ children }) 
 
     console.log('[CitationContext] loadCitation fetching from API', { citationId });
     try {
-      // Use backend API URL
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_BASE_URL}/api/citations/${citationId}`);
+      const response = await fetch(apiUrl(`/api/citations/${citationId}`));
       if (!response.ok) {
         throw new Error(`Failed to load citation: ${response.statusText}`);
       }
@@ -89,9 +88,7 @@ export const CitationProvider: React.FC<CitationProviderProps> = ({ children }) 
 
     console.log('[CitationContext] loadDocument fetching from API', { documentId });
     try {
-      // Use backend API URL
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_BASE_URL}/api/documents/${documentId}`);
+      const response = await fetch(apiUrl(`/api/documents/${documentId}`));
       if (!response.ok) {
         throw new Error(`Failed to load document: ${response.statusText}`);
       }
@@ -110,8 +107,7 @@ export const CitationProvider: React.FC<CitationProviderProps> = ({ children }) 
   }, [documents]);
 
   const getDocumentUrl = useCallback((documentId: string): string => {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    return `${API_BASE_URL}/api/documents/${documentId}/file`;
+    return apiUrl(`/api/documents/${documentId}/file`);
   }, []);
 
   const openCitation = useCallback(async (citationId: string): Promise<void> => {

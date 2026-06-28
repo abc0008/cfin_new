@@ -113,7 +113,7 @@ export function MarketingNav() {
   return (
     <nav className="nav">
       <Link href="/" className="brand">
-        <span className="mark" />
+        <AceAnalyticsMarkIcon />
         <span>Ace Analytics</span>
       </Link>
       <div className="links">
@@ -122,6 +122,9 @@ export function MarketingNav() {
         </Link>
         <Link href="/product" aria-current={pathname.startsWith('/product') ? 'page' : undefined}>
           Products
+        </Link>
+        <Link href="/news" aria-current={pathname.startsWith('/news') ? 'page' : undefined}>
+          Industry News
         </Link>
         <Link href="/about" aria-current={pathname === '/about' ? 'page' : undefined}>
           About Me
@@ -184,6 +187,16 @@ export function MarketingNav() {
         </a>
       </div>
     </nav>
+  )
+}
+
+function AceAnalyticsMarkIcon() {
+  return (
+    <svg viewBox="0 0 64 64" className="brand-mark" aria-hidden="true" focusable="false">
+      <rect className="card-stroke" x="15" y="5" width="34" height="54" rx="4" />
+      <path className="index" d="M18.2 21.8 L21.7 11 L25.2 21.8 M19.95 18.65 H23.45" />
+      <path className="fill" d="M32 18.7 L35.6 29.5 L44.6 34 L35.6 38.5 L32 49.3 L28.4 38.5 L19.4 34 L28.4 29.5 Z" />
+    </svg>
   )
 }
 

@@ -14,6 +14,7 @@ import {
 } from "react-pdf-highlighter";
 import { documentsApi, cleanupBlobUrls } from '@/lib/api/documents';
 import { convertCitationToHighlight, convertHighlightToCitation } from '@/lib/pdf/citationService';
+import { searchMultiplePages } from '@/lib/pdf/textSearch';
 
 // Add PDF.js type declaration
 declare global {
@@ -52,7 +53,6 @@ export function PDFViewer({
   onCitationsLoaded,
   pdfUrl: propsPdfUrl,
   highlightId,
-  renderingQuality = 'medium',
   pageBufferSize = 5,
   extraCitations = []
 }: PDFViewerProps) {
@@ -62,13 +62,11 @@ export function PDFViewer({
   const [errorState, setErrorState] = useState<string | null>(error || null);
   const [loadingState, setLoadingState] = useState<string | null>(null);
   const [documentCitations, setDocumentCitations] = useState<Citation[]>([]);
+  const [searchResolvedCitations, setSearchResolvedCitations] = useState<Citation[]>([]);
   const [totalPages, setTotalPages] = useState<number>(0);
   const [visiblePages, setVisiblePages] = useState<number[]>([]);
   const [loadedPages, setLoadedPages] = useState<Set<number>>(new Set());
-  const [renderScale, setRenderScale] = useState<number>(
-    renderingQuality === 'low' ? 1.0 : 
-    renderingQuality === 'medium' ? 1.5 : 2.0
-  );
+  const [renderScale, setRenderScale] = useState<string>('page-fit');
   const [isBrowser, setIsBrowser] = useState(false);
   
   const [currentPdfDocument, setCurrentPdfDocument] = useState<any>(null);
@@ -163,6 +161,27 @@ export function PDFViewer({
     [escapeForAttributeSelector]
   );
 
+  // Pulse the highlight rect(s) after a jump so the analyst's eye lands on the
+  // exact cited value instead of hunting through the page.
+  const flashHighlight = useCallback((targetHighlightId: string) => {
+    const safeId = escapeForAttributeSelector(targetHighlightId);
+    const wrappers = Array.from(
+      globalThis.document?.querySelectorAll(`.PdfHighlighter [data-highlight-id="${safeId}"]`) || []
+    ) as HTMLElement[];
+    wrappers.forEach((wrapper) => {
+      const parts = wrapper.querySelectorAll('.Highlight__part, .AreaHighlight__part');
+      const targets: HTMLElement[] =
+        parts.length > 0 ? (Array.from(parts) as HTMLElement[]) : [wrapper];
+      targets.forEach((el) => {
+        el.classList.remove('cfin-citation-flash');
+        // Force reflow so re-adding the class restarts the animation on repeat jumps.
+        void el.offsetWidth;
+        el.classList.add('cfin-citation-flash');
+        globalThis.window?.setTimeout(() => el.classList.remove('cfin-citation-flash'), 2600);
+      });
+    });
+  }, [escapeForAttributeSelector]);
+
   const isElementVisibleInViewport = useCallback((element: HTMLElement) => {
     const rect = element.getBoundingClientRect();
     const viewportHeight = globalThis.window?.innerHeight ?? globalThis.document?.documentElement?.clientHeight ?? 0;
@@ -209,7 +228,7 @@ export function PDFViewer({
   // Merge backend citations with any extra ones from props
   const combinedCitations = React.useMemo(() => {
     const byId = new Map<string, Citation>();
-    [...documentCitations, ...extraCitations].forEach((citation) => {
+    [...documentCitations, ...extraCitations, ...searchResolvedCitations].forEach((citation) => {
       const existing = byId.get(citation.id);
       if (!existing) {
         byId.set(citation.id, citation);
@@ -236,7 +255,7 @@ export function PDFViewer({
       });
     });
     return Array.from(byId.values());
-  }, [extraCitations, documentCitations]);
+  }, [extraCitations, documentCitations, searchResolvedCitations]);
 
   // Convert to react-pdf-highlighter format once
   const citationHighlights = React.useMemo(() => {
@@ -276,6 +295,83 @@ export function PDFViewer({
   useEffect(() => {
     combinedCitationsRef.current = combinedCitations;
   }, [combinedCitations]);
+
+  useEffect(() => {
+    if (!currentPdfDocument) return;
+    const transport = currentPdfDocument._transport || currentPdfDocument.transport;
+    if (transport && transport.messageHandler === null) return;
+
+    const candidates = combinedCitations.filter(
+      citation => !(citation.rects?.length > 0) && (citation.searchableText || citation.citedText)
+    );
+    if (candidates.length === 0) return;
+
+    let cancelled = false;
+
+    const buildSearchTerms = (citation: Citation) => {
+      const citedText = citation.citedText || '';
+      const numericTerms = Array.from(citedText.matchAll(/\$?\d[\d,]*(?:\.\d+)?/g))
+        .map(match => match[0].replace(/^\$/, ''))
+        .filter(term => term.length > 1 && !/^20\d{2}$/.test(term));
+
+      const textTerms = [
+        citation.searchableText,
+        citation.displayText,
+        citedText.split(/\r?\n/).find(line => line.trim().length > 0 && line.trim().length <= 120),
+        citedText,
+      ].filter((term): term is string => !!term && term.trim().length > 1);
+
+      return Array.from(new Set([...numericTerms, ...textTerms].map(term => term.trim()))).slice(0, 8);
+    };
+
+    const resolveMissingRects = async () => {
+      const resolved: Citation[] = [];
+
+      for (const citation of candidates) {
+        const startPage = citation.startPageNumber || 1;
+        const endPage = citation.endPageNumber || startPage;
+        const terms = buildSearchTerms(citation);
+
+        for (const term of terms) {
+          try {
+            const results = await searchMultiplePages(currentPdfDocument, term, startPage, endPage);
+            const result = results[0];
+            if (!result?.rects?.length) continue;
+
+            const rects = result.rects.map(rect => ({
+              ...rect,
+              width: rect.x2 - rect.x1,
+              height: rect.y2 - rect.y1,
+              pageNumber: rect.pageNumber,
+            }));
+
+            resolved.push({
+              ...citation,
+              searchableText: term,
+              rects,
+            });
+            break;
+          } catch (error) {
+            console.warn('[PDFViewer] Citation text search failed:', { citationId: citation.id, term, error });
+          }
+        }
+      }
+
+      if (cancelled || resolved.length === 0) return;
+
+      setSearchResolvedCitations(prev => {
+        const byId = new Map(prev.map(citation => [citation.id, citation]));
+        resolved.forEach(citation => byId.set(citation.id, citation));
+        return Array.from(byId.values());
+      });
+    };
+
+    resolveMissingRects();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [combinedCitations, currentPdfDocument]);
   
   // Memory management: Page visibility tracking
   const onVisiblePagesChanged = useCallback((pages?: number[]) => {
@@ -654,13 +750,21 @@ export function PDFViewer({
     }
   }, [document, propsPdfUrl, isBrowser]);
   
-  // Fetch citations when document changes
+  // Keep the latest onCitationsLoaded in a ref so the fetch effect below only
+  // re-runs when the document actually changes (inline callbacks from parents
+  // would otherwise retrigger the expensive citations fetch on every render).
+  const onCitationsLoadedRef = useRef(onCitationsLoaded);
+  useEffect(() => {
+    onCitationsLoadedRef.current = onCitationsLoaded;
+  }, [onCitationsLoaded]);
+
+  // Fetch citations when document changes. Runs in the background — it must
+  // never blank out an already-rendered PDF (citation enrichment can be slow).
   useEffect(() => {
     if (!isBrowser || !document) return;
-    
+
     const fetchCitations = async () => {
       try {
-        setLoadingState("Loading document citations...");
         const incoming = await documentsApi.getDocumentCitations(document.metadata.id);
 
         // Merge with existing citations, keyed by a signature so we can
@@ -731,20 +835,18 @@ export function PDFViewer({
 
         // Convert citations to highlights and notify parent
         const highlightsFromCitations = merged.map(convertCitationToHighlight);
-        if (onCitationsLoaded) {
-          onCitationsLoaded(highlightsFromCitations);
+        if (onCitationsLoadedRef.current) {
+          onCitationsLoadedRef.current(highlightsFromCitations);
         }
-        
-        setLoadingState(null);
       } catch (error) {
         console.error("Error fetching document citations:", error);
         // Don't set error state here as we still want to show the document even if citations fail
-        setLoadingState(null);
       }
     };
-    
+
     fetchCitations();
-  }, [document, onCitationsLoaded, isBrowser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [document?.metadata?.id, isBrowser]);
   
   // After setting allHighlights in useEffect([citations, extraCitations]):
   useEffect(() => {
@@ -821,6 +923,7 @@ export function PDFViewer({
         lastScrollRefKickTargetRef.current = null;
         scrollSessionRef.current = null;
         scheduleVisibilityChecks(target);
+        flashHighlight(target);
         return;
       }
 
@@ -838,16 +941,13 @@ export function PDFViewer({
       }
       visibilityCheckTimeouts.forEach(clearTimeout);
     };
-  }, [highlightId, scrollToHighlight, highlightScrollVersion, getHighlightElement, isElementVisibleInViewport]);
+  }, [highlightId, scrollToHighlight, highlightScrollVersion, getHighlightElement, isElementVisibleInViewport, flashHighlight]);
   
-  // Update render scale when renderingQuality changes
+  // Reset each newly loaded PDF to fit one full page inside the viewer.
   useEffect(() => {
     if (!isBrowser) return;
-    setRenderScale(
-      renderingQuality === 'low' ? 1.0 : 
-      renderingQuality === 'medium' ? 1.5 : 2.0
-    );
-  }, [renderingQuality, isBrowser]);
+    setRenderScale('page-fit');
+  }, [document?.metadata.id, propsPdfUrl, isBrowser]);
   
   // Cleanup on unmount
   useEffect(() => {
@@ -1100,7 +1200,7 @@ export function PDFViewer({
                   }}
                   highlights={allHighlights}
                   highlightTransform={renderHighlight as any}
-                  pdfScaleValue={renderScale.toString()}
+                  pdfScaleValue={renderScale}
                 />
               );
             }}
@@ -1114,20 +1214,26 @@ export function PDFViewer({
           <div className="mb-1 font-medium text-foreground">Performance Options</div>
           <div className="flex space-x-2">
             <button 
-              className={`rounded-full px-3 py-1 ${renderingQuality === 'low' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
-              onClick={() => setRenderScale(1.0)}
+              className={`rounded-full px-3 py-1 ${renderScale === 'page-fit' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+              onClick={() => setRenderScale('page-fit')}
+            >
+              Fit
+            </button>
+            <button 
+              className={`rounded-full px-3 py-1 ${renderScale === '1' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+              onClick={() => setRenderScale('1')}
             >
               Low
             </button>
             <button 
-              className={`rounded-full px-3 py-1 ${renderingQuality === 'medium' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
-              onClick={() => setRenderScale(1.5)}
+              className={`rounded-full px-3 py-1 ${renderScale === '1.5' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+              onClick={() => setRenderScale('1.5')}
             >
               Medium
             </button>
             <button 
-              className={`rounded-full px-3 py-1 ${renderingQuality === 'high' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
-              onClick={() => setRenderScale(2.0)}
+              className={`rounded-full px-3 py-1 ${renderScale === '2' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+              onClick={() => setRenderScale('2')}
             >
               High
             </button>

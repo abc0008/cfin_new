@@ -43,12 +43,16 @@ Interactions with other files:
    - Routes document uploads through the storage layer
 
 This service is configurable through environment variables:
-- STORAGE_TYPE: "local" or "s3" to select the storage backend
+- STORAGE_TYPE: "local", "s3", or "supabase" to select the storage backend
 - UPLOAD_DIR: Directory for local file storage
 - S3_BUCKET_NAME: AWS S3 bucket for cloud storage
 - AWS_ACCESS_KEY_ID: AWS credentials for S3 access
 - AWS_SECRET_ACCESS_KEY: AWS credentials for S3 access
 - S3_REGION: AWS region for S3 bucket
+- SUPABASE_URL: Supabase project URL
+- SUPABASE_STORAGE_BUCKET: Supabase Storage bucket for document PDFs
+- SUPABASE_SECRET_KEY / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_PUBLISHABLE_KEY:
+  API key used by the backend to access Supabase Storage
 
 The storage service layer ensures file operations are consistent regardless of
 the underlying storage mechanism, making the application more flexible and
@@ -58,9 +62,11 @@ easier to deploy in different environments.
 import os
 import io
 import aiofiles
+import httpx
 from typing import Optional
 import logging
 from abc import ABC, abstractmethod
+from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +100,8 @@ class StorageService(ABC):
         
         if storage_type == "s3":
             return S3StorageService()
+        if storage_type == "supabase":
+            return SupabaseStorageService()
         else:
             return LocalStorageService()
 
@@ -232,3 +240,126 @@ class S3StorageService(StorageService):
         """
         # For S3, we don't have a physical path, so return an S3 URL
         return f"s3://{self.bucket_name}/{file_id}"
+
+
+class SupabaseStorageService(StorageService):
+    """Storage service for Supabase Storage."""
+
+    def __init__(self):
+        self.supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+        if not self.supabase_url:
+            raise ValueError("SUPABASE_URL environment variable is not set")
+
+        self.bucket_name = os.getenv("SUPABASE_STORAGE_BUCKET", "cfin-documents")
+        self.api_key = (
+            os.getenv("SUPABASE_SECRET_KEY")
+            or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+            or os.getenv("SUPABASE_SERVICE_KEY")
+            or os.getenv("SUPABASE_ANON_KEY")
+            or os.getenv("SUPABASE_PUBLISHABLE_KEY")
+        )
+        if not self.api_key:
+            raise ValueError(
+                "SUPABASE_SECRET_KEY, SUPABASE_SERVICE_ROLE_KEY, or "
+                "SUPABASE_PUBLISHABLE_KEY environment variable is not set"
+            )
+
+        self.timeout = httpx.Timeout(60.0, connect=10.0)
+
+    def _headers(self, content_type: Optional[str] = None) -> dict:
+        headers = {
+            "apikey": self.api_key,
+            "Authorization": f"Bearer {self.api_key}",
+        }
+        if content_type:
+            headers["Content-Type"] = content_type
+        return headers
+
+    def _object_url(self, file_id: str) -> str:
+        bucket = quote(self.bucket_name, safe="")
+        object_path = quote(file_id.lstrip("/"), safe="/")
+        return f"{self.supabase_url}/storage/v1/object/{bucket}/{object_path}"
+
+    async def save_file(self, file_data: bytes, file_id: str, content_type: str) -> str:
+        """Save a file to Supabase Storage."""
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    self._object_url(file_id),
+                    content=file_data,
+                    headers={
+                        **self._headers(content_type),
+                        "x-upsert": "true",
+                    },
+                )
+
+            if response.status_code not in {200, 201}:
+                raise RuntimeError(
+                    f"Supabase upload failed for {file_id}: "
+                    f"{response.status_code} {response.text[:300]}"
+                )
+
+            logger.info(f"File {file_id} uploaded to Supabase Storage")
+            return f"supabase://{self.bucket_name}/{file_id}"
+        except Exception as e:
+            logger.error(f"Error uploading file {file_id} to Supabase Storage: {str(e)}")
+            raise
+
+    async def get_file(self, file_id: str) -> Optional[bytes]:
+        """Get a file's contents from Supabase Storage."""
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(
+                    self._object_url(file_id),
+                    headers=self._headers(),
+                )
+
+            if response.status_code == 404 or (
+                response.status_code == 400 and '"statusCode":"404"' in response.text
+            ):
+                logger.warning(f"File {file_id} not found in Supabase Storage")
+                return None
+
+            if response.status_code >= 400:
+                logger.error(
+                    f"Supabase download failed for {file_id}: "
+                    f"{response.status_code} {response.text[:300]}"
+                )
+                return None
+
+            return response.content
+        except Exception as e:
+            logger.error(f"Error downloading file {file_id} from Supabase Storage: {str(e)}")
+            return None
+
+    async def delete_file(self, file_id: str) -> bool:
+        """Delete a file from Supabase Storage."""
+        try:
+            delete_url = (
+                f"{self.supabase_url}/storage/v1/object/"
+                f"{quote(self.bucket_name, safe='')}"
+            )
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.request(
+                    "DELETE",
+                    delete_url,
+                    json={"prefixes": [file_id]},
+                    headers=self._headers("application/json"),
+                )
+
+            if response.status_code not in {200, 204}:
+                logger.error(
+                    f"Supabase delete failed for {file_id}: "
+                    f"{response.status_code} {response.text[:300]}"
+                )
+                return False
+
+            logger.info(f"File {file_id} deleted from Supabase Storage")
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting file {file_id} from Supabase Storage: {str(e)}")
+            return False
+
+    def get_file_path(self, file_id: str) -> str:
+        """Get the logical path to a file in Supabase Storage."""
+        return f"supabase://{self.bucket_name}/{file_id}"

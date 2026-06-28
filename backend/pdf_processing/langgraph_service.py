@@ -171,8 +171,16 @@ class LangGraphService:
         2. Ensure the citation format is consistent
         3. Check that citations are relevant to the user's query
         4. Remove any citations that cannot be verified
+        5. Prefer numeric citations in "Row label: value" form over narrative prose
+        6. When duplicate figures exist, keep the table-sourced citation over chart or body text
         
         The final response should maintain academic-level citation quality."""
+
+        from services.citation_instructions import FINANCIAL_AGENT_INSTRUCTIONS
+
+        self.document_processor_prompt += "\n\n" + FINANCIAL_AGENT_INSTRUCTIONS
+        self.response_generator_prompt += "\n\n" + FINANCIAL_AGENT_INSTRUCTIONS
+        self.citation_processor_prompt += "\n\n" + FINANCIAL_AGENT_INSTRUCTIONS
     
     def _create_conversation_graph(self) -> StateGraph:
         """Create the conversation state graph."""

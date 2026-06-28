@@ -115,7 +115,9 @@ class ComprehensiveAnalysisStrategy(AnalysisStrategy):
             tools_for_api_call = self.claude_service.tools_for_api
             
             api_response = await self.claude_service.execute_tool_interaction_turn(
-                system_prompt=COMPREHENSIVE_SYSTEM_PROMPT,
+                system_prompt=ComprehensiveAnalysisStrategy.system_prompt_with_citations(
+                    COMPREHENSIVE_SYSTEM_PROMPT
+                ),
                 messages=conversation_messages,
                 tools=tools_for_api_call, # Pass the correct list of dicts
                 # temperature=0.3, # Optional: can be set here or in ClaudeService

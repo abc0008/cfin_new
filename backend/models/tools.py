@@ -2,6 +2,7 @@ from typing import Dict, List, Optional, Any, Literal, Union, Callable
 from pydantic import BaseModel, Field, RootModel, ConfigDict
 import logging
 from utils import tool_processing
+from services.citation_instructions import VISUALIZATION_TOOL_FORMAT_SUFFIX
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,7 @@ For most charts (bar, line, area, scatter):
 For pie charts:
 - config.xAxisKey can be omitted (defaults to 'name')
 - 'data' objects should have 'name' (category) and 'value' (numeric value) keys
-- Example: [{"name": "Category A", "value": 100}, {"name": "Category B", "value": 200}]"""
+- Example: [{"name": "Category A", "value": 100}, {"name": "Category B", "value": 200}]""" + VISUALIZATION_TOOL_FORMAT_SUFFIX
     input_schema: Dict[str, Any] = ChartGenerationInputSchema.model_json_schema()
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
@@ -140,7 +141,7 @@ class TableGenerationInputSchema(BaseModel):
 
 class TableGenerationTool(ToolSchema):
     name: str = "generate_table_data"
-    description: str = """Use this tool to generate structured JSON data for creating financial data tables.\nSpecify the tableType (e.g., 'comparison', 'detailed'), provide config (title, column definitions), and the data array.\nThe 'data' objects' keys must match the 'key' values defined in 'config.columns'.\nUse appropriate 'format' values in column definitions (number, currency, percentage, text, date)."""
+    description: str = """Use this tool to generate structured JSON data for creating financial data tables.\nSpecify the tableType (e.g., 'comparison', 'detailed'), provide config (title, column definitions), and the data array.\nThe 'data' objects' keys must match the 'key' values defined in 'config.columns'.\nUse appropriate 'format' values in column definitions (number, currency, percentage, text, date).""" + VISUALIZATION_TOOL_FORMAT_SUFFIX
     input_schema: Dict[str, Any] = TableGenerationInputSchema.model_json_schema()
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
@@ -160,7 +161,7 @@ Metrics should include:
 - Value: The numeric value
 - Unit: The unit of measurement (%, $, etc.)
 - IsEstimated: Whether the value is estimated or directly from the document
-"""
+""" + VISUALIZATION_TOOL_FORMAT_SUFFIX
     
     input_schema: Dict[str, Any] = {
         "type": "object",

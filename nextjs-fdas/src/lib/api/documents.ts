@@ -1,13 +1,11 @@
 import { ProcessedDocument, DocumentUploadResponse, Citation } from '@/types';
 import { apiService } from './apiService';
+import { apiUrl } from './baseUrl';
 import { 
   DocumentUploadResponseSchema, 
   ProcessedDocumentSchema,
   CitationSchema
 } from '@/validation/schemas';
-
-// API base URL - would be configured based on environment
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Function to handle API errors - keeping for backwards compatibility
 const handleApiError = (error: any): never => {
@@ -395,7 +393,7 @@ export const documentsApi = {
       // fetch the actual document content as binary data and create a blob URL
       
       // Fetch the document content as a blob
-      const response = await fetch(`${API_BASE_URL}/api/documents/${documentId}/file`, {
+      const response = await fetch(apiUrl(`/api/documents/${documentId}/file`), {
         method: 'GET',
         headers: {
           'Accept': 'application/pdf',
@@ -460,7 +458,19 @@ export const documentsApi = {
    */
   async getDocumentCitations(documentId: string): Promise<Citation[]> {
     try {
-      const response = await apiService.get<ApiCitation[]>(`/api/documents/${documentId}/citations`);
+      const citationResponse = await fetch(apiUrl(`/api/documents/${documentId}/citations`), {
+        headers: { Accept: 'application/json' },
+      });
+
+      if (citationResponse.status === 404) {
+        return [];
+      }
+
+      if (!citationResponse.ok) {
+        throw new Error(`Failed to load document citations: ${citationResponse.status} ${citationResponse.statusText}`);
+      }
+
+      const response = await citationResponse.json() as ApiCitation[];
       
       // Ensure the response is an array
       if (Array.isArray(response)) {
@@ -484,8 +494,8 @@ export const documentsApi = {
       
       return [];
     } catch (error) {
-      console.error('Error getting document citations:', error);
-      throw handleApiError(error);
+      console.warn('Document citations unavailable:', error);
+      return [];
     }
   },
   

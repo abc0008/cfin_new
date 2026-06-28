@@ -168,18 +168,46 @@
   color: inherit;
 }
 
-.ace-marketing .mark {
+.ace-marketing .brand-mark {
   width: 20px;
   height: 20px;
-  background: #ebebeb;
-  position: relative;
+  display: block;
+  flex-shrink: 0;
+  --aa-ink: var(--ink);
+  --aa-accent: var(--accent);
 }
 
-.ace-marketing .mark::after {
-  content: '';
-  position: absolute;
-  inset: 4px;
-  background: #111;
+.ace-marketing .brand-mark .stroke,
+.ace-marketing .brand-mark .card-stroke {
+  fill: none;
+  stroke: var(--aa-ink, currentColor);
+  stroke-width: 2.5;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+.ace-marketing .brand-mark .fill {
+  fill: var(--aa-ink, currentColor);
+}
+
+.ace-marketing .brand-mark .accent {
+  fill: var(--aa-accent, var(--accent));
+}
+
+.ace-marketing .brand-mark .accent-stroke {
+  fill: none;
+  stroke: var(--aa-accent, var(--accent));
+  stroke-width: 3;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+.ace-marketing .brand-mark .index {
+  fill: none;
+  stroke: var(--aa-accent, var(--accent));
+  stroke-width: 1.25;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
 }
 
 .ace-marketing .nav .links {

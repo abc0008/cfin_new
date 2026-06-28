@@ -5,6 +5,7 @@ import { Message, Citation } from '@/types';
 import { ClaudeCitation } from '@/types/citation';
 import { conversationApi } from '@/lib/api/conversation';
 import { useCitation } from '@/context/CitationContext';
+import { ENABLE_WEBSOCKET_STREAMING, apiUrl, websocketUrl } from '@/lib/api/baseUrl';
 // (no placeholder imports)
 
 export interface StreamingEvent {
@@ -202,6 +203,22 @@ export function useStreamingChatWithCitations({
         
         // Check if this text contains citation markers (e.g., [1], [2], etc.)
         const containsCitationMarkers = /\[\d+\]/.test(event.text);
+        const isCitationMarkerOnly = /^\s*(?:\[\d+\]\s*)+$/.test(event.text);
+
+        if (isCitationMarkerOnly && !event.is_post_visualization) {
+          const existingInitialText = `${streamingTextRef.current}\n${frozenInitialTextRef.current}`;
+          const missingMarkers = Array.from(event.text.matchAll(/\[(\d+)\]/g))
+            .map(match => `[${match[1]}]`)
+            .filter(marker => !existingInitialText.includes(marker));
+
+          if (missingMarkers.length > 0) {
+            const markerText = ` ${missingMarkers.join(' ')}`;
+            console.log('Late citation marker-only delta mapped back to initial answer:', markerText);
+            appendToFrozenInitial(markerText);
+            appendToStreamingText(markerText);
+          }
+          return;
+        }
         
         // 1) If this text belongs to a *known* post-viz message, append to it.
         if (event.message_id && event.message_id === postToolMessageId && onMessageUpdate) {
@@ -579,6 +596,7 @@ export function useStreamingChatWithCitations({
             return content;
           };
           finalContent = deduplicate(finalContent);
+          const finalContentWasEmpty = finalContent.trim().length === 0;
           
           // Log the final content for debugging
           console.log('Final streamed content:', {
@@ -620,14 +638,15 @@ export function useStreamingChatWithCitations({
           // Then, fetch additional data (analysis blocks and citations) from backend
           // We'll batch these updates to avoid multiple onMessageUpdate calls
           
-          const expectedCitationCount = (() => {
-            const markerMatches = Array.from((originalContent || '').matchAll(/\[(\d+)\]/g));
-            if (markerMatches.length === 0) return 0;
-            return markerMatches.reduce((max, match) => {
-              const marker = Number(match[1] || 0);
-              return Number.isFinite(marker) ? Math.max(max, marker) : max;
-            }, 0);
-          })();
+	          const expectedCitationCount = (() => {
+	            const markerMatches = Array.from((originalContent || '').matchAll(/\[(\d+)\]/g));
+	            if (markerMatches.length === 0) return 0;
+	            return markerMatches.reduce((max, match) => {
+	              const marker = Number(match[1] || 0);
+	              return Number.isFinite(marker) ? Math.max(max, marker) : max;
+	            }, 0);
+	          })();
+	          const eventCitationCount = Array.isArray(event.citations) ? event.citations.length : 0;
 
           const fetchAnalysisBlocksAndCitations = async () => {
             try {
@@ -724,6 +743,11 @@ export function useStreamingChatWithCitations({
                 content_blocks: message.content_blocks || [],
                 analysis_blocks: message.analysis_blocks || []
               };
+
+              if (backendMessage.content && (!updatedMessage.content || updatedMessage.content.trim().length === 0)) {
+                updatedMessage.content = backendMessage.content;
+                needsUpdate = true;
+              }
               
               // Check for analysis blocks
               if (hadTools && backendMessage.analysis_blocks && backendMessage.analysis_blocks.length > 0) {
@@ -865,7 +889,7 @@ export function useStreamingChatWithCitations({
           };
           
           // Only fetch backend data if we need it
-          const shouldFetchBackendData = hadTools || expectedCitationCount > 0;
+	          const shouldFetchBackendData = hadTools || expectedCitationCount > 0 || finalContentWasEmpty || eventCitationCount > 0;
           if (shouldFetchBackendData) {
             // Clear any existing timeout
             if (pendingFetchTimeoutRef.current) {
@@ -932,6 +956,13 @@ export function useStreamingChatWithCitations({
 
   // WebSocket streaming
   const connectWebSocket = useCallback(async (shouldReconnect = true) => {
+    if (!ENABLE_WEBSOCKET_STREAMING) {
+      console.log('WebSocket streaming disabled for this backend; using HTTP streaming fallback');
+      setIsConnected(false);
+      isConnectingRef.current = false;
+      return;
+    }
+
     // Don't try to connect if no conversationId
     if (!conversationId) {
       console.warn('Cannot connect WebSocket without conversation ID');
@@ -970,15 +1001,7 @@ export function useStreamingChatWithCitations({
         isConnectingRef.current = false;
         return;
       }
-      // Get the backend URL from environment or use default
-      const backendHost = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const backendUrl = new URL(backendHost);
-      
-      // Determine WebSocket protocol based on backend protocol
-      const protocol = backendUrl.protocol === 'https:' ? 'wss:' : 'ws:';
-      
-      // Construct WebSocket URL pointing to the backend server
-      const wsUrl = `${protocol}//${backendUrl.hostname}:${backendUrl.port || (backendUrl.protocol === 'https:' ? '443' : '8000')}/ws/conversation/${conversationId}`;
+      const wsUrl = websocketUrl(`/ws/conversation/${conversationId}`);
       
       console.log('Starting WebSocket connection to:', wsUrl);
       console.log('Current isConnected state before connection:', isConnected);
@@ -1069,7 +1092,7 @@ export function useStreamingChatWithCitations({
   // Send streaming message via HTTP (fallback)
   const sendStreamingMessageHTTP = useCallback(async (content: string) => {
     try {
-      const response = await fetch(`/api/conversation/${conversationId}/message/stream`, {
+      const response = await fetch(apiUrl(`/api/conversation/${conversationId}/message/stream`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1093,6 +1116,7 @@ export function useStreamingChatWithCitations({
       }
 
       const decoder = new TextDecoder();
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -1101,19 +1125,31 @@ export function useStreamingChatWithCitations({
           break;
         }
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          const trimmedLine = line.trimEnd();
+          if (trimmedLine.startsWith('data: ')) {
             try {
-              const streamingEvent: StreamingEvent = JSON.parse(line.slice(6));
+              const streamingEvent: StreamingEvent = JSON.parse(trimmedLine.slice(6));
               // Use the ref to call the latest version of the handler
               handleStreamingEventRef.current?.(streamingEvent);
             } catch (error) {
               console.error('Error parsing SSE chunk:', error);
             }
           }
+        }
+      }
+
+      const finalChunk = `${buffer}${decoder.decode()}`.trim();
+      if (finalChunk.startsWith('data: ')) {
+        try {
+          const streamingEvent: StreamingEvent = JSON.parse(finalChunk.slice(6));
+          handleStreamingEventRef.current?.(streamingEvent);
+        } catch (error) {
+          console.error('Error parsing final SSE chunk:', error);
         }
       }
     } catch (error) {
@@ -1127,7 +1163,7 @@ export function useStreamingChatWithCitations({
     let mounted = true;
     let connectTimeout: NodeJS.Timeout | null = null;
 
-    if (conversationId && mounted) {
+    if (conversationId && mounted && ENABLE_WEBSOCKET_STREAMING) {
       // Add a small delay to debounce rapid re-renders
       connectTimeout = setTimeout(() => {
         if (mounted) {
@@ -1181,7 +1217,7 @@ export function useStreamingChatWithCitations({
     }
 
     try {
-      const sseUrl = `/api/conversation/${conversationId}/message/stream`;
+      const sseUrl = apiUrl(`/api/conversation/${conversationId}/message/stream`);
       eventSourceRef.current = new EventSource(sseUrl);
 
       eventSourceRef.current.onopen = () => {

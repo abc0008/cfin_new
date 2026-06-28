@@ -57,7 +57,27 @@ CITATION GUIDELINES:
 5. CITATION PLACEMENT:
    - Place citations immediately after mentioning specific values
    - Don't wait until the end of a paragraph to cite
+
+6. NUMBER-FIRST SELECTION:
+   - Prioritize concrete numeric financial data when choosing what to cite
+   - Avoid citing purely narrative sentences unless no numeric source exists
+
+7. TABLE SOURCE PREFERENCE:
+   - Default to financial tables over narrative sentences when both contain the same figure
+   - When the same figure appears in narrative text and a table, cite the table cell
+   - Source priority: table cell > chart label > narrative mention
+   - Use narrative sentences for citations only when no table or chart source exists
+
+8. BANKING METRIC FORMATTING:
+   - Rates, yields, margins, and capital ratios: two decimal % (e.g., 4.25%)
+   - Dollar balances: match document unit scale and precision
+   - EPS and per-share values: two decimals; counts as integers with separators
+   - Apply the same precision in cited_text as in narrative and tool outputs
 ```
+
+### Single source of truth
+
+Citation rules and banking metric formatting live in `/backend/services/citation_instructions.py` and are injected at runtime via `enhance_system_prompt_with_citation_instructions()`. The default financial analysis markdown prompt no longer duplicates this block; it is appended when loaded in `api_service.py`. Prebuilt analysis strategies and LangGraph citation nodes use the same helper or `FINANCIAL_AGENT_INSTRUCTIONS`.
 
 ## Testing
 

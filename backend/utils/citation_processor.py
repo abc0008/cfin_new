@@ -31,6 +31,27 @@ def extract_specific_value_from_citation(cited_text: str, page_number: Optional[
     lines = cited_text.strip().split('\n')
     
     logger.info(f"📊 Processing citation with {len(lines)} lines. First line: '{lines[0] if lines else ''}'")
+
+    # Earnings releases often cite compact "Metric of $X versus $Y" lines.
+    # Prefer the directly cited metric before trying generic table extraction,
+    # otherwise years such as 2023 can be misclassified as the value.
+    for line in lines:
+        metric_match = re.match(
+            r'^\s*([A-Za-z][A-Za-z\s,&\-/]+?)\s+of\s+'
+            r'(\$?[\d,]+(?:\.\d+)?\s*(?:million|billion|thousand)?)'
+            r'(?:\s+versus\s+(\$?[\d,]+(?:\.\d+)?\s*(?:million|billion|thousand)?))?',
+            line.strip(),
+            re.IGNORECASE,
+        )
+        if metric_match:
+            label = re.sub(r'\s+', ' ', metric_match.group(1)).strip()
+            current_value = metric_match.group(2).strip()
+            prior_value = metric_match.group(3).strip() if metric_match.group(3) else None
+            extracted = f"{label}: {current_value}"
+            if prior_value:
+                extracted += f" vs {prior_value}"
+            logger.info(f"📊 Extracted metric line from citation: '{extracted}'")
+            return extracted, True
     
     # Debug: Log first few lines to understand table structure
     if len(lines) > 3:

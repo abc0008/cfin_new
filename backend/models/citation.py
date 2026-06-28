@@ -87,6 +87,10 @@ class CitationPayload(BaseModel):
     section: Optional[str] = None
     message_id: Optional[str] = Field(None, alias="messageId")
     analysis_id: Optional[str] = Field(None, alias="analysisId")
+    # Provenance of the highlighted rect: "table" when the matched region looks
+    # like a financial table row (multiple aligned numeric cells), "text" when
+    # it appears to be narrative prose. None when unknown (e.g., stored rects).
+    source_type: Optional[Literal["table", "text"]] = Field(None, alias="sourceType")
     
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 

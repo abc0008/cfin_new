@@ -16,6 +16,7 @@ const BANK_ANALYSIS_APP_URL =
 
 export const RM_PRO_FORMA_URL = `${trimTrailingSlash(BANK_ANALYSIS_APP_URL)}/rm-pro-forma`
 export const CREDIT_SPREAD_URL = `${trimTrailingSlash(BANK_ANALYSIS_APP_URL)}/credit-spread`
+export const REGIONAL_FORECASTING_URL = `${trimTrailingSlash(BANK_ANALYSIS_APP_URL)}/forecasting`
 
 const CFIN_WORKSPACE_DEFAULT_URL = 'https://aceanalytics.dev/workspace'
 export const CFIN_WORKSPACE_URL = resolvePublicUrl(

@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import { ApiError, ErrorDetail } from '../errors/ApiError';
-
-// API base URL - would be configured based on environment
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { apiUrl } from './baseUrl';
 
 // Configuration for retries
 const MAX_RETRY_ATTEMPTS = 3;
@@ -50,10 +48,7 @@ class ApiService {
       endpoint = '/' + endpoint;
     }
     
-    // Ensure URL doesn't have duplicated /api
-    const finalUrl = API_BASE_URL.endsWith('/api') 
-      ? `${API_BASE_URL}${endpoint}`
-      : `${API_BASE_URL}${endpoint}`;
+    const finalUrl = apiUrl(endpoint);
       
     console.log(`Sending ${method} request to ${finalUrl}`);
     
@@ -247,10 +242,7 @@ class ApiService {
       endpoint = '/' + endpoint;
     }
     
-    // Ensure URL doesn't have duplicated /api
-    const finalUrl = API_BASE_URL.endsWith('/api') 
-      ? `${API_BASE_URL}${endpoint}`
-      : `${API_BASE_URL}${endpoint}`;
+    const finalUrl = apiUrl(endpoint);
       
     console.log(`Uploading file to ${finalUrl}`);
     
@@ -337,10 +329,7 @@ class ApiService {
       endpoint = '/' + endpoint;
     }
     
-    // Ensure URL doesn't have duplicated /api
-    const finalUrl = API_BASE_URL.endsWith('/api') 
-      ? `${API_BASE_URL}${endpoint}`
-      : `${API_BASE_URL}${endpoint}`;
+    const finalUrl = apiUrl(endpoint);
     
     try {
       const response = await fetch(finalUrl, {

@@ -131,7 +131,9 @@ class BasicFinancialStrategy(AnalysisStrategy):
                     }
 
                 api_response: Message = await self.claude_service.execute_tool_interaction_turn(
-                    system_prompt=BasicFinancialStrategy.LOADED_PROMPT,
+                    system_prompt=BasicFinancialStrategy.system_prompt_with_citations(
+                        BasicFinancialStrategy.LOADED_PROMPT
+                    ),
                     messages=current_messages,
                     tools=self.claude_service.tools_for_api, # Assuming tools_for_api is prepared by ClaudeService
                     model_override=model_for_this_turn_override
