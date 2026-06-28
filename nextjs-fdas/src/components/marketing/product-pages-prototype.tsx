@@ -2,12 +2,13 @@
 
 import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
-import { ParallaxMock } from '@/components/marketing/product-mocks'
+import { ParallaxMock, PeerLensMock } from '@/components/marketing/product-mocks'
 import { Eyebrow, ProductSubnav, useReveal } from '@/components/marketing/shared'
 import {
   BOOK_DEMO_URL,
   CFIN_WORKSPACE_URL,
   CREDIT_SPREAD_URL,
+  PEER_ANALYSIS_URL,
   REGIONAL_FORECASTING_URL,
   RM_PRO_FORMA_URL,
 } from '@/lib/app-urls'
@@ -1114,6 +1115,164 @@ export function LatticeProductDetailPage() {
         secondary="See sample committee output"
         secondaryHref="/product/lattice#methods"
         accent="var(--accent-2)"
+      />
+    </main>
+  )
+}
+
+export function PeerLensProductDetailPage() {
+  const accent = 'var(--accent-teal)'
+  return (
+    <main className="pp pp-rm">
+      <ProductSubnav />
+
+      <section className="pp-hero">
+        <div className="wrap pp-hero-grid">
+          <div className="pp-hero-copy">
+            <div className="pp-eyebrow">
+              <span className="op" style={{ color: accent }}>
+                OP_PRLN
+              </span>
+              <span className="pill">peeranalysis.aceanalytics.dev</span>
+            </div>
+            <h1 className="pp-h1">
+              Read a bank against
+              <br />
+              <span className="ital" style={{ color: accent }}>
+                a fair peer set.
+              </span>
+            </h1>
+            <p className="pp-lede">
+              Peer Lens builds a defensible ~11-bank peer group from FDIC regulatory data, compares it
+              across 44 metrics, and writes CFO-grade takeaways - every number traces back to the Call
+              Report.
+            </p>
+            <div className="pp-hero-actions">
+              <a
+                className="btn btn-primary"
+                style={{ background: accent, color: '#fff' }}
+                href={PEER_ANALYSIS_URL}
+              >
+                Open Peer Lens →
+              </a>
+              <a className="btn btn-ghost" href={PEER_ANALYSIS_URL}>
+                Try the demo
+              </a>
+            </div>
+            <div className="pp-hero-tags">
+              {[
+                ['44', 'metrics compared'],
+                ['~11', 'defensible peers'],
+                ['0', 'fabricated figures'],
+              ].map(([a, b], i) => (
+                <div key={i} className="pp-tag" style={{ '--tc': accent } as React.CSSProperties}>
+                  <div className="t">{a}</div>
+                  <div className="s">{b}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="pp-hero-art">
+            <PeerLensMock />
+          </div>
+        </div>
+      </section>
+
+      <section className="pp-strip">
+        <div className="wrap">
+          <CapCard
+            ix="01"
+            title="Defensible peer set"
+            body="Asset band, business model, Fed region, and proximity. Sweep and trust banks are auto-screened, and every member is swappable by hand."
+            accent={accent}
+          />
+          <CapCard
+            ix="02"
+            title="44 regulatory metrics"
+            body="Scale, profitability, funding, capital, and asset quality - FDIC Call Report-derived and bank-level for clean comparability."
+            accent="var(--accent-slate)"
+          />
+          <CapCard
+            ix="03"
+            title="Direction-aware"
+            body="Efficiency, cost of funds, NIE/assets, and charge-offs read better-when-lower. Percentile is position, not virtue."
+            accent={accent}
+          />
+          <CapCard
+            ix="04"
+            title="CFO-grade takeaways"
+            body="Mechanism-level findings, watch items, and caveats - every figure cited from the computed stats, never invented."
+            accent="var(--accent-plum)"
+          />
+        </div>
+      </section>
+
+      <section className="pp-rm-statements" id="methods">
+        <div className="wrap">
+          <div className="pp-split-head">
+            <Eyebrow op="OP_PRLN_02">How the peer set is built</Eyebrow>
+            <h2 className="pp-h2">
+              Regulatory-first, screened for outliers,
+              <br />
+              and{' '}
+              <span className="ital" style={{ color: accent }}>
+                defensible to a CFO.
+              </span>
+            </h2>
+          </div>
+          <p className="pp-lede" style={{ marginTop: 24, maxWidth: '70ch' }}>
+            Start from FDIC BankFind. Filter candidates to a 0.5x-2.0x asset band, gate on business model
+            and Fed region, then rank by proximity. Sweep and trust banks fall into a screened-out tray you
+            can pull back in. Numbers are computed in Python and verified against the Call Report - the
+            model only writes the prose.
+          </p>
+        </div>
+      </section>
+
+      <PPFlow
+        op="OP_PRLN_03"
+        title={
+          <>
+            Pick.{' '}
+            <span className="ital" style={{ color: accent }}>
+              Compare.
+            </span>{' '}
+            Read.
+          </>
+        }
+        steps={[
+          {
+            n: '01',
+            t: 'Pick a target',
+            b: 'Type a bank name or FDIC CERT. Ambiguous names disambiguate by certificate.',
+          },
+          {
+            n: '02',
+            t: 'Build the peer set',
+            b: 'A defensible ~11-bank group is proposed; remove or swap members and pull screened-out banks back in.',
+          },
+          {
+            n: '03',
+            t: 'Read the takeaways',
+            b: 'Percentile strips, a performance-frontier scatter, and CFO-grade findings - every figure traced to FDIC.',
+          },
+        ]}
+        accent={accent}
+      />
+
+      <PPCta
+        title={
+          <>
+            Benchmark a bank <span className="ital">in under a minute.</span>
+          </>
+        }
+        sub="Peer Lens replaces the hand-built comp sheet with a defensible, regulatory-first peer analysis."
+        primary="Open Peer Lens"
+        primaryHref={PEER_ANALYSIS_URL}
+        secondary="Read the methods"
+        secondaryHref="/product/peer-analysis#methods"
+        accent={accent}
       />
     </main>
   )

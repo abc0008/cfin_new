@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { MarketPanel } from '@/components/marketing/market-panel'
-import { ApertureMock, DialectMock, LatticeMock, ParallaxMock } from '@/components/marketing/product-mocks'
+import { ApertureMock, DialectMock, LatticeMock, ParallaxMock, PeerLensMock } from '@/components/marketing/product-mocks'
 import { EncryptedText } from '@/components/ui/encrypted-text'
 import { BOOK_DEMO_URL } from '@/lib/app-urls'
 import {
@@ -63,6 +63,30 @@ export const PROTOTYPE_TOOLS = [
     route: '/product/credit-spread',
     methodsRoute: '/product/credit-spread#methods',
     mock: (isActive?: boolean, _shouldAnimate?: boolean) => <ParallaxMock isActive={isActive} />,
+  },
+  {
+    op: 'OP_A5',
+    code: 'FCST',
+    name: 'Forecast',
+    tag: 'Regional bank planning',
+    color: 'var(--accent-plum)',
+    desc: 'Start with GL actuals, layer macro scenarios, producer hiring, attrition, expense levers, and guardrails. Write the final plan back as a governed scenario version.',
+    route: '/product/forecasting',
+    methodsRoute: '/product/forecasting#methods',
+    mock: (isActive?: boolean, shouldAnimate?: boolean) => (
+      <LatticeMock isActive={isActive} shouldAnimate={shouldAnimate} />
+    ),
+  },
+  {
+    op: 'OP_A6',
+    code: 'PRLN',
+    name: 'Peer Lens',
+    tag: 'Peer benchmarking + analysis',
+    color: 'var(--accent-teal)',
+    desc: 'Pick a bank. Peer Lens builds a defensible ~11-bank peer set from FDIC regulatory data, compares it across 44 metrics, and writes CFO-grade takeaways - every number traces back to the Call Report.',
+    route: '/product/peer-analysis',
+    methodsRoute: '/product/peer-analysis#methods',
+    mock: (isActive?: boolean, _shouldAnimate?: boolean) => <PeerLensMock isActive={isActive} />,
   },
 ]
 
@@ -127,9 +151,9 @@ function HeroCinematic() {
                 </span>
               </h1>
               <p className="lede hero-main-lede" style={{ marginTop: 36 }}>
-                Four focused AI tools for financial analysts. Scenario to breakeven, natural
-                language to SQL, filings to model, and borrower packages to credit spread. Calibrated on
-                real filings, audited end to end.
+                Five focused AI tools for financial analysts. Scenario to breakeven, natural
+                language to SQL, filings to model, borrower packages to credit spread, and market
+                inputs to forecast cube. Calibrated on real workflows, audited end to end.
               </p>
               <div style={{ display: 'flex', gap: 12, marginTop: 40, flexWrap: 'wrap' }}>
                 <a className="btn btn-ink" href={BOOK_DEMO_URL}>
@@ -166,8 +190,8 @@ function HeroSplit() {
             </span>
           </h1>
           <p className="lede hero-main-lede" style={{ marginTop: 28 }}>
-            Four focused AI tools for financial analysts. Scenario to breakeven, natural language
-            to SQL, filings to model, and scans to credit spread.
+            Five focused AI tools for financial analysts. Scenario to breakeven, natural language
+            to SQL, filings to model, scans to credit spread, and market plans to forecast cube.
           </p>
           <div style={{ display: 'flex', gap: 12, marginTop: 32, flexWrap: 'wrap' }}>
             <a className="btn btn-ink" href={BOOK_DEMO_URL}>
@@ -207,9 +231,9 @@ function HeroTypographic() {
           }}
         >
           <p className="lede" style={{ maxWidth: 600 }}>
-            Four focused AI tools for financial analysts. Scenario to breakeven, natural language
-            to SQL, filings to model, and scans to credit spread. Calibrated on real filings,
-            audited end to end.
+            Five focused AI tools for financial analysts. Scenario to breakeven, natural language
+            to SQL, filings to model, scans to credit spread, and market plans to forecast cube.
+            Calibrated on real workflows, audited end to end.
           </p>
           <div style={{ display: 'flex', gap: 12 }}>
             <a className="btn btn-ink" href={BOOK_DEMO_URL}>
@@ -355,7 +379,7 @@ function Philosophy() {
     {
       ix: '01',
       title: 'Tools.',
-      body: 'Not a platform. Not a suite. Four tools, each doing one job at a level a senior analyst would accept.',
+      body: 'Not a platform. Not a suite. Six tools, each doing one job at a level a senior analyst would accept.',
       color: 'var(--accent-slate)',
       panel: <PhilArtScalpel />,
     },

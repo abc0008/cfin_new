@@ -70,6 +70,18 @@ export function ProductPrototypePage() {
         ['Covenant engine', 'Tracks covenants and flags breaches under stress scenarios before signature.'],
         ['Tax return savvy', 'Understands 1040, 1041, 1065, 1120, K-1s, and reconciles personal to business flows.'],
       ],
+      [
+        ['GL actuals baseline', 'Pulls GL_Fact, entity, and GL account history into a 60-month starting plan.'],
+        ['Scenario layering', 'Macro, workforce, producer hiring, credit, liquidity, and expense levers recompute live.'],
+        ['Guardrail monitor', 'Capital, liquidity, and appetite metrics show healthy, watch, and breach ranges by year.'],
+        ['Forecast cube load', 'Approved plans write back as governed scenario versions with user lineage.'],
+      ],
+      [
+        ['Defensible peer set', 'Asset band, business model, Fed region, and proximity - sweep and trust banks auto-screened, swappable by hand.'],
+        ['44 regulatory metrics', 'Scale, profitability, funding, capital, and asset quality - FDIC Call Report-derived and bank-level for clean comparability.'],
+        ['Direction-aware reads', 'Efficiency, cost of funds, NIE/assets, and charge-offs scored better-when-lower. Percentile is position, not virtue.'],
+        ['CFO-grade takeaways', 'Mechanism-level findings, watch items, and caveats - every figure cited from the computed stats, never invented.'],
+      ],
     ],
     [],
   )
@@ -82,7 +94,7 @@ export function ProductPrototypePage() {
         <div className="wrap">
           <Eyebrow op="/ PRODUCT">The toolkit</Eyebrow>
           <h1 className="display h1" style={{ marginTop: 40 }}>
-            Four tools.
+            Six tools.
             <br />
             Each one a
             <br />

@@ -121,7 +121,7 @@ export function MarketingNav() {
           Home
         </Link>
         <Link href="/product" aria-current={pathname.startsWith('/product') ? 'page' : undefined}>
-          Products
+          Projects
         </Link>
         <Link href="/news" aria-current={pathname.startsWith('/news') ? 'page' : undefined}>
           Industry News
@@ -129,6 +129,9 @@ export function MarketingNav() {
         <Link href="/about" aria-current={pathname === '/about' ? 'page' : undefined}>
           About Me
         </Link>
+        <a href="/candidate-profile.html">
+          Candidate Profile
+        </a>
       </div>
       <div className="cta">
         <div className="nav-controls">
@@ -368,6 +371,12 @@ export function MarketingFooter() {
               <li>
                 <Link href="/product/credit-spread">Parallax</Link>
               </li>
+              <li>
+                <Link href="/product/forecasting">Forecast</Link>
+              </li>
+              <li>
+                <Link href="/product/peer-analysis">Peer Lens</Link>
+              </li>
             </ul>
           </div>
           <div>
@@ -435,6 +444,8 @@ export function ProductSubnav() {
     { href: '/product/text2sql', label: 'Text2SQL', sub: 'Dialect', color: 'var(--accent-slate)' },
     { href: '/product/cfin', label: 'CFIN Workspace', sub: 'Aperture', color: 'var(--accent)' },
     { href: '/product/credit-spread', label: 'Credit Spreading', sub: 'Parallax', color: 'var(--accent-orange)' },
+    { href: '/product/forecasting', label: 'Regional Forecast', sub: 'Forecast', color: 'var(--accent-plum)' },
+    { href: '/product/peer-analysis', label: 'Peer Analysis', sub: 'Peer Lens', color: 'var(--accent-teal)' },
   ]
 
   return (

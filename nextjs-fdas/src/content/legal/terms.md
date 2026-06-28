@@ -22,7 +22,7 @@ This restriction does not preclude general professional discussion, public-infor
 
 ## 2. Nature of the site
 
-The four tools featured on the site - **Aperture**, **Parallax**, **Lattice**, and **Dialect** - are independent personal projects. They are presented as capability demonstrations only. They are not licensed software products, are not supported under any service-level agreement, and may be modified, restricted, or discontinued at any time without notice.
+The six tools featured on the site - **Aperture**, **Parallax**, **Lattice**, **Dialect**, **Forecast**, and **Peer Lens** - are independent personal projects. They are presented as capability demonstrations only. They are not licensed software products, are not supported under any service-level agreement, and may be modified, restricted, or discontinued at any time without notice.
 
 ## 3. Permitted use
 

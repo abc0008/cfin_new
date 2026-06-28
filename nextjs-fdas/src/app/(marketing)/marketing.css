@@ -13,6 +13,7 @@
   --accent-orange: #d95f3d;
   --accent-plum: #2b1d34;
   --accent-olive: #444a3e;
+  --accent-teal: #13a8a8;
   --line: rgba(17, 17, 17, 0.12);
   --line-strong: rgba(17, 17, 17, 0.28);
   --chrome-body: #fcfaf5;
@@ -756,6 +757,7 @@
   --accent-orange: #e6724f;
   --accent-plum: #8b6da5;
   --accent-olive: #8b9178;
+  --accent-teal: #2bb6b6;
   --line: rgba(235, 235, 235, 0.12);
   --line-strong: rgba(235, 235, 235, 0.3);
   --chrome-body: #0b0b0c;

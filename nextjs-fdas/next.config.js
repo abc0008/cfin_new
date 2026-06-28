@@ -94,8 +94,28 @@ const nextConfig = {
         permanent: false,
       },
       {
+        source: "/forecasting",
+        destination: "/product/forecasting",
+        permanent: false,
+      },
+      {
+        source: "/forecasting/app",
+        destination: "https://bankanalysis.aceanalytics.dev/forecasting",
+        permanent: false,
+      },
+      {
         source: "/lattice",
         destination: "/product/lattice",
+        permanent: false,
+      },
+      {
+        source: "/peer-analysis",
+        destination: "/product/peer-analysis",
+        permanent: false,
+      },
+      {
+        source: "/peer-lens",
+        destination: "/product/peer-analysis",
         permanent: false,
       },
     ];

@@ -21,6 +21,133 @@ function Chrome({ url, children }: { url: string; children: React.ReactNode }) {
   )
 }
 
+export function PeerLensMock({ isActive = true }: { isActive?: boolean } = {}) {
+  void isActive
+  const teal = 'var(--accent-teal)'
+  const glow = 'rgba(19, 168, 168, 0.22)'
+  const rows: Array<{ k: string; v: string; pct: number; pos: number }> = [
+    { k: 'ROA', v: '0.54%', pct: 0, pos: 8 },
+    { k: 'Efficiency', v: '83.2%', pct: 100, pos: 94 },
+    { k: 'NIM', v: '4.00%', pct: 73, pos: 70 },
+    { k: 'ROTCE', v: '11.4%', pct: 18, pos: 22 },
+    { k: 'CET1', v: '11.5%', pct: 18, pos: 22 },
+  ]
+
+  return (
+    <Chrome url="peeranalysis.ace / Arvest Bank vs 11 peers">
+      <div style={{ padding: '14px 16px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: 10,
+              letterSpacing: '0.1em',
+              color: 'var(--ink-2)',
+            }}
+          >
+            PEER PERCENTILE · 12 BANKS · FDIC
+          </span>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: 10,
+              color: teal,
+            }}
+          >
+            <span style={{ width: 3, height: 12, background: teal, borderRadius: 1 }} /> ARVEST
+          </span>
+        </div>
+        {rows.map((r) => (
+          <div
+            key={r.k}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '76px 1fr 50px',
+              gap: 12,
+              alignItems: 'center',
+              padding: '9px 0',
+              borderTop: '1px solid var(--line)',
+            }}
+          >
+            <div style={{ fontSize: 12.5, fontWeight: 600 }}>{r.k}</div>
+            <div style={{ position: 'relative', height: 18 }}>
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: 0,
+                  right: 0,
+                  height: 5,
+                  transform: 'translateY(-50%)',
+                  borderRadius: 999,
+                  background: 'color-mix(in srgb, currentColor 10%, transparent)',
+                }}
+              />
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '15%',
+                  width: '70%',
+                  height: 5,
+                  transform: 'translateY(-50%)',
+                  borderRadius: 999,
+                  background: 'color-mix(in srgb, currentColor 20%, transparent)',
+                }}
+              />
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  width: 2,
+                  height: 13,
+                  transform: 'translate(-50%, -50%)',
+                  borderRadius: 1,
+                  background: 'color-mix(in srgb, currentColor 55%, transparent)',
+                }}
+              />
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: `${r.pos}%`,
+                  width: 4,
+                  height: 18,
+                  transform: 'translate(-50%, -50%)',
+                  borderRadius: 2,
+                  background: teal,
+                  boxShadow: `0 0 0 3px ${glow}`,
+                }}
+              />
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: teal }}>
+                {r.v}
+              </div>
+              <div
+                style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: 'var(--ink-2)' }}
+              >
+                {r.pct}th
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Chrome>
+  )
+}
+
 export function ApertureMock({ isActive = true }: { isActive?: boolean } = {}) {
   const items = [
     ['Revenue', '€84.7b'],
