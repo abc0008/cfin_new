@@ -1143,9 +1143,9 @@ export function PeerLensProductDetailPage() {
               </span>
             </h1>
             <p className="pp-lede">
-              Peer Lens builds a defensible ~11-bank peer group from FDIC regulatory data, compares it
-              across 44 metrics, and writes CFO-grade takeaways - every number traces back to the Call
-              Report.
+              Peer Lens runs an AI agent to identify a defensible peer group from FDIC regulatory data,
+              compares it across 44 metrics, and an advisor-backed model writes CFO-grade takeaways -
+              interpretation by AI, every figure grounded in the Call Report.
             </p>
             <div className="pp-hero-actions">
               <a
@@ -1183,14 +1183,14 @@ export function PeerLensProductDetailPage() {
         <div className="wrap">
           <CapCard
             ix="01"
-            title="Defensible peer set"
-            body="Asset band, business model, Fed region, and proximity. Sweep and trust banks are auto-screened, and every member is swappable by hand."
+            title="Agentic peer identification"
+            body="An AI agent assembles candidates from FDIC data - asset band, business model, Fed region, proximity - then an advisor model pressure-tests whether the set is defensible. Sweep and trust banks are screened out; swap any member by hand."
             accent={accent}
           />
           <CapCard
             ix="02"
             title="44 regulatory metrics"
-            body="Scale, profitability, funding, capital, and asset quality - FDIC Call Report-derived and bank-level for clean comparability."
+            body="Scale, profitability, funding, capital, and asset quality - FDIC Call Report-derived and bank-level. Computed in code, not guessed, for clean comparability."
             accent="var(--accent-slate)"
           />
           <CapCard
@@ -1201,8 +1201,8 @@ export function PeerLensProductDetailPage() {
           />
           <CapCard
             ix="04"
-            title="CFO-grade takeaways"
-            body="Mechanism-level findings, watch items, and caveats - every figure cited from the computed stats, never invented."
+            title="AI analysis, grounded"
+            body="An AI analyst - an executor model with a stronger advisor - writes mechanism-level findings, watch items, and caveats. Every figure is cited from the computed stats; the model never invents one."
             accent="var(--accent-plum)"
           />
         </div>
@@ -1222,10 +1222,11 @@ export function PeerLensProductDetailPage() {
             </h2>
           </div>
           <p className="pp-lede" style={{ marginTop: 24, maxWidth: '70ch' }}>
-            Start from FDIC BankFind. Filter candidates to a 0.5x-2.0x asset band, gate on business model
-            and Fed region, then rank by proximity. Sweep and trust banks fall into a screened-out tray you
-            can pull back in. Numbers are computed in Python and verified against the Call Report - the
-            model only writes the prose.
+            Start from FDIC BankFind. An agent screens candidates to a 0.5x-2.0x asset band, gates on
+            business model and Fed region, ranks by proximity, and an advisor model checks the set&apos;s
+            defensibility - sweep and trust banks fall into a tray you can pull back in. The metrics are
+            computed in code and grounded in the Call Report; the AI interprets them, it never invents a
+            number.
           </p>
         </div>
       </section>
@@ -1249,13 +1250,13 @@ export function PeerLensProductDetailPage() {
           },
           {
             n: '02',
-            t: 'Build the peer set',
-            b: 'A defensible ~11-bank group is proposed; remove or swap members and pull screened-out banks back in.',
+            t: 'Agent builds the set',
+            b: 'An AI agent proposes a defensible ~11-bank group and an advisor model pressure-tests it; remove, swap, or pull screened-out banks back in.',
           },
           {
             n: '03',
-            t: 'Read the takeaways',
-            b: 'Percentile strips, a performance-frontier scatter, and CFO-grade findings - every figure traced to FDIC.',
+            t: 'Read the AI analysis',
+            b: 'Percentile strips, a performance-frontier scatter, and AI-written CFO-grade findings - every figure traced to FDIC.',
           },
         ]}
         accent={accent}
@@ -1267,7 +1268,7 @@ export function PeerLensProductDetailPage() {
             Benchmark a bank <span className="ital">in under a minute.</span>
           </>
         }
-        sub="Peer Lens replaces the hand-built comp sheet with a defensible, regulatory-first peer analysis."
+        sub="Peer Lens replaces the hand-built comp sheet with agentic peer identification and AI analysis, grounded in regulatory data."
         primary="Open Peer Lens"
         primaryHref={PEER_ANALYSIS_URL}
         secondary="Read the methods"

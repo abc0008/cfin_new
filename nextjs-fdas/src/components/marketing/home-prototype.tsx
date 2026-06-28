@@ -83,7 +83,7 @@ export const PROTOTYPE_TOOLS = [
     name: 'Peer Lens',
     tag: 'Peer benchmarking + analysis',
     color: 'var(--accent-teal)',
-    desc: 'Pick a bank. Peer Lens builds a defensible ~11-bank peer set from FDIC regulatory data, compares it across 44 metrics, and writes CFO-grade takeaways - every number traces back to the Call Report.',
+    desc: 'Pick a bank. An AI agent assembles a defensible peer set from FDIC data and an advisor model pressure-tests it; then an AI analyst writes CFO-grade takeaways across 44 metrics - every figure grounded in the Call Report, none invented.',
     route: '/product/peer-analysis',
     methodsRoute: '/product/peer-analysis#methods',
     mock: (isActive?: boolean, _shouldAnimate?: boolean) => <PeerLensMock isActive={isActive} />,
@@ -151,9 +151,10 @@ function HeroCinematic() {
                 </span>
               </h1>
               <p className="lede hero-main-lede" style={{ marginTop: 36 }}>
-                Five focused AI tools for financial analysts. Scenario to breakeven, natural
-                language to SQL, filings to model, borrower packages to credit spread, and market
-                inputs to forecast cube. Calibrated on real workflows, audited end to end.
+                Six focused AI tools for financial analysts. Scenario to breakeven, natural
+                language to SQL, filings to model, borrower packages to credit spread, market
+                inputs to forecast cube, and any bank to a defensible peer set. Calibrated on real
+                workflows, audited end to end.
               </p>
               <div style={{ display: 'flex', gap: 12, marginTop: 40, flexWrap: 'wrap' }}>
                 <a className="btn btn-ink" href={BOOK_DEMO_URL}>

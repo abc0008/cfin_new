@@ -77,10 +77,10 @@ export function ProductPrototypePage() {
         ['Forecast cube load', 'Approved plans write back as governed scenario versions with user lineage.'],
       ],
       [
-        ['Defensible peer set', 'Asset band, business model, Fed region, and proximity - sweep and trust banks auto-screened, swappable by hand.'],
-        ['44 regulatory metrics', 'Scale, profitability, funding, capital, and asset quality - FDIC Call Report-derived and bank-level for clean comparability.'],
+        ['Agentic peer set', 'An AI agent assembles candidates by asset band, model, and Fed region; an advisor model pressure-tests the set. Sweep and trust banks auto-screened, swappable by hand.'],
+        ['44 regulatory metrics', 'Scale, profitability, funding, capital, and asset quality - FDIC Call Report-derived and computed in code for clean comparability.'],
         ['Direction-aware reads', 'Efficiency, cost of funds, NIE/assets, and charge-offs scored better-when-lower. Percentile is position, not virtue.'],
-        ['CFO-grade takeaways', 'Mechanism-level findings, watch items, and caveats - every figure cited from the computed stats, never invented.'],
+        ['AI takeaways, grounded', 'An AI analyst writes mechanism-level findings, watch items, and caveats - every figure cited from the computed stats, never invented.'],
       ],
     ],
     [],
