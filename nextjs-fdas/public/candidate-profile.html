@@ -280,8 +280,9 @@ body.locked .sitenav{display:none}
       <button data-view="fitmap"><span class="n">2</span> How I Fit the Role</button>
       <button data-view="qa"><span class="n">3</span> My Approach</button>
       <button data-view="frameworks"><span class="n">4</span> Frameworks</button>
-      <button data-view="close"><span class="n">5</span> Closing</button>
-      <button data-view="references"><span class="n">6</span> References</button>
+      <button data-view="peeranalysis"><span class="n">5</span> Peer Research: Arvest</button>
+      <button data-view="close"><span class="n">6</span> Closing</button>
+      <button data-view="references"><span class="n">7</span> References</button>
     </nav>
     <div class="sidefoot">Regional-bank finance &amp; FP&amp;A transformation leader.<br/>Built for the journey from ~$28B to $40B and beyond.</div>
   </aside>
@@ -867,6 +868,22 @@ body.locked .sitenav{display:none}
           <li><b>Benchmark by operating model, not the average</b> — peers cluster into winning profiles, and efficiency ratio only means something within a business type.</li>
           <li><b>Diagnosis &rarr; owned targets</b> — three buckets (balance sheet · business reimagination · corporate service) become quantified goals the businesses are accountable for.</li>
         </ul>
+      </div>
+    </section>
+
+    <!-- ============ 5. PEER LENS — ARVEST ============ -->
+    <section class="view" id="peeranalysis">
+      <div class="wrap">
+        <h2 class="sec">Peer Lens — Arvest Bank</h2>
+        <p class="lead">This is a live run of <a href="https://aceanalytics.dev/product/peer-analysis" target="_blank" rel="noopener" style="color:#1f6feb;font-weight:700;text-decoration:underline">Peer Lens</a> — an AI-enabled bank benchmarking tool I built as part of my Ace Analytics hub. You point it at any U.S. bank; an agent <b>auto-identifies a defensible peer group</b> from FDIC data, <b>pulls in the Call Report metrics</b>, and a <b>team of agents analyzes</b> the set across 44 metrics, writes the CFO-grade takeaways, and <b>renders the charts</b> — every figure traced to the regulatory filing, the interpretation written by an advisor-grade model. Below is the actual <b>Q1 2026 output for Arvest Bank</b> (FDIC CERT 8728) against a 12-bank peer set, with every accordion expanded. <b>Hover any bubble or column</b> in the charts to identify the peer bank and its value.</p>
+        <div class="callout" style="margin-bottom:16px">
+          <div class="h">Why this is here</div>
+          It shows three things at once: that I read Arvest's regulatory financial position cold — the overhead / efficiency-ratio story jumps right out — that I think in defensible peer sets, and that I build the analytical tooling to get there. Source: FDIC BankFind / Call Report, CERT 8728, as of 2026-03-31.
+        </div>
+        <div style="border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#121212">
+          <iframe id="plArvestFrame" src="peer-analysis-arvest.html" title="Peer Lens — Arvest Bank peer analysis" loading="lazy" scrolling="yes" style="width:100%;height:82vh;min-height:560px;border:0;display:block;background:#121212"></iframe>
+        </div>
+        <p class="disc">Rendered from a live Peer Lens run · interpretation by AI, every figure grounded in the FDIC Call Report · <a href="peer-analysis-arvest.html" target="_blank" rel="noopener">open full screen &#8599;</a> · <a href="https://peeranalysis.aceanalytics.dev" target="_blank" rel="noopener">run it yourself &#8599;</a></p>
       </div>
     </section>
 
