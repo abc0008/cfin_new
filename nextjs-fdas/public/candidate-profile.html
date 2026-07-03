@@ -207,14 +207,7 @@ ul.pts li b{color:var(--navy)}
 @media print{.sidebar{display:none}.view{display:block!important}.topbar{background:var(--navy)!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.acc .body{padding-left:16px}}
 h1,h2,h4{font-family:'Inter Tight',system-ui,sans-serif}.brand .sub,.kpi .lbl,.lab,.tbl th,.theme-row td,h3.blk,.thesis .cap,.fband .bl,.fgrp .gh,.mtag,.vcap,.fsublabel,.fsublabel span,.chip,.step .sn,.usefor b,.disc{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,monospace}
 .tbl .req{color:var(--muted)}.tbl .deliver{color:var(--ink);font-weight:500}
-.blk{scroll-margin-top:16px}
-h3.blk{font-size:13px;font-weight:700;color:var(--navy);margin:22px 0 10px;font-family:'JetBrains Mono',ui-monospace,monospace;letter-spacing:.3px;border-bottom:2px solid var(--amber);padding-bottom:5px;display:inline-block}
-#runbook code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;background:#ECECEC;border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:var(--navy)}
-.rb-code{background:#111111;color:#E6E6E6;border-radius:10px;padding:16px 18px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;line-height:1.75;overflow-x:auto;box-shadow:var(--shadow);margin:0 0 18px}
-.rb-code .c{color:#FFAC03}
-.rb-notes{display:grid;gap:8px;margin:0 0 18px}
-.rb-note{display:flex;align-items:flex-start;gap:4px;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 13px;box-shadow:var(--shadow)}
-.rb-note .b-num{margin-top:1px}.reflinks{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}.reflinks .rl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--faint)}.reflinks a{font-size:11.5px;font-weight:600;text-decoration:none;border-radius:99px;padding:4px 11px;border:1px solid var(--line);background:var(--card);color:var(--navy);cursor:pointer}.reflinks a.fjump{border-color:#E0CFA0;background:#FBEFD6;color:#7a4f12}.reflinks a.exlink{border-color:#C6C6C6;color:var(--navy)}.reflinks a:hover{border-color:var(--amber);color:#111}.reflinks a .ar{color:var(--amber);font-weight:700}
+.blk{scroll-margin-top:16px}.reflinks{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}.reflinks .rl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--faint)}.reflinks a{font-size:11.5px;font-weight:600;text-decoration:none;border-radius:99px;padding:4px 11px;border:1px solid var(--line);background:var(--card);color:var(--navy);cursor:pointer}.reflinks a.fjump{border-color:#E0CFA0;background:#FBEFD6;color:#7a4f12}.reflinks a.exlink{border-color:#C6C6C6;color:var(--navy)}.reflinks a:hover{border-color:var(--amber);color:#111}.reflinks a .ar{color:var(--amber);font-weight:700}
 .sitenav{position:sticky;top:0;z-index:200;display:flex;align-items:center;gap:18px;height:54px;padding:0 22px;background:var(--navy);color:#fff;border-bottom:1px solid rgba(255,255,255,.12);font-family:'Inter Tight',system-ui,sans-serif}
 .sitenav a{color:#fff;text-decoration:none}
 .sn-brand{font-weight:700;font-size:14px;letter-spacing:.2px;white-space:nowrap}
@@ -351,9 +344,8 @@ body.locked .sitenav{display:none}
       <button data-view="frameworks"><span class="n">4</span> Frameworks</button>
       <button data-view="madeepdive"><span class="n">5</span> M&amp;A Process Deep Dive</button>
       <button data-view="peeranalysis"><span class="n">6</span> Peer Research: Arvest</button>
-      <button data-view="runbook"><span class="n">7</span> Agent Deploy Runbook</button>
-      <button data-view="close"><span class="n">8</span> Closing</button>
-      <button data-view="references"><span class="n">9</span> References</button>
+      <button data-view="close"><span class="n">7</span> Closing</button>
+      <button data-view="references"><span class="n">8</span> References</button>
     </nav>
     <div class="sidefoot">Regional-bank finance &amp; FP&amp;A transformation leader.<br/>Built for the journey from ~$28B to $40B and beyond.</div>
   </aside>
@@ -409,12 +401,50 @@ body.locked .sitenav{display:none}
         </div>
         <p class="lead" style="margin-top:12px">Around those five: an efficiency-ratio / ROA-ROE cadence, board &amp; owner reporting, capital-stress / ALCO support, a high-performance team build, and a "no jerks, no BS" culture.</p>
 
-        <div class="callout" style="margin-top:18px">
-          <div class="h">How I'd start — first 12 months</div>
-          <span class="tag">1 · Listen &amp; map</span> current process, metric integrity, decision rights &nbsp;
-          <span class="tag">2 · Stand up cadence</span> monthly segment reviews + efficiency/ROA-ROE pack &nbsp;
-          <span class="tag">3 · Pilot top-down</span> driver-based model on one segment + DFW/Frisco proving ground &nbsp;
-          <span class="tag">4 · Make M&amp;A repeatable</span> diligence playbook before a deal is live
+        <h3 class="blk" style="margin-top:26px">How I'd start — first 12 months</h3>
+        <div class="card" style="padding:16px 16px 10px">
+          <svg viewBox="0 0 760 330" role="img" aria-label="First 12 months plan: four overlapping phases — listen and map, stand up cadence, pilot top-down, make M&amp;A repeatable — each feeding the next, with a continuous talent assessment and development track across all twelve months" style="width:100%;height:auto;display:block">
+            <g font-family="JetBrains Mono,monospace" font-size="8.5" fill="#8C8C8C" text-anchor="middle">
+              <text x="87.5" y="16">M1</text><text x="142.5" y="16">M2</text><text x="197.5" y="16">M3</text><text x="252.5" y="16">M4</text><text x="307.5" y="16">M5</text><text x="362.5" y="16">M6</text><text x="417.5" y="16">M7</text><text x="472.5" y="16">M8</text><text x="527.5" y="16">M9</text><text x="582.5" y="16">M10</text><text x="637.5" y="16">M11</text><text x="692.5" y="16">M12</text>
+            </g>
+            <g stroke="#E5E5E5" stroke-width="1">
+              <line x1="60" y1="22" x2="60" y2="266"/><line x1="115" y1="22" x2="115" y2="266"/><line x1="170" y1="22" x2="170" y2="266"/><line x1="225" y1="22" x2="225" y2="266"/><line x1="280" y1="22" x2="280" y2="266"/><line x1="335" y1="22" x2="335" y2="266"/><line x1="390" y1="22" x2="390" y2="266"/><line x1="445" y1="22" x2="445" y2="266"/><line x1="500" y1="22" x2="500" y2="266"/><line x1="555" y1="22" x2="555" y2="266"/><line x1="610" y1="22" x2="610" y2="266"/><line x1="665" y1="22" x2="665" y2="266"/><line x1="720" y1="22" x2="720" y2="266"/>
+            </g>
+            <defs><marker id="tlArr" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="#606060"/></marker></defs>
+            <!-- P1 · Listen & map · M1-M3 -->
+            <rect x="60" y="28" width="165" height="26" rx="4" fill="#E8E8E8" stroke="#9A9A9A"/>
+            <text x="70" y="45" font-family="JetBrains Mono,monospace" font-size="10.5" font-weight="700" fill="#3A3A3A">1 · LISTEN &amp; MAP</text>
+            <text x="60" y="70" font-family="Inter Tight,sans-serif" font-size="9.5" fill="#606060">current process · metric integrity · decision rights</text>
+            <path d="M225 41 H300 V86" fill="none" stroke="#606060" stroke-width="1.2" marker-end="url(#tlArr)"/>
+            <text x="308" y="72" font-family="JetBrains Mono,monospace" font-size="8" fill="#606060">INFORMS THE CADENCE</text>
+            <!-- P2 · Stand up cadence · M2-M5 -->
+            <rect x="115" y="92" width="220" height="26" rx="4" fill="#FBEFD6" stroke="#D99C0B"/>
+            <text x="125" y="109" font-family="JetBrains Mono,monospace" font-size="10.5" font-weight="700" fill="#8a5a16">2 · STAND UP CADENCE</text>
+            <text x="115" y="134" font-family="Inter Tight,sans-serif" font-size="9.5" fill="#606060">monthly segment reviews · efficiency / ROA-ROE pack ·</text>
+            <text x="115" y="146" font-family="Inter Tight,sans-serif" font-size="9.5" fill="#606060">assess forecast &amp; reporting granularity + forecast cadence</text>
+            <path d="M335 105 H480 V150" fill="none" stroke="#606060" stroke-width="1.2" marker-end="url(#tlArr)"/>
+            <text x="488" y="136" font-family="JetBrains Mono,monospace" font-size="8" fill="#606060">SURFACES THE PILOT SEGMENT</text>
+            <!-- P3 · Pilot top-down · M4-M9 -->
+            <rect x="225" y="156" width="330" height="26" rx="4" fill="#E3EBF5" stroke="#3a6ea5"/>
+            <text x="235" y="173" font-family="JetBrains Mono,monospace" font-size="10.5" font-weight="700" fill="#2c5681">3 · PILOT TOP-DOWN</text>
+            <text x="225" y="198" font-family="Inter Tight,sans-serif" font-size="9.5" fill="#606060">driver-based model on one segment · DFW / Frisco proving ground</text>
+            <path d="M555 169 H600 V214" fill="none" stroke="#606060" stroke-width="1.2" marker-end="url(#tlArr)"/>
+            <text x="608" y="200" font-family="JetBrains Mono,monospace" font-size="8" fill="#606060">PROVES THE DEAL ENGINE</text>
+            <!-- P4 · Make M&A repeatable · M7-M12 -->
+            <rect x="390" y="220" width="330" height="26" rx="4" fill="#E5EFE9" stroke="#2E7D5B"/>
+            <text x="400" y="237" font-family="JetBrains Mono,monospace" font-size="10.5" font-weight="700" fill="#27553f">4 · MAKE M&amp;A REPEATABLE</text>
+            <text x="390" y="262" font-family="Inter Tight,sans-serif" font-size="9.5" fill="#606060">repeatable diligence playbook — built before a deal is live</text>
+            <!-- Continuous talent track -->
+            <text x="60" y="284" font-family="JetBrains Mono,monospace" font-size="9" font-weight="700" fill="#111111">CONTINUOUS · TALENT ASSESSMENT &amp; DEVELOPMENT PROGRAM</text>
+            <rect x="60" y="290" width="660" height="16" rx="4" fill="#F3F3F3" stroke="#111111" stroke-dasharray="4 3"/>
+            <g fill="#FFAC03" stroke="#8a5a16" stroke-width="1"><circle cx="130" cy="298" r="4"/><circle cx="420" cy="298" r="4"/><circle cx="690" cy="298" r="4"/></g>
+            <g font-family="Inter Tight,sans-serif" font-size="8.5" fill="#606060">
+              <text x="130" y="322" text-anchor="middle">assess team &middot; define roles</text>
+              <text x="420" y="322" text-anchor="middle">develop / upgrade talent</text>
+              <text x="720" y="322" text-anchor="end">succession bench</text>
+            </g>
+          </svg>
+          <div style="font-size:10.5px;color:#8C8C8C;font-family:'JetBrains Mono',ui-monospace,monospace;border-top:1px solid var(--line);margin-top:10px;padding-top:8px">Indicative sequencing &mdash; phases overlap by design and each feeds the next &middot; talent runs all twelve months, milestones on the amber dots</div>
         </div>
       </div>
     </section>
@@ -1045,80 +1075,6 @@ body.locked .sitenav{display:none}
           <iframe id="plArvestFrame" src="peer-analysis-arvest.html" title="Peer Lens — Arvest Bank peer analysis" loading="lazy" scrolling="yes" style="width:100%;height:82vh;min-height:560px;border:0;display:block;background:#121212"></iframe>
         </div>
         <p class="disc">Rendered from a live Peer Lens run · interpretation by AI, every figure grounded in the FDIC Call Report · <a href="peer-analysis-arvest.html" target="_blank" rel="noopener">open full screen &#8599;</a> · <a href="https://peeranalysis.aceanalytics.dev" target="_blank" rel="noopener">run it yourself &#8599;</a></p>
-      </div>
-    </section>
-
-    <!-- ============ 7. AGENT DEPLOY RUNBOOK ============ -->
-    <section class="view" id="runbook">
-      <div class="wrap">
-        <h2 class="sec">ACE Analytics — Multi-App Vercel Deploy Runbook (For AI Agents)</h2>
-        <p class="lead">The source-of-truth process my AI agents follow to deploy the ACE Analytics ecosystem to production — four apps, one checklist, explicit verification and rollback. This is the operating discipline behind everything demoed on this site: agents do the work, but they work from a governed runbook.</p>
-        <div class="callout" style="margin-bottom:16px">
-          <div class="h">Why this is here</div>
-          The mandate calls for finance-led automation with governance. This is what that looks like in practice at small scale: agentic deployment with a canonical app-to-project mapping, preflight checks, environment-variable contracts, known failure modes with fixes, and a rollback procedure &mdash; the same shape I'd bring to governed AI in an FP&amp;A shop.
-        </div>
-
-        <h3 class="blk">Canonical app-to-project mapping</h3>
-        <table class="tbl" style="margin-bottom:18px">
-          <thead><tr><th style="width:30%">App surface</th><th style="width:30%">Domain</th><th style="width:20%">Vercel project</th><th style="width:20%">Local source</th></tr></thead>
-          <tbody>
-            <tr><td><b>Main ACE site + CFIN routes</b></td><td class="req">aceanalytics.dev &middot; www</td><td class="deliver">nextjs-fdas</td><td class="proof">cfin_new/nextjs-fdas</td></tr>
-            <tr><td><b>Text2SQL</b></td><td class="req">text2sql.aceanalytics.dev</td><td class="deliver">text2sql1</td><td class="proof">Text2SQL1/frontend</td></tr>
-            <tr><td><b>Bank Analysis</b></td><td class="req">bankanalysis.aceanalytics.dev</td><td class="deliver">bankanalysis</td><td class="proof">BankAnalysis/frontend</td></tr>
-            <tr><td><b>Mail forward + cal vanity URL</b></td><td class="req">cal.aceanalytics.dev</td><td class="deliver">aceanalytics-mail-forwarder</td><td class="proof">aceanalytics-mail-forwarder</td></tr>
-          </tbody>
-        </table>
-
-        <h3 class="blk">Critical notes (do not skip)</h3>
-        <div class="rb-notes">
-          <div class="rb-note"><span class="b-num">1</span>Deploy <b>apex</b> from <code>cfin_new/nextjs-fdas</code> (canonical source), not legacy directories.</div>
-          <div class="rb-note"><span class="b-num">2</span>Deploy <b>bankanalysis</b> from the <code>frontend</code> subdirectory, not repo root &mdash; root deploys fail with <code>react-scripts: command not found</code>.</div>
-          <div class="rb-note"><span class="b-num">3</span>If the apex still shows old content after a successful deploy, the alias is stale &mdash; explicitly re-point <code>aceanalytics.dev</code> + <code>www</code> to the new deployment URL.</div>
-        </div>
-
-        <h3 class="blk">Deploy sequence</h3>
-        <pre class="rb-code"><span class="c"># 0 &middot; preflight — authenticate + confirm scope (alex-cardells-projects)</span>
-vercel whoami &amp;&amp; vercel project ls --scope alex-cardells-projects
-
-<span class="c"># 1 &middot; main site (nextjs-fdas) — deploy, then FORCE apex aliases</span>
-cd cfin_new/nextjs-fdas
-vercel link --yes --scope alex-cardells-projects --project nextjs-fdas
-vercel deploy --prod --yes --scope alex-cardells-projects
-vercel alias set &lt;DEPLOY_URL&gt; aceanalytics.dev --scope alex-cardells-projects
-vercel alias set &lt;DEPLOY_URL&gt; www.aceanalytics.dev --scope alex-cardells-projects
-
-<span class="c"># 2 &middot; text2sql1 (from Text2SQL1/frontend) &middot; 3 &middot; bankanalysis (from BankAnalysis/frontend)</span>
-<span class="c"># 4 &middot; mail-forwarder (Resend inbound + cal.aceanalytics.dev/demo)</span>
-<span class="c">#     same pattern: cd → vercel link → vercel deploy --prod</span>
-
-<span class="c"># verify — every domain, after every deploy</span>
-vercel inspect https://aceanalytics.dev
-curl -sL https://aceanalytics.dev | rg "Read between|Aperture|OP_A1"</pre>
-
-        <h3 class="blk">Environment-variable contract</h3>
-        <table class="tbl" style="margin-bottom:18px">
-          <thead><tr><th style="width:26%">Project</th><th style="width:44%">Required vars</th><th style="width:30%">Notes</th></tr></thead>
-          <tbody>
-            <tr><td><b>nextjs-fdas</b></td><td class="req">NEXT_PUBLIC_ACE_NEWS_API_BASE &middot; ACE_NEWS_API_BASE (fallback)</td><td class="proof">Unset &rarr; falls back to localhost; local dev only</td></tr>
-            <tr><td><b>aceanalytics-news-api</b></td><td class="req">ANTHROPIC_API_KEY &middot; ALLOWED_ORIGINS &middot; BLOB_READ_WRITE_TOKEN &middot; CRON_SECRET &middot; REFRESH_TOKEN</td><td class="proof">Blob-backed persistence; hourly Vercel Cron refresh &mdash; never rely on /tmp</td></tr>
-            <tr><td><b>aceanalytics-mail-forwarder</b></td><td class="req">RESEND_API_KEY &middot; RESEND_WEBHOOK_SECRET &middot; CAL_DEMO_BOOKING_URL</td><td class="proof">Plus Resend DNS + webhook per project SETUP.md</td></tr>
-          </tbody>
-        </table>
-
-        <h3 class="blk">Known failure modes &rarr; fixes</h3>
-        <table class="tbl" style="margin-bottom:18px">
-          <thead><tr><th style="width:38%">Symptom</th><th style="width:28%">Cause</th><th style="width:34%">Fix</th></tr></thead>
-          <tbody>
-            <tr><td><b>Apex shows old page after deploy</b></td><td class="req">Domain alias still points at prior deployment</td><td class="proof">Explicit <code>vercel alias set</code> for apex + www</td></tr>
-            <tr><td><b>bankanalysis build fails (react-scripts not found)</b></td><td class="req">Deployed from repo root</td><td class="proof">Deploy from /frontend only</td></tr>
-            <tr><td><b>nextjs-fdas blocked by lint errors</b></td><td class="req">Prod build runs lint/type checks</td><td class="proof">eslint.ignoreDuringBuilds in next.config.js</td></tr>
-          </tbody>
-        </table>
-
-        <h3 class="blk">Rollback</h3>
-        <p style="font-size:13px;color:var(--muted);max-width:760px;margin:6px 0 14px">Identify the last known-good deployment URL for the affected project, re-point the apex + www aliases to it, then re-verify with <code>vercel inspect</code>. Aliases are the control surface &mdash; rollback is a pointer move, not a rebuild.</p>
-
-        <p class="disc">Source-of-truth runbook consumed by AI agents deploying the ACE Analytics ecosystem &middot; scope: aceanalytics.dev, text2sql, bankanalysis, cal redirect &middot; secrets are referenced by name only and live in Vercel project settings.</p>
       </div>
     </section>
 
