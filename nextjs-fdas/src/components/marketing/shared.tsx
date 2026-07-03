@@ -446,6 +446,7 @@ export function ProductSubnav() {
     { href: '/product/credit-spread', label: 'Credit Spreading', sub: 'Parallax', color: 'var(--accent-orange)' },
     { href: '/product/forecasting', label: 'Regional Forecast', sub: 'Forecast', color: 'var(--accent-plum)' },
     { href: '/product/peer-analysis', label: 'Peer Analysis', sub: 'Peer Lens', color: 'var(--accent-teal)' },
+    { href: '/product/close-intel', label: 'Close Intelligence', sub: 'Close Intel', color: 'var(--accent-blue)' },
   ]
 
   return (

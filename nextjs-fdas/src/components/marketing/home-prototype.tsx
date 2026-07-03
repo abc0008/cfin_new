@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
+import { CloseIntelMock } from '@/components/marketing/close-intel-page'
 import { MarketPanel } from '@/components/marketing/market-panel'
 import { ApertureMock, DialectMock, LatticeMock, ParallaxMock, PeerLensMock } from '@/components/marketing/product-mocks'
 import { EncryptedText } from '@/components/ui/encrypted-text'
@@ -88,6 +89,17 @@ export const PROTOTYPE_TOOLS = [
     methodsRoute: '/product/peer-analysis#methods',
     mock: (isActive?: boolean, _shouldAnimate?: boolean) => <PeerLensMock isActive={isActive} />,
   },
+  {
+    op: 'OP_A7',
+    code: 'CLSI',
+    name: 'Close Intel',
+    tag: 'Continuous close monitoring',
+    color: 'var(--accent-blue)',
+    desc: 'A deterministic monitor that notices GL anomalies intra-month, an analyst teaching loop it remembers, and a narrator that writes cited board-grade close commentary. Every number computed, never generated - and it gets smarter every month.',
+    route: '/product/close-intel',
+    methodsRoute: '/product/close-intel#methods',
+    mock: (isActive?: boolean, _shouldAnimate?: boolean) => <CloseIntelMock isActive={isActive} />,
+  },
 ]
 
 export function HomePrototypePage() {
@@ -151,10 +163,10 @@ function HeroCinematic() {
                 </span>
               </h1>
               <p className="lede hero-main-lede" style={{ marginTop: 36 }}>
-                Six focused AI tools for financial analysts. Scenario to breakeven, natural
+                Seven focused AI tools for financial analysts. Scenario to breakeven, natural
                 language to SQL, filings to model, borrower packages to credit spread, market
-                inputs to forecast cube, and any bank to a defensible peer set. Calibrated on real
-                workflows, audited end to end.
+                inputs to forecast cube, any bank to a defensible peer set, and close monitoring
+                to cited commentary. Calibrated on real workflows, audited end to end.
               </p>
               <div style={{ display: 'flex', gap: 12, marginTop: 40, flexWrap: 'wrap' }}>
                 <a className="btn btn-ink" href={BOOK_DEMO_URL}>
@@ -191,8 +203,9 @@ function HeroSplit() {
             </span>
           </h1>
           <p className="lede hero-main-lede" style={{ marginTop: 28 }}>
-            Five focused AI tools for financial analysts. Scenario to breakeven, natural language
-            to SQL, filings to model, scans to credit spread, and market plans to forecast cube.
+            Seven focused AI tools for financial analysts. Scenario to breakeven, natural language
+            to SQL, filings to model, scans to credit spread, market plans to forecast cube, peer
+            analysis, and close monitoring.
           </p>
           <div style={{ display: 'flex', gap: 12, marginTop: 32, flexWrap: 'wrap' }}>
             <a className="btn btn-ink" href={BOOK_DEMO_URL}>
@@ -232,8 +245,9 @@ function HeroTypographic() {
           }}
         >
           <p className="lede" style={{ maxWidth: 600 }}>
-            Five focused AI tools for financial analysts. Scenario to breakeven, natural language
-            to SQL, filings to model, scans to credit spread, and market plans to forecast cube.
+            Seven focused AI tools for financial analysts. Scenario to breakeven, natural language
+            to SQL, filings to model, scans to credit spread, market plans to forecast cube, peer
+            analysis, and close monitoring.
             Calibrated on real workflows, audited end to end.
           </p>
           <div style={{ display: 'flex', gap: 12 }}>
@@ -380,7 +394,7 @@ function Philosophy() {
     {
       ix: '01',
       title: 'Tools.',
-      body: 'Not a platform. Not a suite. Six tools, each doing one job at a level a senior analyst would accept.',
+      body: 'Not a platform. Not a suite. Seven tools, each doing one job at a level a senior analyst would accept.',
       color: 'var(--accent-slate)',
       panel: <PhilArtScalpel />,
     },

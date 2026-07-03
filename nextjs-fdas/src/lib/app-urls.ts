@@ -17,6 +17,7 @@ const BANK_ANALYSIS_APP_URL =
 export const RM_PRO_FORMA_URL = `${trimTrailingSlash(BANK_ANALYSIS_APP_URL)}/rm-pro-forma`
 export const CREDIT_SPREAD_URL = `${trimTrailingSlash(BANK_ANALYSIS_APP_URL)}/credit-spread`
 export const REGIONAL_FORECASTING_URL = `${trimTrailingSlash(BANK_ANALYSIS_APP_URL)}/forecasting`
+export const CLOSE_INTEL_URL = `${trimTrailingSlash(BANK_ANALYSIS_APP_URL)}/forecasting/close-intel`
 
 const PEER_ANALYSIS_APP_URL =
   process.env.NEXT_PUBLIC_PEER_ANALYSIS_APP_URL ||

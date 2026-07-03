@@ -82,6 +82,12 @@ export function ProductPrototypePage() {
         ['Direction-aware reads', 'Efficiency, cost of funds, NIE/assets, and charge-offs scored better-when-lower. Percentile is position, not virtue.'],
         ['AI takeaways, grounded', 'An AI analyst writes mechanism-level findings, watch items, and caveats - every figure cited from the computed stats, never invented.'],
       ],
+      [
+        ['Deterministic monitor', 'Baselines per GL account × cost center × month-of-year and vs the active forecast version - 21,585 cells scored in about 50 seconds.'],
+        ['Teaching loop', 'Dispositions draft suppression rules and become retrieval memory. A verdict in month N provably changes month N+1 - suppressed items carry rule attribution.'],
+        ['Cited narrator', 'Penny-tied variance bridges, expectation bands, and analyst context feed commentary where every paragraph carries its citations.'],
+        ['Numbers guard', 'Every figure in every narrative string-matches a deterministically computed value - zero LLM-computed numbers, enforced in code.'],
+      ],
     ],
     [],
   )
@@ -94,7 +100,7 @@ export function ProductPrototypePage() {
         <div className="wrap">
           <Eyebrow op="/ PRODUCT">The toolkit</Eyebrow>
           <h1 className="display h1" style={{ marginTop: 40 }}>
-            Six tools.
+            Seven tools.
             <br />
             Each one a
             <br />

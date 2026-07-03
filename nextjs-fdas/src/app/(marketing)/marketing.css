@@ -8,6 +8,7 @@
   --ink-2: #606060;
   --ink-3: #b8b8b8;
   --accent: #ffac03;
+  --accent-blue: #4b7fe0;
   --accent-2: #7a8579;
   --accent-slate: #263c49;
   --accent-orange: #d95f3d;
@@ -758,6 +759,7 @@
   --ink-2: #d1d1d1;
   --ink-3: #606060;
   --accent: #ffac03;
+  --accent-blue: #5b8def;
   --accent-2: #739666;
   --accent-slate: #6e8ea0;
   --accent-orange: #e6724f;
@@ -3105,6 +3107,600 @@
   gap: 12px;
   margin-top: 28px;
   flex-wrap: wrap;
+}
+
+.ace-marketing .cid-section {
+  padding: 96px 0 80px;
+  border-top: 1px solid var(--line);
+}
+
+.ace-marketing .cid-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.ace-marketing .cid-eyebrow::after {
+  content: ' ●';
+  color: var(--accent);
+}
+
+.ace-marketing .cid-caption {
+  font-size: 14.5px;
+  color: var(--ink-2);
+  max-width: 760px;
+  margin: 14px 0 28px;
+  line-height: 1.5;
+}
+
+.ace-marketing .cid-caption-after {
+  margin-top: 14px;
+  margin-bottom: 0;
+}
+
+.ace-marketing .cid-mock {
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.ace-marketing .cid-mock-chrome {
+  border-bottom: 1px solid var(--line);
+}
+
+.ace-marketing .cid-mock-chrome .url {
+  flex: 1;
+  color: var(--ink-2);
+}
+
+.ace-marketing .cid-mock-chrome .tag {
+  margin-left: auto;
+  letter-spacing: 0.08em;
+}
+
+.ace-marketing .cid-month-tick {
+  color: var(--ink-3);
+  margin-left: 8px;
+}
+
+.ace-marketing .cid-mock-body {
+  min-height: 398px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.ace-marketing .cid-phase-stack {
+  position: relative;
+  min-height: 312px;
+}
+
+.ace-marketing .cid-phase {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 450ms ease-out,
+    transform 450ms ease-out;
+  pointer-events: none;
+}
+
+.ace-marketing .cid-phase.on,
+.ace-marketing .cid-phase.reduced {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.ace-marketing .cid-reduced .cid-phase-stack {
+  display: grid;
+  gap: 14px;
+  min-height: 0;
+}
+
+.ace-marketing .cid-reduced .cid-phase {
+  position: relative;
+  inset: auto;
+}
+
+.ace-marketing .cid-phase-label {
+  color: var(--accent-blue);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  margin-bottom: 12px;
+}
+
+.ace-marketing .cid-ledger {
+  border: 1px solid var(--line);
+}
+
+.ace-marketing .cid-ledger-row {
+  display: grid;
+  grid-template-columns: 0.9fr 1.35fr 0.55fr 0.5fr;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 11px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 360ms ease-out,
+    transform 360ms ease-out;
+}
+
+.ace-marketing .cid-ledger-row:last-child {
+  border-bottom: 0;
+}
+
+.ace-marketing .cid-phase.on .cid-ledger-row,
+.ace-marketing .cid-phase.reduced .cid-ledger-row {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.ace-marketing .cid-ledger-row.hot {
+  border-left: 1px solid var(--accent-blue);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent-blue) 8%, transparent);
+}
+
+.ace-marketing .cid-findings-foot {
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  color: var(--ink-2);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.ace-marketing .cid-disposition-card {
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.ace-marketing .cid-disposition-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink-2);
+  font-size: 11px;
+}
+
+.ace-marketing .cid-verdict {
+  border: 1px solid var(--accent-blue);
+  border-radius: 99px;
+  color: var(--accent-blue);
+  padding: 4px 9px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.ace-marketing .cid-note {
+  margin-top: 18px;
+  color: var(--ink);
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.ace-marketing .cid-rule-row {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-left: 1px solid var(--accent-blue);
+  color: var(--ink-2);
+  padding: 12px 14px;
+  font-size: 11px;
+  transform: translateX(-8px);
+  opacity: 0;
+  transition:
+    opacity 420ms ease-out 140ms,
+    transform 420ms ease-out 140ms;
+}
+
+.ace-marketing .cid-phase.on .cid-rule-row,
+.ace-marketing .cid-phase.reduced .cid-rule-row {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.ace-marketing .cid-memory {
+  margin-top: 14px;
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  color: var(--ink-3);
+  font-size: 11px;
+  position: relative;
+}
+
+.ace-marketing .cid-memory .from,
+.ace-marketing .cid-memory .to {
+  grid-column: 2;
+  grid-row: 1;
+  color: var(--ink-2);
+  transition:
+    opacity 450ms ease-out,
+    transform 450ms ease-out;
+}
+
+.ace-marketing .cid-memory .from.off {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.ace-marketing .cid-memory .to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.ace-marketing .cid-memory .to.on {
+  opacity: 1;
+  transform: translateY(0);
+  color: var(--accent-blue);
+}
+
+.ace-marketing .cid-commentary-card {
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.ace-marketing .cid-commentary-text {
+  margin: 0;
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  font-size: 24px;
+  line-height: 1.28;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  clip-path: inset(0 100% 0 0);
+}
+
+.ace-marketing .cid-commentary-text.on,
+.ace-marketing .cid-phase.reduced .cid-commentary-text {
+  animation: cidType 1100ms steps(12, end) forwards;
+}
+
+.ace-marketing .cid-phase.reduced .cid-commentary-text {
+  clip-path: inset(0 0 0 0);
+  animation: none;
+}
+
+.ace-marketing .cid-citations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.ace-marketing .cid-citations span {
+  border: 1px solid var(--line-strong);
+  border-radius: 99px;
+  padding: 4px 7px;
+  color: var(--ink-2);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+}
+
+.ace-marketing .cid-guard {
+  display: inline-flex;
+  margin-top: 14px;
+  border: 1px solid var(--accent-2);
+  border-radius: 99px;
+  padding: 7px 10px;
+  color: var(--accent-2);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+}
+
+.ace-marketing .cid-phase-indicator {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.ace-marketing .cid-phase-indicator span {
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 5px 9px;
+  color: var(--ink-3);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.ace-marketing .cid-phase-indicator span.on {
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+.ace-marketing .cid-cycle {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  padding: 28px 24px 20px;
+}
+
+.ace-marketing .cid-ring {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 44px;
+  position: relative;
+}
+
+.ace-marketing .cid-station {
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  padding: 14px 16px;
+  position: relative;
+}
+
+.ace-marketing .cid-station .op {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+}
+
+.ace-marketing .cid-station .t {
+  font-weight: 600;
+  font-size: 15.5px;
+  margin: 3px 0 4px;
+}
+
+.ace-marketing .cid-station .d {
+  font-size: 12px;
+  color: var(--ink-2);
+  line-height: 1.45;
+}
+
+.ace-marketing .cid-station .kind {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid var(--line-strong);
+  border-radius: 99px;
+  padding: 2px 8px;
+  margin-top: 9px;
+  color: var(--ink-2);
+}
+
+.ace-marketing .cid-station .kind.det {
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+.ace-marketing .cid-station .kind.llm {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.ace-marketing .cid-station .kind.human {
+  color: var(--accent-2);
+  border-color: var(--accent-2);
+}
+
+.ace-marketing .cid-station::after {
+  content: '';
+  position: absolute;
+  right: -36px;
+  top: 50%;
+  width: 26px;
+  height: 1px;
+  background: var(--line-strong);
+}
+
+.ace-marketing .cid-station::before {
+  content: '';
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left: 7px solid var(--line-strong);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+
+.ace-marketing .cid-station:last-child::after,
+.ace-marketing .cid-station:last-child::before {
+  display: none;
+}
+
+.ace-marketing .cid-return {
+  margin-top: 26px;
+  position: relative;
+  height: 56px;
+  color: var(--accent-blue);
+}
+
+.ace-marketing .cid-return svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ace-marketing .cid-return .lbl {
+  position: absolute;
+  left: 50%;
+  top: 26px;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--accent-blue);
+  background: var(--panel);
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.ace-marketing .cid-month {
+  position: absolute;
+  right: 0;
+  top: 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.ace-marketing .cid-month b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.ace-marketing .cid-rail {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 0;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.ace-marketing .cid-rail .cellb {
+  padding: 18px;
+  background: var(--bg);
+}
+
+.ace-marketing .cid-rail .cellb.panelb {
+  background: var(--panel);
+}
+
+.ace-marketing .cid-rail .vb {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 0 14px;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+
+.ace-marketing .cid-rail .verb {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-blue);
+  white-space: nowrap;
+}
+
+.ace-marketing .cid-rail .arr {
+  color: var(--line-strong);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.ace-marketing .cid-rail .h {
+  font-weight: 600;
+  font-size: 15px;
+  margin: 0 0 4px;
+}
+
+.ace-marketing .cid-rail .s {
+  font-size: 12px;
+  color: var(--ink-2);
+  line-height: 1.45;
+}
+
+.ace-marketing .cid-rail .mono-line {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-2);
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.ace-marketing .cid-rail .ok {
+  color: var(--accent-2);
+  font-weight: 600;
+}
+
+@keyframes cidType {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (max-width: 1100px) {
+  .ace-marketing .cid-ring,
+  .ace-marketing .cid-rail {
+    grid-template-columns: 1fr;
+  }
+
+  .ace-marketing .cid-station::after,
+  .ace-marketing .cid-station::before,
+  .ace-marketing .cid-return svg {
+    display: none;
+  }
+
+  .ace-marketing .cid-return {
+    height: auto;
+    display: grid;
+    gap: 8px;
+  }
+
+  .ace-marketing .cid-return .lbl,
+  .ace-marketing .cid-month {
+    position: static;
+    transform: none;
+    white-space: normal;
+    background: transparent;
+    padding: 0;
+  }
+
+  .ace-marketing .cid-rail .vb {
+    min-height: 58px;
+    border-left: 0;
+    border-right: 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 700px) {
+  .ace-marketing .cid-mock-body {
+    padding: 18px;
+  }
+
+  .ace-marketing .cid-mock-chrome .tag {
+    display: none;
+  }
+
+  .ace-marketing .cid-ledger-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .ace-marketing .cid-findings-foot,
+  .ace-marketing .cid-disposition-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ace-marketing .cid-commentary-text {
+    font-size: 20px;
+  }
 }
 
 .ace-marketing .pp-beam {
