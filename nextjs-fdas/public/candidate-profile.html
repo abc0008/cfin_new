@@ -207,7 +207,14 @@ ul.pts li b{color:var(--navy)}
 @media print{.sidebar{display:none}.view{display:block!important}.topbar{background:var(--navy)!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.acc .body{padding-left:16px}}
 h1,h2,h4{font-family:'Inter Tight',system-ui,sans-serif}.brand .sub,.kpi .lbl,.lab,.tbl th,.theme-row td,h3.blk,.thesis .cap,.fband .bl,.fgrp .gh,.mtag,.vcap,.fsublabel,.fsublabel span,.chip,.step .sn,.usefor b,.disc{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,monospace}
 .tbl .req{color:var(--muted)}.tbl .deliver{color:var(--ink);font-weight:500}
-.blk{scroll-margin-top:16px}.reflinks{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}.reflinks .rl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--faint)}.reflinks a{font-size:11.5px;font-weight:600;text-decoration:none;border-radius:99px;padding:4px 11px;border:1px solid var(--line);background:var(--card);color:var(--navy);cursor:pointer}.reflinks a.fjump{border-color:#E0CFA0;background:#FBEFD6;color:#7a4f12}.reflinks a.exlink{border-color:#C6C6C6;color:var(--navy)}.reflinks a:hover{border-color:var(--amber);color:#111}.reflinks a .ar{color:var(--amber);font-weight:700}
+.blk{scroll-margin-top:16px}
+h3.blk{font-size:13px;font-weight:700;color:var(--navy);margin:22px 0 10px;font-family:'JetBrains Mono',ui-monospace,monospace;letter-spacing:.3px;border-bottom:2px solid var(--amber);padding-bottom:5px;display:inline-block}
+#runbook code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;background:#ECECEC;border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:var(--navy)}
+.rb-code{background:#111111;color:#E6E6E6;border-radius:10px;padding:16px 18px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;line-height:1.75;overflow-x:auto;box-shadow:var(--shadow);margin:0 0 18px}
+.rb-code .c{color:#FFAC03}
+.rb-notes{display:grid;gap:8px;margin:0 0 18px}
+.rb-note{display:flex;align-items:flex-start;gap:4px;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 13px;box-shadow:var(--shadow)}
+.rb-note .b-num{margin-top:1px}.reflinks{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}.reflinks .rl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--faint)}.reflinks a{font-size:11.5px;font-weight:600;text-decoration:none;border-radius:99px;padding:4px 11px;border:1px solid var(--line);background:var(--card);color:var(--navy);cursor:pointer}.reflinks a.fjump{border-color:#E0CFA0;background:#FBEFD6;color:#7a4f12}.reflinks a.exlink{border-color:#C6C6C6;color:var(--navy)}.reflinks a:hover{border-color:var(--amber);color:#111}.reflinks a .ar{color:var(--amber);font-weight:700}
 .sitenav{position:sticky;top:0;z-index:200;display:flex;align-items:center;gap:18px;height:54px;padding:0 22px;background:var(--navy);color:#fff;border-bottom:1px solid rgba(255,255,255,.12);font-family:'Inter Tight',system-ui,sans-serif}
 .sitenav a{color:#fff;text-decoration:none}
 .sn-brand{font-weight:700;font-size:14px;letter-spacing:.2px;white-space:nowrap}
@@ -344,8 +351,9 @@ body.locked .sitenav{display:none}
       <button data-view="frameworks"><span class="n">4</span> Frameworks</button>
       <button data-view="madeepdive"><span class="n">5</span> M&amp;A Process Deep Dive</button>
       <button data-view="peeranalysis"><span class="n">6</span> Peer Research: Arvest</button>
-      <button data-view="close"><span class="n">7</span> Closing</button>
-      <button data-view="references"><span class="n">8</span> References</button>
+      <button data-view="runbook"><span class="n">7</span> Agent Deploy Runbook</button>
+      <button data-view="close"><span class="n">8</span> Closing</button>
+      <button data-view="references"><span class="n">9</span> References</button>
     </nav>
     <div class="sidefoot">Regional-bank finance &amp; FP&amp;A transformation leader.<br/>Built for the journey from ~$28B to $40B and beyond.</div>
   </aside>
@@ -1037,6 +1045,80 @@ body.locked .sitenav{display:none}
           <iframe id="plArvestFrame" src="peer-analysis-arvest.html" title="Peer Lens — Arvest Bank peer analysis" loading="lazy" scrolling="yes" style="width:100%;height:82vh;min-height:560px;border:0;display:block;background:#121212"></iframe>
         </div>
         <p class="disc">Rendered from a live Peer Lens run · interpretation by AI, every figure grounded in the FDIC Call Report · <a href="peer-analysis-arvest.html" target="_blank" rel="noopener">open full screen &#8599;</a> · <a href="https://peeranalysis.aceanalytics.dev" target="_blank" rel="noopener">run it yourself &#8599;</a></p>
+      </div>
+    </section>
+
+    <!-- ============ 7. AGENT DEPLOY RUNBOOK ============ -->
+    <section class="view" id="runbook">
+      <div class="wrap">
+        <h2 class="sec">ACE Analytics — Multi-App Vercel Deploy Runbook (For AI Agents)</h2>
+        <p class="lead">The source-of-truth process my AI agents follow to deploy the ACE Analytics ecosystem to production — four apps, one checklist, explicit verification and rollback. This is the operating discipline behind everything demoed on this site: agents do the work, but they work from a governed runbook.</p>
+        <div class="callout" style="margin-bottom:16px">
+          <div class="h">Why this is here</div>
+          The mandate calls for finance-led automation with governance. This is what that looks like in practice at small scale: agentic deployment with a canonical app-to-project mapping, preflight checks, environment-variable contracts, known failure modes with fixes, and a rollback procedure &mdash; the same shape I'd bring to governed AI in an FP&amp;A shop.
+        </div>
+
+        <h3 class="blk">Canonical app-to-project mapping</h3>
+        <table class="tbl" style="margin-bottom:18px">
+          <thead><tr><th style="width:30%">App surface</th><th style="width:30%">Domain</th><th style="width:20%">Vercel project</th><th style="width:20%">Local source</th></tr></thead>
+          <tbody>
+            <tr><td><b>Main ACE site + CFIN routes</b></td><td class="req">aceanalytics.dev &middot; www</td><td class="deliver">nextjs-fdas</td><td class="proof">cfin_new/nextjs-fdas</td></tr>
+            <tr><td><b>Text2SQL</b></td><td class="req">text2sql.aceanalytics.dev</td><td class="deliver">text2sql1</td><td class="proof">Text2SQL1/frontend</td></tr>
+            <tr><td><b>Bank Analysis</b></td><td class="req">bankanalysis.aceanalytics.dev</td><td class="deliver">bankanalysis</td><td class="proof">BankAnalysis/frontend</td></tr>
+            <tr><td><b>Mail forward + cal vanity URL</b></td><td class="req">cal.aceanalytics.dev</td><td class="deliver">aceanalytics-mail-forwarder</td><td class="proof">aceanalytics-mail-forwarder</td></tr>
+          </tbody>
+        </table>
+
+        <h3 class="blk">Critical notes (do not skip)</h3>
+        <div class="rb-notes">
+          <div class="rb-note"><span class="b-num">1</span>Deploy <b>apex</b> from <code>cfin_new/nextjs-fdas</code> (canonical source), not legacy directories.</div>
+          <div class="rb-note"><span class="b-num">2</span>Deploy <b>bankanalysis</b> from the <code>frontend</code> subdirectory, not repo root &mdash; root deploys fail with <code>react-scripts: command not found</code>.</div>
+          <div class="rb-note"><span class="b-num">3</span>If the apex still shows old content after a successful deploy, the alias is stale &mdash; explicitly re-point <code>aceanalytics.dev</code> + <code>www</code> to the new deployment URL.</div>
+        </div>
+
+        <h3 class="blk">Deploy sequence</h3>
+        <pre class="rb-code"><span class="c"># 0 &middot; preflight — authenticate + confirm scope (alex-cardells-projects)</span>
+vercel whoami &amp;&amp; vercel project ls --scope alex-cardells-projects
+
+<span class="c"># 1 &middot; main site (nextjs-fdas) — deploy, then FORCE apex aliases</span>
+cd cfin_new/nextjs-fdas
+vercel link --yes --scope alex-cardells-projects --project nextjs-fdas
+vercel deploy --prod --yes --scope alex-cardells-projects
+vercel alias set &lt;DEPLOY_URL&gt; aceanalytics.dev --scope alex-cardells-projects
+vercel alias set &lt;DEPLOY_URL&gt; www.aceanalytics.dev --scope alex-cardells-projects
+
+<span class="c"># 2 &middot; text2sql1 (from Text2SQL1/frontend) &middot; 3 &middot; bankanalysis (from BankAnalysis/frontend)</span>
+<span class="c"># 4 &middot; mail-forwarder (Resend inbound + cal.aceanalytics.dev/demo)</span>
+<span class="c">#     same pattern: cd → vercel link → vercel deploy --prod</span>
+
+<span class="c"># verify — every domain, after every deploy</span>
+vercel inspect https://aceanalytics.dev
+curl -sL https://aceanalytics.dev | rg "Read between|Aperture|OP_A1"</pre>
+
+        <h3 class="blk">Environment-variable contract</h3>
+        <table class="tbl" style="margin-bottom:18px">
+          <thead><tr><th style="width:26%">Project</th><th style="width:44%">Required vars</th><th style="width:30%">Notes</th></tr></thead>
+          <tbody>
+            <tr><td><b>nextjs-fdas</b></td><td class="req">NEXT_PUBLIC_ACE_NEWS_API_BASE &middot; ACE_NEWS_API_BASE (fallback)</td><td class="proof">Unset &rarr; falls back to localhost; local dev only</td></tr>
+            <tr><td><b>aceanalytics-news-api</b></td><td class="req">ANTHROPIC_API_KEY &middot; ALLOWED_ORIGINS &middot; BLOB_READ_WRITE_TOKEN &middot; CRON_SECRET &middot; REFRESH_TOKEN</td><td class="proof">Blob-backed persistence; hourly Vercel Cron refresh &mdash; never rely on /tmp</td></tr>
+            <tr><td><b>aceanalytics-mail-forwarder</b></td><td class="req">RESEND_API_KEY &middot; RESEND_WEBHOOK_SECRET &middot; CAL_DEMO_BOOKING_URL</td><td class="proof">Plus Resend DNS + webhook per project SETUP.md</td></tr>
+          </tbody>
+        </table>
+
+        <h3 class="blk">Known failure modes &rarr; fixes</h3>
+        <table class="tbl" style="margin-bottom:18px">
+          <thead><tr><th style="width:38%">Symptom</th><th style="width:28%">Cause</th><th style="width:34%">Fix</th></tr></thead>
+          <tbody>
+            <tr><td><b>Apex shows old page after deploy</b></td><td class="req">Domain alias still points at prior deployment</td><td class="proof">Explicit <code>vercel alias set</code> for apex + www</td></tr>
+            <tr><td><b>bankanalysis build fails (react-scripts not found)</b></td><td class="req">Deployed from repo root</td><td class="proof">Deploy from /frontend only</td></tr>
+            <tr><td><b>nextjs-fdas blocked by lint errors</b></td><td class="req">Prod build runs lint/type checks</td><td class="proof">eslint.ignoreDuringBuilds in next.config.js</td></tr>
+          </tbody>
+        </table>
+
+        <h3 class="blk">Rollback</h3>
+        <p style="font-size:13px;color:var(--muted);max-width:760px;margin:6px 0 14px">Identify the last known-good deployment URL for the affected project, re-point the apex + www aliases to it, then re-verify with <code>vercel inspect</code>. Aliases are the control surface &mdash; rollback is a pointer move, not a rebuild.</p>
+
+        <p class="disc">Source-of-truth runbook consumed by AI agents deploying the ACE Analytics ecosystem &middot; scope: aceanalytics.dev, text2sql, bankanalysis, cal redirect &middot; secrets are referenced by name only and live in Vercel project settings.</p>
       </div>
     </section>
 
