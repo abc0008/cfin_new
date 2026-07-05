@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mapping the Bank FP&A Space · AceAnalytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Fraunces:ital,wght@1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EBEBEB;--bg-deep:#D1D1D1;--panel:#EFEFEF;--ink:#111111;--ink2:#606060;--ink3:#B8B8B8;
+  --line:rgba(17,17,17,.12);--line-strong:rgba(17,17,17,.28);--gold:#FFAC03;
+  --disp:'Inter Tight',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--serif:'Fraunces',Georgia,serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--disp)}
+.eyebrow{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2)}
+.eyebrow .dot{color:var(--gold)}
+header{padding:22px 28px 14px;border-bottom:1px solid var(--line)}
+header h1{font-size:36px;font-weight:500;letter-spacing:-.03em;margin:6px 0 10px;line-height:1.08}
+header h1 em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--gold)}
+header .sub{font-family:var(--mono);font-size:12px;color:var(--ink2);letter-spacing:.04em;margin-top:4px}
+.app{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - 108px)}
+.app.collapsed{grid-template-columns:38px 1fr}
+.app.collapsed aside{padding:12px 5px}
+.app.collapsed #sideContent{display:none}
+#sideToggle{width:100%;border:1px solid var(--line-strong);background:transparent;border-radius:8px;padding:7px 4px;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--ink2);margin-bottom:12px}
+#sideToggle:hover{background:var(--ink);color:var(--bg)}
+.app.collapsed #sideToggle{writing-mode:vertical-rl;padding:10px 5px;height:auto;min-height:120px}
+body.png .app{grid-template-columns:1fr;height:auto}
+aside{border-right:1px solid var(--line);padding:16px 18px;overflow:auto;background:var(--bg)}
+body.png aside{display:none}
+aside h3{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2);margin:18px 0 8px;border-top:1px solid var(--line);padding-top:12px}
+aside h3:first-child{margin-top:0;border-top:0;padding-top:0}
+label.row{display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0;cursor:pointer}
+.chip{display:flex;align-items:center;gap:9px;padding:7px 10px;border:1px solid var(--line-strong);border-radius:99px;margin:6px 0;cursor:pointer;background:transparent;font-size:12.5px;width:100%;text-align:left;font-family:var(--disp)}
+.chip .code{font-family:var(--mono);font-size:10px;color:var(--ink2);letter-spacing:.06em;min-width:34px}
+.chip .pdot{width:11px;height:11px;border-radius:50%;flex:0 0 11px}
+.chip.active{background:var(--ink);color:var(--bg)} .chip.active .code{color:var(--ink3)}
+.chip .n{flex:1}
+.legend{font-size:12px;color:var(--ink2);line-height:1.6}
+.legend .sw{display:inline-block;width:13px;height:13px;border-radius:50%;margin-right:8px;vertical-align:-2px}
+button.reset{width:100%;margin-top:14px;padding:10px;border:1px solid var(--line-strong);background:transparent;border-radius:99px;font-family:var(--disp);font-size:13px;cursor:pointer}
+button.reset:hover{background:var(--ink);color:var(--bg)}
+main{position:relative;overflow:hidden}
+body.png main{overflow:visible}
+svg{width:100%;height:100%;display:block}
+body.png svg{height:auto}
+.tooltip{position:absolute;display:none;max-width:400px;padding:13px 15px;background:rgba(17,17,17,.97);color:#EBEBEB;border-radius:14px;font-size:13px;line-height:1.5;pointer-events:none;z-index:9}
+.tooltip .tt-cl{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#B8B8B8;margin-bottom:3px}
+.tooltip .tt-name{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.tooltip .tt-cov{font-family:var(--mono);font-size:11px;margin:4px 0 6px;color:#D1D1D1}
+.tooltip .tt-p{margin-top:7px;padding-top:7px;border-top:1px solid rgba(235,235,235,.18)}
+.tooltip .tt-p .pn{font-weight:600;font-size:13px}
+.tooltip .tt-p .ev{color:#B8B8B8;font-size:12px}
+.tooltip .tt-p .pd{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+footer{display:flex;justify-content:space-between;align-items:center;padding:10px 28px;border-top:1px solid var(--line);font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.06em}
+.pnglegend{display:none;padding:14px 28px 6px;border-top:1px solid var(--line)}
+body.png .pnglegend{display:flex;gap:34px;flex-wrap:wrap;align-items:flex-start}
+.pnglegend .grp{min-width:200px}
+.pnglegend .grp h4{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2);margin:0 0 7px}
+.pnglegend .li{font-size:12px;color:var(--ink);margin:4px 0;display:flex;align-items:center;gap:8px}
+.pnglegend .li .code{font-family:var(--mono);font-size:9.5px;color:var(--ink2);min-width:32px}
+.capText{font-family:var(--disp);font-weight:500;fill:var(--ink)}
+.capText.dim{fill:var(--ink3)}
+.node{cursor:pointer}
+.arcName{font-family:var(--disp);font-weight:600;letter-spacing:-.01em;fill:#111}
+.arcSys{font-family:var(--mono);font-weight:500;letter-spacing:.14em;fill:#606060}
+.chipTxt{font-family:var(--mono);font-weight:500;letter-spacing:.08em;fill:#FCFAF5}
+.chipName{font-family:var(--disp);font-weight:600;fill:#111}
+a.prodLink{cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow"><span class="dot">●</span> OP_07 · BANK FP&A · CAPABILITY CONSTELLATION · ACEANALYTICS.DEV</div>
+  <h1>Mapping the Bank FP&A space <em>versus my experience and agentic solutions.</em></h1>
+  <div class="sub">SIX FUNCTIONAL SYSTEMS · 60 CAPABILITIES · NODE FILL = MY COVERAGE (ROLE EXPERIENCE + BUILDS) · TERRITORIES = PRODUCT REACH (CHIPS LINK TO EACH PRODUCT) · SCROLL / PINCH TO ZOOM, DRAG TO PAN</div>
+</header>
+<div class="app">
+<aside>
+  <button id="sideToggle" title="Collapse panel">◀ HIDE PANEL</button>
+  <div id="sideContent">
+  <h3>Encoding — node fill = my coverage</h3>
+  <div class="legend">
+    <div><span class="sw" style="background:#5B8DEF"></span>Solid — deep: led in role and/or a build's core job</div>
+    <div><span class="sw" style="background:#5B8DEF66"></span>Half tone — working: hands-on role work or a supporting build</div>
+    <div><span class="sw" style="background:transparent;border:2px solid #5B8DEF"></span>Outline — light: one touchpoint so far</div>
+    <div><span class="sw" style="background:transparent;border:2px dashed #5B8DEF"></span>Dashed — open ground: not yet in my portfolio</div>
+    <div style="margin-top:6px"><span class="sw" style="background:#7A8579;border-radius:3px"></span>Territory — a build's reach, core + supporting (chip links to the product; areas may overlap)</div>
+    <div><span class="sw" style="background:#7A8579;width:10px;height:10px"></span>Badge filled — build's core job</div>
+    <div><span class="sw" style="background:transparent;border:2px solid #7A8579;width:10px;height:10px"></span>Badge ring — build supports</div>
+  </div>
+
+  <h3>Display</h3>
+  <label class="row"><input id="tTerr" type="checkbox" checked> Product territories</label>
+  <label class="row"><input id="tCross" type="checkbox" checked> Cross-functional links</label>
+  <label class="row"><input id="tHulls" type="checkbox" checked> System envelopes</label>
+  <label class="row"><input id="tBadges" type="checkbox" checked> Product badges</label>
+  <label class="row" style="display:none"><input id="tGaps" type="checkbox"></label>
+
+  <h3>My coverage</h3>
+  <label class="row"><input class="fcov" value="Strong" type="checkbox" checked> Deep</label>
+  <label class="row"><input class="fcov" value="Partial" type="checkbox" checked> Working</label>
+  <label class="row"><input class="fcov" value="Limited" type="checkbox" checked> Light</label>
+  <label class="row"><input class="fcov" value="Missing" type="checkbox" checked> Open ground</label>
+
+  <h3>AceAnalytics builds — click to isolate</h3>
+  <div id="chips"></div>
+  <button class="reset" id="reset">Reset view</button>
+  </div>
+</aside>
+<main>
+  <svg id="viz" viewBox="0 0 2720 2180" preserveAspectRatio="xMidYMid meet"></svg>
+  <div class="tooltip" id="tt"></div>
+</main>
+</div>
+<div class="pnglegend" id="pnglegend"></div>
+<footer>
+  <div>V2.0 · FY26Q3 · UPDATED 07.04.26 · 33.519°N 86.810°W</div>
+  <div>NODE FILL = MY COVERAGE (EXPERIENCE + BUILDS) · TERRITORY = PRODUCT REACH · BADGE FILLED = CORE / RING = SUPPORTS · GOLD = CANDIDATE FRAMEWORKS</div>
+</footer>
+
+<script>
+const CLUSTERS=[
+ {id:"plan", name:"Enterprise Planning & Outlook", sys:"01 · PLAN THE ENTERPRISE", color:"#5B8DEF"},
+ {id:"rep",  name:"Reporting, Performance & Insight", sys:"02 · MEASURE PERFORMANCE", color:"#9C6ADE"},
+ {id:"biz",  name:"Business Partnership & Resource Allocation", sys:"03 · ADVISE & ALLOCATE", color:"#2F9E6E"},
+ {id:"bs",   name:"Balance Sheet, Earnings & Capital", sys:"04 · MANAGE THE EARNINGS ENGINE", color:"#E8743B"},
+ {id:"tx",   name:"Strategic Transactions & Transformation", sys:"05 · EXECUTE STRATEGIC CHANGE", color:"#D9534F"},
+ {id:"ops",  name:"FP&A Operating Model, Data & Talent", sys:"06 · BUILD THE CAPABILITY", color:"#6E8EA0"},
+];
+const CAPS=[
+ {l:"Strategic Planning",c:"plan",s:"Strong"},{l:"Annual Budgeting",c:"plan",s:"Strong"},
+ {l:"Rolling Forecasting",c:"plan",s:"Partial"},{l:"Driver-Based Modeling",c:"plan",s:"Strong"},
+ {l:"Scenario & Sensitivity Analysis",c:"plan",s:"Strong"},{l:"Assumption Governance",c:"plan",s:"Limited"},
+ {l:"Forecast Accuracy & Back-Testing",c:"plan",s:"Missing"},
+ {l:"Enterprise Management Reporting",c:"rep",s:"Strong"},{l:"Segment Reporting",c:"rep",s:"Strong"},
+ {l:"Business-Line Reporting",c:"rep",s:"Strong"},{l:"Geographic & Market Reporting",c:"rep",s:"Strong"},
+ {l:"Product Reporting",c:"rep",s:"Missing"},{l:"Customer & Relationship Profitability",c:"rep",s:"Missing"},
+ {l:"Channel & Branch Reporting",c:"rep",s:"Limited"},{l:"Monthly Performance Reviews",c:"rep",s:"Strong"},
+ {l:"Variance Analysis",c:"rep",s:"Partial"},{l:"KPI & Scorecard Management",c:"rep",s:"Strong"},
+ {l:"Executive & Board Reporting",c:"rep",s:"Strong"},{l:"Ownership / Investor Reporting",c:"rep",s:"Partial"},
+ {l:"Regulatory Reporting Support",c:"rep",s:"Partial"},{l:"Peer & Competitive Benchmarking",c:"rep",s:"Missing"},
+ {l:"Business-Line Finance Partnership",c:"biz",s:"Strong"},{l:"Corporate-Function Partnership",c:"biz",s:"Strong"},
+ {l:"Expense Management",c:"biz",s:"Limited"},{l:"Headcount & Compensation Planning",c:"biz",s:"Missing"},
+ {l:"Strategic Resource Allocation",c:"biz",s:"Strong"},{l:"Investment Prioritization",c:"biz",s:"Strong"},
+ {l:"Business-Case Evaluation",c:"biz",s:"Strong"},{l:"Benefits Realization",c:"biz",s:"Partial"},
+ {l:"Productivity & Efficiency Mgmt",c:"biz",s:"Partial"},{l:"Incentive & Metric Support",c:"biz",s:"Missing"},
+ {l:"Balance-Sheet Planning",c:"bs",s:"Partial"},{l:"Net Interest Income Forecasting",c:"bs",s:"Missing"},
+ {l:"Net Interest Margin Analysis",c:"bs",s:"Missing"},{l:"Fee-Income Forecasting",c:"bs",s:"Missing"},
+ {l:"Credit-Cost Forecasting",c:"bs",s:"Limited"},{l:"Capital Planning",c:"bs",s:"Strong"},
+ {l:"Stress Testing",c:"bs",s:"Strong"},{l:"ALCO Support",c:"bs",s:"Partial"},
+ {l:"Funds Transfer Pricing",c:"bs",s:"Missing"},{l:"Capital & Liquidity Attribution",c:"bs",s:"Missing"},
+ {l:"Management Allocations",c:"bs",s:"Missing"},
+ {l:"M&A Target Assessment",c:"tx",s:"Strong"},{l:"M&A Valuation & Modeling",c:"tx",s:"Strong"},
+ {l:"Financial Due Diligence",c:"tx",s:"Strong"},{l:"Synergy & Integration Modeling",c:"tx",s:"Strong"},
+ {l:"Post-Merger Performance Tracking",c:"tx",s:"Partial"},{l:"Geographic & Organic Expansion",c:"tx",s:"Strong"},
+ {l:"Enterprise Transformation Finance",c:"tx",s:"Strong"},{l:"Branch & Distribution Optimization",c:"tx",s:"Limited"},
+ {l:"FP&A Organizational Design",c:"ops",s:"Strong"},{l:"Talent & Succession",c:"ops",s:"Strong"},
+ {l:"EPM & Planning Systems",c:"ops",s:"Strong"},{l:"ERP & EPM Implementation",c:"ops",s:"Partial"},
+ {l:"BI & Analytics",c:"ops",s:"Strong"},
+ {l:"Data Governance",c:"ops",s:"Partial"},{l:"Model Governance",c:"ops",s:"Missing"},
+ {l:"Process Governance",c:"ops",s:"Strong"},{l:"Reporting Controls",c:"ops",s:"Partial"},
+ {l:"Change Leadership",c:"ops",s:"Strong"},
+];
+const PRODUCTS=[
+ {id:"LTTC",name:"Lattice",tag:"RM pro-forma · breakeven",color:"#7A8579",url:"aceanalytics.dev/product/lattice"},
+ {id:"DLCT",name:"Dialect",tag:"Text-to-SQL for banks",color:"#444A3E",url:"aceanalytics.dev/product/text2sql"},
+ {id:"APRT",name:"Aperture",tag:"Filings → cited models",color:"#263C49",url:"aceanalytics.dev/product/cfin"},
+ {id:"FCST",name:"Forecast",tag:"Governed bank planning",color:"#8B6DA5",url:"aceanalytics.dev/product/forecasting"},
+ {id:"PRLN",name:"Peer Lens",tag:"FDIC peer benchmarking",color:"#13A8A8",url:"aceanalytics.dev/product/peer-analysis"},
+ {id:"CLIN",name:"Close Intel",tag:"GL monitor · variance narrator",color:"#D95F3D",url:"aceanalytics.dev/product/close-intel"},
+ {id:"FWK",name:"Candidate Frameworks",tag:"F1–F8 · M&A · ROI governance",color:"#FFAC03",url:"aceanalytics.dev/candidate-profile.html"},
+];
+const LINKS=[
+ {p:"LTTC",cap:"Business-Case Evaluation",t:"core",e:"Cumulative payback — exact break-even month, committee-ready"},
+ {p:"LTTC",cap:"Headcount & Compensation Planning",t:"core",e:"Model the hire, not just the role — salary, incentive, deferred cost per loan"},
+ {p:"LTTC",cap:"Driver-Based Modeling",t:"supports",e:"Volume, pricing, runoff, deposit mix — month by month over six years"},
+ {p:"LTTC",cap:"Scenario & Sensitivity Analysis",t:"supports",e:"BASE / BULL / BEAR; rate shocks propagate to every cash flow"},
+ {p:"LTTC",cap:"Net Interest Income Forecasting",t:"supports",e:"Projected income statement tied to live rate assumptions"},
+ {p:"LTTC",cap:"Balance-Sheet Planning",t:"supports",e:"Balance-sheet dynamics; full financial statements"},
+ {p:"LTTC",cap:"Geographic & Organic Expansion",t:"supports",e:"Direct productization of banker-team lift-out and de novo market models"},
+ {p:"DLCT",cap:"BI & Analytics",t:"core",e:"Ask in English, get production SQL — execute & visualize"},
+ {p:"DLCT",cap:"Data Governance",t:"supports",e:"Banking semantic layer: glossary maps ROE / NIM / market to columns"},
+ {p:"DLCT",cap:"Reporting Controls",t:"supports",e:"Validator fails closed; plan-of-reasoning + cell-level provenance"},
+ {p:"APRT",cap:"BI & Analytics",t:"core",e:"Line-item extraction → ratio, trend, roll-up dashboards"},
+ {p:"APRT",cap:"Financial Due Diligence",t:"supports",e:"M&A review at scale — compliance flags, redlines, missing-doc alerts"},
+ {p:"APRT",cap:"Reporting Controls",t:"supports",e:"Click any number → exact page, row, bounding box"},
+ {p:"APRT",cap:"Variance Analysis",t:"supports",e:"Automated ratio roll-ups and period-over-period"},
+ {p:"FCST",cap:"Rolling Forecasting",t:"core",e:"60-month monthly planning horizon, GL-baselined"},
+ {p:"FCST",cap:"Scenario & Sensitivity Analysis",t:"core",e:"Macro layer: rates, GDP, deposit runoff, credit stress toggles"},
+ {p:"FCST",cap:"Assumption Governance",t:"core",e:"Governance, lineage & guardrails; governed writeback to GL_Fact"},
+ {p:"FCST",cap:"EPM & Planning Systems",t:"core",e:"Live operating surface — market assumptions, central controls, audit-ready loads"},
+ {p:"FCST",cap:"Driver-Based Modeling",t:"supports",e:"Producer hiring economics and controllable-spend levers"},
+ {p:"FCST",cap:"Headcount & Compensation Planning",t:"supports",e:"Market hiring, attrition, ramp assumptions"},
+ {p:"FCST",cap:"Expense Management",t:"supports",e:"Expense controls; controllable spend assumptions"},
+ {p:"FCST",cap:"Business-Line Finance Partnership",t:"supports",e:"Forecast from the market. Govern from the center."},
+ {p:"PRLN",cap:"Peer & Competitive Benchmarking",t:"core",e:"Defensible peer set from FDIC data · 44 Call Report metrics"},
+ {p:"PRLN",cap:"KPI & Scorecard Management",t:"supports",e:"Direction-aware percentile strips — ROA, efficiency, NIM, ROTCE, CET1"},
+ {p:"PRLN",cap:"Executive & Board Reporting",t:"supports",e:"CFO-grade findings, every figure traced to FDIC"},
+ {p:"PRLN",cap:"Model Governance",t:"supports",e:"Advisor-checked executor model — 0 fabricated figures"},
+ {p:"CLIN",cap:"Variance Analysis",t:"core",e:"592 penny-tied bridges — rate/volume/mix, headcount×rate"},
+ {p:"CLIN",cap:"Monthly Performance Reviews",t:"core",e:"One loop per month; 21,585 GL cells scored in ~50s"},
+ {p:"CLIN",cap:"Reporting Controls",t:"core",e:"Every numeric token string-matches a deterministic figure"},
+ {p:"CLIN",cap:"Executive & Board Reporting",t:"supports",e:"Board-grade commentary with citation chips to the GL transaction"},
+ {p:"CLIN",cap:"Forecast Accuracy & Back-Testing",t:"supports",e:"Baseline leg against the active forecast version; expectation bands"},
+ {p:"CLIN",cap:"Model Governance",t:"supports",e:"Zero LLM-computed numbers — the discipline is code, not a prompt"},
+ {p:"CLIN",cap:"Business-Line Reporting",t:"supports",e:"Commentary per line, per LOB, company summary"},
+ {p:"FWK",cap:"FP&A Organizational Design",t:"core",e:"F1 — five-stage maturity curve: bookkeeper → active value management"},
+ {p:"FWK",cap:"Talent & Succession",t:"supports",e:"F1 — job-applied learning, coaching, credible succession bench"},
+ {p:"FWK",cap:"Productivity & Efficiency Mgmt",t:"core",e:"F2/F8 — efficiency by unit vs returns; decompose the efficiency ratio"},
+ {p:"FWK",cap:"Strategic Planning",t:"supports",e:"F2 — regression on valuation drivers → three opportunity buckets"},
+ {p:"FWK",cap:"Strategic Resource Allocation",t:"supports",e:"F3 — RAC sets pools; capacity measured on 8 dimensions"},
+ {p:"FWK",cap:"Investment Prioritization",t:"core",e:"F3 — RAC/EIC two-tier committee; sizing lanes <$25K to >$5M"},
+ {p:"FWK",cap:"Business-Case Evaluation",t:"core",e:"F3 — auto-spread economics into pro forma with project ROI"},
+ {p:"FWK",cap:"Benefits Realization",t:"supports",e:"F3 — semi-annual post-mortems: realized ROI vs original case"},
+ {p:"FWK",cap:"Corporate-Function Partnership",t:"supports",e:"F3 — partner with COO/CIO; financial linkage to enterprise PMO"},
+ {p:"FWK",cap:"Financial Due Diligence",t:"core",e:"F4 — led finance diligence on a bank acquisition; New-Lost-Existing durability"},
+ {p:"FWK",cap:"M&A Target Assessment",t:"supports",e:"F4 — five decision lenses + target scorecard"},
+ {p:"FWK",cap:"M&A Valuation & Modeling",t:"supports",e:"F4 — normalized run-rate earnings; EPS, TBV earnback, ROIC"},
+ {p:"FWK",cap:"Synergy & Integration Modeling",t:"supports",e:"F4 — synergy ramps, dis-synergies, integration plan"},
+ {p:"FWK",cap:"Post-Merger Performance Tracking",t:"supports",e:"F4 — post-close tracking gate in the six-gate deep dive"},
+ {p:"FWK",cap:"Annual Budgeting",t:"core",e:"F5 — firm top-down budgets; decision rights, effective challenge"},
+ {p:"FWK",cap:"Driver-Based Modeling",t:"supports",e:"F6 — GL/ERP linked to drivers; second-order effects modeled"},
+ {p:"FWK",cap:"Model Governance",t:"core",e:"F6 — LLM proposes; deterministic model computes; human approves"},
+ {p:"FWK",cap:"Assumption Governance",t:"supports",e:"F6 — every change is a reviewable proposal with attribution"},
+ {p:"FWK",cap:"Segment Reporting",t:"core",e:"F7 — consumer/commercial/SB/C&I/CRE; contribution · ROA/ROE"},
+ {p:"FWK",cap:"Customer & Relationship Profitability",t:"supports",e:"F7 — householding roll-ups; banker profitability to the advisor"},
+ {p:"FWK",cap:"Management Allocations",t:"supports",e:"F7 — revenue − direct − allocated OH − credit = contribution"},
+ {p:"FWK",cap:"Expense Management",t:"supports",e:"F8 — strategic vs run-rate; never challenge cost without a productivity link"},
+ {p:"FWK",cap:"Peer & Competitive Benchmarking",t:"supports",e:"F2/F8 — bucket peers by operating model; benchmark every lever"},
+];
+const CROSS=[
+ ["Strategic Planning","Strategic Resource Allocation"],["Strategic Planning","Capital Planning"],
+ ["Annual Budgeting","Expense Management"],["Annual Budgeting","Headcount & Compensation Planning"],
+ ["Rolling Forecasting","Net Interest Income Forecasting"],["Rolling Forecasting","Fee-Income Forecasting"],
+ ["Driver-Based Modeling","Business-Case Evaluation"],["Scenario & Sensitivity Analysis","Stress Testing"],
+ ["Assumption Governance","Data Governance"],["Forecast Accuracy & Back-Testing","Model Governance"],
+ ["Segment Reporting","Funds Transfer Pricing"],["Segment Reporting","Management Allocations"],
+ ["Segment Reporting","Business-Line Finance Partnership"],["Customer & Relationship Profitability","Capital & Liquidity Attribution"],
+ ["Channel & Branch Reporting","Branch & Distribution Optimization"],["KPI & Scorecard Management","Incentive & Metric Support"],
+ ["Monthly Performance Reviews","Benefits Realization"],["Peer & Competitive Benchmarking","Strategic Planning"],
+ ["Investment Prioritization","Business-Case Evaluation"],["Investment Prioritization","Enterprise Transformation Finance"],
+ ["Benefits Realization","Post-Merger Performance Tracking"],["Balance-Sheet Planning","ALCO Support"],
+ ["Net Interest Income Forecasting","Net Interest Margin Analysis"],["Capital Planning","Stress Testing"],
+ ["M&A Valuation & Modeling","Capital Planning"],["Financial Due Diligence","Synergy & Integration Modeling"],
+ ["EPM & Planning Systems","Rolling Forecasting"],["EPM & Planning Systems","ERP & EPM Implementation"],["BI & Analytics","Enterprise Management Reporting"],
+ ["Reporting Controls","Executive & Board Reporting"],["Variance Analysis","Monthly Performance Reviews"],
+];
+
+
+
+/* ============ LAYOUT (deterministic radial sectors) ============ */
+const W=2720,H=2180,CX=1360,CY=1060,KX=1.32,KY=0.95;
+const svg=document.getElementById("viz");
+const NS="http://www.w3.org/2000/svg";
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);(parent||svg).appendChild(e);return e;}
+function P(a,r){return [CX+Math.cos(a)*r*KX, CY+Math.sin(a)*r*KY];}
+
+const byCluster={};CAPS.forEach(c=>{(byCluster[c.c]=byCluster[c.c]||[]).push(c)});
+const PAD=3.2, total=CAPS.length+CLUSTERS.length*PAD;
+let ang=-Math.PI/2 - (byCluster["plan"].length+PAD)/total*Math.PI; // center 'plan' at top
+const sector={};
+CLUSTERS.forEach(cl=>{
+  const n=byCluster[cl.id].length, width=(n+PAD)/total*2*Math.PI;
+  sector[cl.id]={a0:ang, a1:ang+width, mid:ang+width/2};
+  ang+=width;
+});
+const capIndex={};
+CLUSTERS.forEach(cl=>{
+  const caps=byCluster[cl.id], s=sector[cl.id];
+  const usable=(s.a1-s.a0)*0.80, start=s.mid-usable/2;
+  let innerCount=0;
+  caps.forEach((c,i)=>{
+    const f=caps.length===1?0.5:i/(caps.length-1);
+    const a=start+f*usable;
+    const inner=(i%2===1);
+    const r=inner?540:760;
+    c.ring=inner?"inner":"outer";
+    c.ci=i;
+    if(inner)c.innerIdx=innerCount++;
+    [c.x,c.y]=P(a,r);
+    c.angle=a; c.color=cl.color; c.clusterName=cl.name;
+    capIndex[c.l]=c;
+  });
+  sector[cl.id].hub=(()=>{const [x,y]=P(s.mid,290);return{x,y}})();
+});
+
+/* ============ LAYERS ============ */
+const gRoot=el("g",{});
+const gHull=el("g",{},gRoot),gTerr=el("g",{},gRoot),gSpokes=el("g",{},gRoot),gCross=el("g",{},gRoot),gNodes=el("g",{},gRoot),gLabels=el("g",{},gRoot),gChips=el("g",{},gRoot);
+
+function catmull(points){
+  const p=points.concat([points[0],points[1]]);let d=`M ${p[0][0]},${p[0][1]}`;
+  for(let i=0;i<points.length;i++){
+    const p0=p[Math.max(0,i-1)],p1=p[i],p2=p[i+1],p3=p[i+2];
+    d+=` C ${p1[0]+(p2[0]-p0[0])/6},${p1[1]+(p2[1]-p0[1])/6} ${p2[0]-(p3[0]-p1[0])/6},${p2[1]-(p3[1]-p1[1])/6} ${p2[0]},${p2[1]}`;
+  }return d+" Z";
+}
+function hull(pts,pad){
+  pts=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+  const cross=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+  const lo=[],up=[];
+  for(const p of pts){while(lo.length>=2&&cross(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p);}
+  for(const p of pts.slice().reverse()){while(up.length>=2&&cross(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p);}
+  const h=lo.slice(0,-1).concat(up.slice(0,-1));
+  const cx=h.reduce((s,p)=>s+p[0],0)/h.length, cy=h.reduce((s,p)=>s+p[1],0)/h.length;
+  return h.map(p=>{const dx=p[0]-cx,dy=p[1]-cy,L=Math.hypot(dx,dy)||1;return[p[0]+dx/L*pad,p[1]+dy/L*pad];});
+}
+const hullEls={};
+CLUSTERS.forEach(cl=>{
+  const pts=byCluster[cl.id].map(c=>[c.x,c.y]).concat([[sector[cl.id].hub.x,sector[cl.id].hub.y]]);
+  const h=hull(pts,66);
+  hullEls[cl.id]=el("path",{d:catmull(h),fill:cl.color,"fill-opacity":.07,stroke:cl.color,"stroke-opacity":.5,"stroke-width":1.5},gHull);
+});
+
+/* spokes center→hub→cap */
+CLUSTERS.forEach(cl=>{
+  const hb=sector[cl.id].hub;
+  el("line",{x1:CX,y1:CY,x2:hb.x,y2:hb.y,stroke:cl.color,"stroke-width":2.6,"stroke-opacity":.55},gSpokes);
+  byCluster[cl.id].forEach(c=>{
+    el("path",{d:`M ${hb.x},${hb.y} Q ${(hb.x+c.x)/2+(c.x-CX)*0.06},${(hb.y+c.y)/2+(c.y-CY)*0.06} ${c.x},${c.y}`,
+      fill:"none",stroke:cl.color,"stroke-width":1.2,"stroke-opacity":.4},gSpokes);
+  });
+  el("circle",{cx:hb.x,cy:hb.y,r:9,fill:cl.color},gSpokes);
+});
+
+/* cross links */
+const crossEls=[];
+CROSS.forEach(([a,b])=>{
+  const A=capIndex[a],B=capIndex[b];if(!A||!B)return;
+  const mx=(A.x+B.x)/2+(CX-(A.x+B.x)/2)*0.35, my=(A.y+B.y)/2+(CY-(A.y+B.y)/2)*0.35;
+  crossEls.push(el("path",{d:`M ${A.x},${A.y} Q ${mx},${my} ${B.x},${B.y}`,fill:"none",
+    stroke:"#111","stroke-opacity":.22,"stroke-width":1.6,"stroke-dasharray":"5 6"},gCross));
+});
+
+/* ============ PRODUCT TERRITORIES (core capabilities) ============ */
+const linkByCap={};LINKS.forEach(L=>{(linkByCap[L.cap]=linkByCap[L.cap]||[]).push(L)});
+const prodById={};PRODUCTS.forEach(p=>prodById[p.id]=p);
+
+/* ============ EXPERIENCE (resume + LinkedIn) ============ */
+// depth: "led" = owned/led the function · "hands" = hands-on delivery
+const R_PNFP="Pinnacle Financial — Director, Enterprise Analytics & Finance Transformation ('26–)";
+const R_SNVSF="Synovus — Director, Strategic Finance ('23–'26)";
+const R_SNVPR="Synovus — Senior FP&A Manager, Performance Reporting ('22–'23)";
+const R_FHN="First Horizon / IberiaBank — FP&A & Analytics Manager, VP ('14–'22)";
+const R_RFALM="Regions — Asset/Liability Analyst, Corporate Treasury ('13–'14)";
+const R_RFFDP="Regions — Finance Development Program ('11–'13)";
+const R_ACE="AceAnalytics.dev — agentic FP&A builds ('25–present)";
+const EXP=[
+ {cap:"Strategic Planning",d:"led",role:R_SNVSF,note:"Aligned strategy and capital deployment with the firm's objectives across a $25B wholesale book"},
+ {cap:"Annual Budgeting",d:"led",role:R_FHN,note:"Led a team of 8 on Empyrean-based market- and LOB-level budgeting for a $40B+ segment"},
+ {cap:"Rolling Forecasting",d:"led",role:R_SNVSF,note:"Led driver-based forecasting for Wholesale, CIB, and Treasury Payment Solutions"},
+ {cap:"Driver-Based Modeling",d:"led",role:R_SNVSF,note:"Driver-based forecasting and profitability deep dives tied to capital deployment"},
+ {cap:"Scenario & Sensitivity Analysis",d:"hands",role:R_RFALM,note:"QRM-based forecasting and rate scenarios in Corporate Treasury"},
+ {cap:"Assumption Governance",d:"hands",role:R_PNFP,note:"Metric governance and a single source of truth across consolidated LOB analytics"},
+ {cap:"Enterprise Management Reporting",d:"led",role:R_PNFP,note:"Enterprise KPI reporting from company and segment level down to the individual advisor"},
+ {cap:"Segment Reporting",d:"led",role:R_SNVSF,note:"Built segment-level P&L and product-profitability reporting to drive client selection"},
+ {cap:"Business-Line Reporting",d:"led",role:R_SNVSF,note:"Strategic Finance for Wholesale ($25B loans), CIB ($700MM), TPS ($84MM revenue)"},
+ {cap:"Geographic & Market Reporting",d:"led",role:R_FHN,note:"Owned FP&A for the $40B+ geography-based Regional Banking segment"},
+ {cap:"Product Reporting",d:"led",role:R_SNVSF,note:"Product-profitability reporting down to the client-level Banker Dashboard"},
+ {cap:"Product Reporting",d:"note",role:R_SNVSF,note:"Supported a deep product-profitability study in Treasury Management"},
+ {cap:"Customer & Relationship Profitability",d:"led",role:R_SNVSF,note:"CEO/CFO deep dives on pricing, customer profitability, and sub-business viability"},
+ {cap:"Monthly Performance Reviews",d:"led",role:R_SNVSF,note:"Led CEO/CFO quarterly business reviews — candid, decision-forcing deep dives"},
+ {cap:"Variance Analysis",d:"hands",role:R_FHN,note:"Budget-vs-actual and financial reporting cadence for State, Market & LOB leaders"},
+ {cap:"KPI & Scorecard Management",d:"led",role:R_PNFP,note:"Banker and segment KPI reporting on connected loan/deposit/fee/trust data models"},
+ {cap:"Executive & Board Reporting",d:"led",role:R_SNVSF,note:"Board, ownership, and regulatory reporting; decision-ready guidance to CEO/CFO"},
+ {cap:"Ownership / Investor Reporting",d:"hands",role:R_RFFDP,note:"Investor Relations team — investor targeting model and activist-defense work"},
+ {cap:"Ownership / Investor Reporting",d:"hands",role:R_SNVSF,note:"Contribute to investor presentations (BAAB), the quarterly earnings Q&A document, and investor earnings decks"},
+ {cap:"Regulatory Reporting Support",d:"hands",role:R_RFALM,note:"ALCO / CCAR reporting support from Corporate Treasury"},
+ {cap:"Peer & Competitive Benchmarking",d:"led",role:R_SNVSF,note:"Peer benchmarking and profitability deep dives feeding strategy"},
+ {cap:"Business-Line Finance Partnership",d:"led",role:R_SNVSF,note:"Embedded finance partner to Wholesale, CIB, and TPS leadership"},
+ {cap:"Corporate-Function Partnership",d:"hands",role:R_PNFP,note:"Sizing technology and operations investments with business-case frameworks"},
+ {cap:"Expense Management",d:"led",role:R_SNVSF,note:"Led multiple expense-management initiatives across supported segments"},
+ {cap:"Strategic Resource Allocation",d:"hands",role:R_SNVSF,note:"Client selection, capital deployment, and capital-recycling decisions"},
+ {cap:"Investment Prioritization",d:"led",role:R_PNFP,note:"Project-ROI frameworks to size and rank technology and operations investments"},
+ {cap:"Business-Case Evaluation",d:"led",role:R_PNFP,note:"Business-case-to-pro-forma framework with auto-spread project ROI"},
+ {cap:"Productivity & Efficiency Mgmt",d:"hands",role:R_SNVSF,note:"Sub-business viability and efficiency deep dives"},
+ {cap:"Balance-Sheet Planning",d:"hands",role:R_RFALM,note:"QRM balance-sheet forecasting in Corporate Treasury"},
+ {cap:"Net Interest Income Forecasting",d:"hands",role:R_RFALM,note:"QRM-based NII forecasting supporting ALM"},
+ {cap:"Net Interest Margin Analysis",d:"hands",role:R_RFALM,note:"NIM and margin attribution within the ALM framework"},
+ {cap:"Net Interest Margin Analysis",d:"hands",role:R_SNVSF,note:"Margin attribution on LOB books — rate/volume/mix in segment FP&A"},
+ {cap:"Fee-Income Forecasting",d:"led",role:R_FHN,note:"Built ARIMA models for NSF fee forecasting; modeled pricing-toggle and new-initiative impacts on fee income; fee-income pipeline reporting & intelligence"},
+ {cap:"Fee-Income Forecasting",d:"hands",role:R_SNVSF,note:"Treasury Payment Solutions — $84MM fee-revenue business"},
+ {cap:"Capital Planning",d:"hands",role:R_RFALM,note:"Indirect exposure — capital as an input/iterate of ALM balance-sheet modeling and ALCO document compilation, not direct ownership"},
+ {cap:"Stress Testing",d:"hands",role:R_RFFDP,note:"CCAR stress tests; QRM stress modeling"},
+ {cap:"ALCO Support",d:"hands",role:R_RFALM,note:"QRM/Empyrean balance-sheet and NII/risk scenario modeling; contributed to ALCO packages"},
+ {cap:"ALCO Support",d:"hands",role:R_RFFDP,note:"Second ALM stint — QRM modeling and ALCO package support in the rotation"},
+ {cap:"Funds Transfer Pricing",d:"led",role:R_PNFP,note:"FTP working-group member (1 of ~20); deposit beta modeling; built a system connecting and challenging Treasury FTP assumptions against LOB assumptions"},
+ {cap:"Incentive & Metric Support",d:"led",role:R_SNVSF,note:"Challenged and redesigned incentive systems — co-designed a new incentive management framework with HR, with impact studies aligning incentives to strategy"},
+ {cap:"Incentive & Metric Support",d:"hands",role:R_SNVSF,note:"Ran the person-level incentive accrual buildup for Wholesale, TPS & CIB, quarter after quarter"},
+ {cap:"Channel & Branch Reporting",d:"hands",role:R_FHN,note:"Merger branch density and overlap studies — key markets, client domicile, drive-time overlap; branch staffing models"},
+ {cap:"Branch & Distribution Optimization",d:"led",role:R_FHN,note:"Led merger-related branch density, overlap, and drive-time studies; branch staffing and optimization workflows"},
+ {cap:"Geographic & Organic Expansion",d:"led",role:R_SNVSF,note:"Led de novo market analyses and banker-team lift-out models; Moody's metro GDP and population-growth models informing market selection"},
+ {cap:"Credit-Cost Forecasting",d:"hands",role:R_SNVSF,note:"Aided build-out of complex credit reporting packages — risk-rating migration, past-dues (reporting, not forecasting)"},
+ {cap:"Management Allocations",d:"hands",role:R_SNVSF,note:"Segment P&L with direct expense, allocated overhead, and credit components"},
+ {cap:"M&A Target Assessment",d:"hands",role:R_SNVSF,note:"Target economics inside the M&A finance diligence workstream"},
+ {cap:"M&A Valuation & Modeling",d:"hands",role:R_RFALM,note:"Backed into an SEC view of a target from regulatory reports, then bolted a marginal business onto the QRM ALM model to price a rate-risk-neutral acquisition (NII/EVE)"},
+ {cap:"Financial Due Diligence",d:"led",role:R_SNVSF,note:"Led the M&A finance diligence workstream — earnings normalization, revenue & workforce durability"},
+ {cap:"Synergy & Integration Modeling",d:"hands",role:R_SNVSF,note:"Supporting a live merger-of-equals integration"},
+ {cap:"Post-Merger Performance Tracking",d:"hands",role:R_PNFP,note:"Leading the post-merger Finance analytics consolidation"},
+ {cap:"Enterprise Transformation Finance",d:"led",role:R_PNFP,note:"Half the current title — lead the Finance Enterprise Analytics & Transformation team: Power BI, Databricks, workflow automation"},
+ {cap:"Enterprise Transformation Finance",d:"hands",role:R_ACE,note:"Seven shipped agentic finance builds — transformation practiced end-to-end, not theorized"},
+ {cap:"FP&A Organizational Design",d:"led",role:R_PNFP,note:"Built and lead a team of 10; consolidated fragmented LOB analytics into one enterprise function"},
+ {cap:"Talent & Succession",d:"hands",role:R_FHN,note:"Led a team of 8; rebuilt the reporting team from peer laggard to peer leader"},
+ {cap:"EPM & Planning Systems",d:"hands",role:R_FHN,note:"Empyrean budgeting platform; ERP across SAP, Oracle, IBM; QRM"},
+ {cap:"ERP & EPM Implementation",d:"hands",role:R_SNVPR,note:"Rebuilt an MDX multidimensional cube as a Power BI Tabular model; implemented Tabular versions of the key dimension tables"},
+ {cap:"ERP & EPM Implementation",d:"note",role:R_SNVPR,note:"Have not directly installed or administered a financial ERP (TM1, IBM Planning Analytics, Essbase) — depth is in the adjacent semantic-model and dimension layer"},
+ {cap:"BI & Analytics",d:"led",role:R_SNVPR,note:"Built a Power BI/SQL/SAS platform in 6 months; 50M+ record model behind the bank's most-used dashboard"},
+ {cap:"Data Governance",d:"led",role:R_PNFP,note:"Eliminated redundant datasets; metric governance for a single source of truth"},
+ {cap:"Change Leadership",d:"led",role:R_PNFP,note:"AI-assisted development, Databricks, workflow automation — champion for agentic analytics adoption"},
+ // score-neutral "note" entries — extra roles and detail for the tooltip, no tier impact
+ {cap:"BI & Analytics",d:"note",role:R_FHN,note:"Rebuilt the segment's reporting team around a peer-leading Power BI environment"},
+ {cap:"BI & Analytics",d:"note",role:R_PNFP,note:"Databricks + AI-assisted development across an enterprise analytics function of 10"},
+ {cap:"Enterprise Management Reporting",d:"note",role:R_SNVPR,note:"50M+ record ERP/GL model powering the bank's most-used Power BI dashboard"},
+ {cap:"Segment Reporting",d:"note",role:R_PNFP,note:"Enterprise segment reporting on connected loan / deposit / fee / trust / treasury-management data models"},
+ {cap:"Customer & Relationship Profitability",d:"note",role:R_PNFP,note:"Banker-level profitability from company and segment level down to the individual advisor"},
+ {cap:"Rolling Forecasting",d:"note",role:R_FHN,note:"Market- and LOB-based forecasting on legacy ERP across a $40B+ segment"},
+ {cap:"Monthly Performance Reviews",d:"note",role:R_FHN,note:"Monthly reporting cadence to State, Market & LOB leaders in a heavily matrixed org"},
+ {cap:"Stress Testing",d:"note",role:R_RFALM,note:"QRM stress modeling supporting capital planning in Corporate Treasury"},
+ {cap:"M&A Target Assessment",d:"note",role:R_RFFDP,note:"Supported the Morgan Keegan divestiture from the ALM / Treasury seat"},
+ {cap:"Balance-Sheet Planning",d:"note",role:R_RFFDP,note:"Due diligence on a $23B investment portfolio during the rotation program"},
+ {cap:"Talent & Succession",d:"note",role:R_PNFP,note:"Built and lead a team of 10 through post-merger consolidation of fragmented analytics groups"},
+ {cap:"Funds Transfer Pricing",d:"note",role:R_RFALM,note:"FTP mechanics grounded in two ALM stints — funding value, liquidity cost, rate components"},
+];
+const expByCap={};EXP.forEach(e=>{(expByCap[e.cap]=expByCap[e.cap]||[]).push(e)});
+
+/* my-coverage score per capability: experience (led 2 / hands 1) + builds (core 2 / supports 1) */
+CAPS.forEach(c=>{
+  const ex=expByCap[c.l]||[], pl=linkByCap[c.l]||[];
+  const eS=Math.min(3,ex.reduce((s,e)=>s+(e.d==="led"?2:e.d==="hands"?1:0),0)); // stints accumulate (led+hands can reach Deep alone); "note" entries enrich tooltips without scoring
+  const pS=pl.some(L=>L.t==="core")?2:pl.length?1:0;
+  const t=eS+pS;
+  c.profile=c.s;                       // reference profile (internal)
+  c.my=t>=3?"Strong":t===2?"Partial":t===1?"Limited":"Missing";
+  c.myLabel=t>=3?"DEEP":t===2?"WORKING":t===1?"LIGHT":"OPEN GROUND";
+});
+const CHIP_OFF={DLCT:[-165,-6],APRT:[158,70],PRLN:[150,-108],CLIN:[95,150],LTTC:[-12,6],FCST:[-6,158]};
+const terrEls={},chipEls={};
+function buildTerritories(){
+const labelPts=[];
+CAPS.forEach(c=>(c.labelEls||[]).forEach(t=>labelPts.push([+t.getAttribute("x"),+t.getAttribute("y")])));
+PRODUCTS.filter(p=>p.id!=="FWK").forEach(p=>{
+  const members=LINKS.filter(L=>L.p===p.id).map(L=>capIndex[L.cap]).filter(Boolean);
+  if(!members.length)return;
+  // archipelago: islands per contiguous run within each cluster (non-contiguous, overlaps allowed)
+  const groups={};members.forEach(m=>{(groups[m.c]=groups[m.c]||[]).push(m)});
+  const islands=[];
+  Object.values(groups).forEach(arr=>{
+    arr.sort((a,b)=>a.ci-b.ci);
+    let run=[arr[0]];
+    for(let i=1;i<arr.length;i++){
+      if(arr[i].ci-arr[i-1].ci<=1)run.push(arr[i]);
+      else{islands.push(run);run=[arr[i]];}
+    }
+    islands.push(run);
+  });
+  const gp=el("g",{},gTerr);
+  const coreCaps=new Set(LINKS.filter(L=>L.p===p.id&&L.t==="core").map(L=>L.cap));
+  let big=null,bigCore=null;
+  islands.forEach(arr=>{
+    const samples=[];
+    arr.forEach(m=>{for(let k=0;k<14;k++){const a=k/14*2*Math.PI;samples.push([m.x+Math.cos(a)*66,m.y+Math.sin(a)*66]);}});
+    const h=hull(samples,10);
+    el("path",{d:catmull(h),fill:p.color,"fill-opacity":.07,stroke:p.color,
+      "stroke-width":2.2,"stroke-dasharray":"9 7","stroke-opacity":.85},gp);
+    if(!big||arr.length>big.length)big=arr;
+    if(arr.some(m=>coreCaps.has(m.l))&&(!bigCore||arr.length>bigCore.length))bigCore=arr;
+  });
+  big=bigCore||big;   // anchor the chip on a core island
+  terrEls[p.id]=gp;
+  // chip at the largest island's centroid (+ hint nudge), then relaxed away from
+  // nodes, the center, and previously placed chips — deterministic, no overlap
+  const off=CHIP_OFF[p.id]||[0,0];
+  let cx=big.reduce((s,m)=>s+m.x,0)/big.length+off[0];
+  let cy=big.reduce((s,m)=>s+m.y,0)/big.length+off[1];
+  for(let it=0;it<80;it++){
+    let fx=0,fy=0;
+    CAPS.forEach(n=>{const d=Math.hypot(cx-n.x,cy-n.y);if(d<135){fx+=(cx-n.x)/d*(135-d)*.35;fy+=(cy-n.y)/d*(135-d)*.35;}});
+    labelPts.forEach(pt=>{const d=Math.hypot(cx-pt[0],cy-pt[1])||1;if(d<118){fx+=(cx-pt[0])/d*(118-d)*.3;fy+=(cy-pt[1])/d*(118-d)*.3;}});
+    const dc=Math.hypot(cx-CX,cy-CY);if(dc<230){fx+=(cx-CX)/dc*(230-dc)*.4;fy+=(cy-CY)/dc*(230-dc)*.4;}
+    Object.values(chipEls).forEach(o=>{const d=Math.hypot(cx-o.cx,cy-o.cy)||1;if(d<200){fx+=(cx-o.cx)/d*(200-d)*.5;fy+=(cy-o.cy)/d*(200-d)*.5;}});
+    if(Math.abs(fx)<0.5&&Math.abs(fy)<0.5)break;
+    cx+=fx;cy+=fy;
+  }
+  cx=Math.max(90,Math.min(W-90,cx));cy=Math.max(80,Math.min(H-110,cy));
+  const a=el("a",{href:"https://"+p.url,target:"_blank",class:"prodLink"},gChips);
+  const cw=86,ch=46;
+  el("rect",{x:cx-cw/2,y:cy-ch/2,rx:11,width:cw,height:ch,fill:p.color,stroke:p.id==="FWK"?"#111":"none","stroke-width":1.4},a);
+  const t=el("text",{x:cx,y:cy+6,"text-anchor":"middle",class:"chipTxt","font-size":19},a);t.textContent=p.id;
+  const nm=el("text",{x:cx,y:cy+ch/2+24,"text-anchor":"middle",class:"chipName","font-size":18},a);nm.textContent=p.name;
+  chipEls[p.id]={a,cx,cy};
+  a.addEventListener("mousemove",ev=>showProdTT(ev,p));
+  a.addEventListener("mouseleave",()=>tt.style.display="none");
+});
+}
+
+/* center node */
+el("circle",{cx:CX,cy:CY,r:88,fill:"#111111"},gNodes);
+const ct=el("text",{x:CX,y:CY-8,"text-anchor":"middle",fill:"#EBEBEB","font-size":27,"font-weight":600,"letter-spacing":"-0.01em",style:"font-family:var(--disp)"},gNodes);
+ct.textContent="BANK";
+const ct2=el("text",{x:CX,y:CY+22,"text-anchor":"middle",fill:"#EBEBEB","font-size":27,"font-weight":600,style:"font-family:var(--disp)"},gNodes);
+ct2.textContent="FP&A";
+
+/* capability nodes */
+function wrap(t,max){const w=t.split(" ");const lines=[];let cur="";
+  w.forEach(x=>{if((cur+" "+x).trim().length>max){lines.push(cur.trim());cur=x;}else cur+=" "+x;});
+  if(cur.trim())lines.push(cur.trim());return lines;}
+const nodeEls=[];
+CAPS.forEach(c=>{
+  const g=el("g",{class:"node"},gNodes);
+  const R=17;
+  const fill=c.my==="Strong"?c.color:c.my==="Partial"?c.color+"66":"#EBEBEB";
+  const circ=el("circle",{cx:c.x,cy:c.y,r:R,fill:fill,stroke:c.color,
+    "stroke-width":c.my==="Limited"||c.my==="Missing"?2.8:1.8,
+    "stroke-dasharray":c.my==="Missing"?"5 4":""},g);
+  const isInner=c.ring==="inner";
+  const lines=wrap(c.l,isInner?12:14);
+  const lh=22;
+  const dx=c.x-CX, dy=c.y-CY, DL=Math.hypot(dx,dy);
+  const dir=isInner?-1:1;
+  const ex=dx/DL*dir, ey=dy/DL*dir;
+  const stag=(isInner&&c.innerIdx%2===1)?56:0;
+  const FORCE={"Incentive & Metric Support":"down","Net Interest Margin Analysis":"down","ALCO Support":"down"};
+  const EXTRA={"Net Interest Margin Analysis":18};
+  let anchor,lx,y0,labelSide;
+  if(FORCE[c.l]==="down"){
+    anchor="middle"; lx=c.x; y0=c.y+R+28+(EXTRA[c.l]||0); labelSide="down";
+  }else if(Math.abs(ex)>0.55){
+    anchor=ex>0?"start":"end";
+    lx=c.x+(ex>0?1:-1)*(R+13+stag*Math.abs(ex));
+    y0=c.y+ey*8+ey*stag-((lines.length-1)*lh)/2+6;
+    labelSide="side";
+  }else{
+    anchor="middle"; lx=c.x+ex*stag*0.4;
+    if(ey<0){ y0=c.y-R-15-stag-(lines.length-1)*lh; labelSide="up"; }
+    else { y0=c.y+R+28+stag; labelSide="down"; }
+  }
+  lines.forEach((ln,i)=>{
+    const t=el("text",{x:lx,y:y0+i*lh,"text-anchor":anchor,class:"capText","font-size":18.5},gLabels);
+    t.textContent=ln; (c.labelEls=c.labelEls||[]).push(t);
+  });
+  const pls=linkByCap[c.l]||[];
+  const by=(labelSide==="up")? c.y+R+17 : c.y-R-17;
+  const bw=24, x0=c.x-((pls.length-1)*bw)/2;
+  c.badgeEls=[];
+  pls.forEach((L,i)=>{
+    const p=prodById[L.p];
+    const isCore=L.t==="core";
+    const b=el("circle",{cx:x0+i*bw,cy:by,r:8.5,
+      fill:isCore?p.color:"#EBEBEB",stroke:p.color==="#FFAC03"&&isCore?"#111":p.color,
+      "stroke-width":isCore?(p.color==="#FFAC03"?1.4:0):2.6},gLabels);
+    c.badgeEls.push({elm:b,link:L});
+  });
+  c.circ=circ;c.g=g;
+  nodeEls.push(c);
+  g.addEventListener("mousemove",ev=>showTT(ev,c));
+  g.addEventListener("mouseleave",()=>tt.style.display="none");
+});
+buildTerritories();
+
+/* ============ CIRCULAR SYSTEM TITLES (arc text at each sector's outer edge) ============ */
+function arcPath(id,r,a0,a1,reverse){
+  const [x0,y0]=P(reverse?a1:a0,r), [x1,y1]=P(reverse?a0:a1,r);
+  const large=Math.abs(a1-a0)>Math.PI?1:0;
+  const sweep=reverse?0:1;
+  const d=`M ${x0},${y0} A ${r*KX},${r*KY} 0 ${large} ${sweep} ${x1},${y1}`;
+  const p=el("path",{id,d,fill:"none"},gLabels);
+  return p;
+}
+CLUSTERS.forEach((cl,i)=>{
+  const s=sector[cl.id];
+  const bottom=Math.sin(s.mid)>0.25;   // flip arcs on the lower half so text reads upright
+  const rName=bottom?1005:960, rSys=bottom?952:1016;
+  arcPath("arcN"+i,rName,s.a0,s.a1,bottom);
+  arcPath("arcS"+i,rSys,s.a0,s.a1,bottom);
+  const tN=el("text",{class:"arcName","font-size":34},gLabels);
+  const tpN=el("textPath",{href:"#arcN"+i,startOffset:"50%","text-anchor":"middle"},tN);
+  tpN.textContent=cl.name;
+  const tS=el("text",{class:"arcSys","font-size":17},gLabels);
+  const tpS=el("textPath",{href:"#arcS"+i,startOffset:"50%","text-anchor":"middle"},tS);
+  const dot=document.createElementNS(NS,"tspan");dot.setAttribute("fill",cl.color);dot.textContent="● ";
+  tpS.appendChild(dot);
+  const rest=document.createElementNS(NS,"tspan");rest.textContent=cl.sys;
+  tpS.appendChild(rest);
+});
+
+/* tooltips */
+const tt=document.getElementById("tt");
+function ttPos(ev){
+  const m=document.querySelector("main").getBoundingClientRect();
+  let x=ev.clientX-m.left+18,y=ev.clientY-m.top+18;
+  if(x>m.width-420)x-=450; if(y>m.height-280)y-=300;
+  tt.style.left=x+"px";tt.style.top=y+"px";
+}
+function showTT(ev,c){
+  const pls=linkByCap[c.l]||[];
+  const profTxt={Strong:"strong emphasis",Partial:"partial / implied",Limited:"limited mention",Missing:"not explicit"}[c.profile];
+  let html=`<div class="tt-cl">${c.clusterName}</div><div class="tt-name">${c.l}</div><div class="tt-cov">MY COVERAGE: ${c.myLabel}</div>`;
+  (expByCap[c.l]||[]).forEach(e=>{
+    const tag=e.d==="led"?"LED":e.d==="hands"?"HANDS-ON":"ALSO";
+    html+=`<div class="tt-p"><span class="pd" style="background:${e.d==='led'?'#111':'transparent'};border:2px ${e.d==='note'?'dotted':'solid'} #111"></span><span class="pn">My experience</span> <span style="font-family:var(--mono);font-size:10px;color:#B8B8B8">· ${tag}</span><div class="ev"><strong>${e.role}</strong><br>${e.note}</div></div>`;});
+  pls.forEach(L=>{const p=prodById[L.p];
+    html+=`<div class="tt-p"><span class="pd" style="background:${L.t==='core'?p.color:'transparent'};border:2px solid ${p.color}"></span><span class="pn">${p.name}</span> <span style="font-family:var(--mono);font-size:10px;color:#B8B8B8">· ${L.t.toUpperCase()}</span><div class="ev">${L.e}</div></div>`;});
+  if(!pls.length&&!(expByCap[c.l]||[]).length)html+=`<div class="tt-p ev" style="color:#B8B8B8">Open ground — not yet in role experience or a build.</div>`;
+  tt.innerHTML=html;tt.style.display="block";ttPos(ev);
+}
+function showProdTT(ev,p){
+  const cores=LINKS.filter(L=>L.p===p.id&&L.t==="core").map(L=>L.cap);
+  const sups=LINKS.filter(L=>L.p===p.id&&L.t==="supports").map(L=>L.cap);
+  tt.innerHTML=`<div class="tt-cl">${p.url}</div><div class="tt-name">${p.name}</div><div class="tt-cov">${p.tag}</div>
+   <div class="tt-p"><span class="pn">Core</span><div class="ev">${cores.join(" · ")}</div></div>
+   ${sups.length?`<div class="tt-p"><span class="pn">Supports</span><div class="ev">${sups.join(" · ")}</div></div>`:""}
+   <div class="tt-p ev">Click to open the product page ↗</div>`;
+  tt.style.display="block";ttPos(ev);
+}
+
+/* ============ CONTROLS ============ */
+let activeProduct=null;
+const chips=document.getElementById("chips");
+PRODUCTS.forEach(p=>{
+  const b=document.createElement("button");b.className="chip";b.dataset.p=p.id;
+  b.innerHTML=`<span class="pdot" style="background:${p.color}"></span><span class="n"><strong>${p.name}</strong><br><span style="font-size:10.5px;color:inherit;opacity:.65">${p.tag}</span></span><span class="code">${p.id}</span>`;
+  b.addEventListener("click",()=>{activeProduct=activeProduct===p.id?null:p.id;render();});
+  chips.appendChild(b);
+});
+function render(){
+  const covOn=new Set([...document.querySelectorAll(".fcov:checked")].map(x=>x.value));
+  const badgesOn=document.getElementById("tBadges").checked;
+  const terrOn=document.getElementById("tTerr").checked;
+  const gapsOn=document.getElementById("tGaps").checked;
+  document.querySelectorAll(".chip").forEach(ch=>ch.classList.toggle("active",ch.dataset.p===activeProduct));
+  nodeEls.forEach(c=>{
+    const pls=linkByCap[c.l]||[];
+    const inProduct=!activeProduct||pls.some(L=>L.p===activeProduct);
+    const covOK=covOn.has(c.my);
+    // gap = the profile emphasizes it, my coverage is thin
+    const isGap=(c.profile==="Strong")&&(c.my==="Limited"||c.my==="Missing");
+    const on=covOK&&inProduct;
+    const dim=!on||(gapsOn&&!isGap&&!activeProduct);
+    c.circ.setAttribute("opacity",dim?.12:1);
+    (c.labelEls||[]).forEach(t=>t.setAttribute("class","capText"+(dim?" dim":"")));
+    (c.badgeEls||[]).forEach(b=>{
+      const bOn=badgesOn&&on&&(!activeProduct||b.link.p===activeProduct)&&(!gapsOn||isGap||activeProduct);
+      b.elm.setAttribute("opacity",bOn?1:0);
+    });
+    if(gapsOn&&isGap&&covOK&&inProduct){c.circ.setAttribute("stroke-width",4.4);}
+    else c.circ.setAttribute("stroke-width",c.my==="Limited"||c.my==="Missing"?2.8:1.8);
+  });
+  Object.entries(terrEls).forEach(([pid,e])=>{
+    const show=terrOn&&(!activeProduct||activeProduct===pid);
+    e.setAttribute("display",show?"":"none");
+  });
+  Object.entries(chipEls).forEach(([pid,o])=>{
+    o.a.setAttribute("opacity",(!activeProduct||activeProduct===pid)?1:0.15);
+  });
+  crossEls.forEach(e=>e.setAttribute("display",document.getElementById("tCross").checked?"":"none"));
+  Object.values(hullEls).forEach(h=>h.setAttribute("display",document.getElementById("tHulls").checked?"":"none"));
+}
+document.querySelectorAll("input").forEach(i=>i.addEventListener("change",render));
+document.getElementById("reset").addEventListener("click",()=>{
+  activeProduct=null;document.getElementById("tGaps").checked=false;
+  ["tCross","tHulls","tBadges","tTerr"].forEach(id=>document.getElementById(id).checked=true);
+  document.querySelectorAll(".fcov").forEach(x=>x.checked=true);
+  vk=1;vtx=0;vty=0;applyView();render();
+});
+render();
+
+/* collapsible sidebar */
+document.getElementById("sideToggle").addEventListener("click",()=>{
+  const app=document.querySelector(".app");
+  const collapsed=app.classList.toggle("collapsed");
+  document.getElementById("sideToggle").textContent=collapsed?"▶ SHOW PANEL":"◀ HIDE PANEL";
+});
+
+/* ============ ZOOM & PAN (wheel, drag, pinch) ============ */
+let vk=1,vtx=0,vty=0;
+function applyView(){gRoot.setAttribute("transform",`translate(${vtx},${vty}) scale(${vk})`);}
+function toViewBox(clientX,clientY){
+  const r=svg.getBoundingClientRect();
+  const s=Math.min(r.width/W,r.height/H);           // xMidYMid meet
+  const ox=(r.width-W*s)/2, oy=(r.height-H*s)/2;
+  return [(clientX-r.left-ox)/s,(clientY-r.top-oy)/s];
+}
+function zoomAt(px,py,factor){
+  const k2=Math.max(.45,Math.min(9,vk*factor));
+  vtx=px-(k2/vk)*(px-vtx); vty=py-(k2/vk)*(py-vty); vk=k2; applyView();
+}
+svg.addEventListener("wheel",e=>{
+  e.preventDefault();
+  const [px,py]=toViewBox(e.clientX,e.clientY);
+  zoomAt(px,py,Math.exp(-e.deltaY*(e.ctrlKey?0.0075:0.0016)));
+},{passive:false});
+const ptrs=new Map();let panStart=null,pinchStart=null;
+svg.addEventListener("pointerdown",e=>{
+  if(e.target.closest("a.prodLink"))return;         // don't hijack product links
+  svg.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId,[e.clientX,e.clientY]);
+  if(ptrs.size===1)panStart={x:e.clientX,y:e.clientY,tx:vtx,ty:vty};
+  if(ptrs.size===2){
+    const[a,b]=[...ptrs.values()];
+    pinchStart={d:Math.hypot(a[0]-b[0],a[1]-b[1]),k:vk,
+      mid:toViewBox((a[0]+b[0])/2,(a[1]+b[1])/2),tx:vtx,ty:vty};
+    panStart=null;
+  }
+});
+svg.addEventListener("pointermove",e=>{
+  if(!ptrs.has(e.pointerId))return;
+  ptrs.set(e.pointerId,[e.clientX,e.clientY]);
+  if(ptrs.size===1&&panStart){
+    const r=svg.getBoundingClientRect();
+    const s=Math.min(r.width/W,r.height/H);
+    vtx=panStart.tx+(e.clientX-panStart.x)/s;
+    vty=panStart.ty+(e.clientY-panStart.y)/s;
+    applyView();
+  }else if(ptrs.size===2&&pinchStart){
+    const[a,b]=[...ptrs.values()];
+    const d=Math.hypot(a[0]-b[0],a[1]-b[1]);
+    const k2=Math.max(.45,Math.min(9,pinchStart.k*d/pinchStart.d));
+    const [px,py]=pinchStart.mid;
+    vtx=px-(k2/pinchStart.k)*(px-pinchStart.tx);
+    vty=py-(k2/pinchStart.k)*(py-pinchStart.ty);
+    vk=k2; applyView();
+  }
+});
+["pointerup","pointercancel","pointerleave"].forEach(ev=>svg.addEventListener(ev,e=>{
+  ptrs.delete(e.pointerId);
+  if(ptrs.size<2)pinchStart=null;
+  if(ptrs.size<1)panStart=null;
+  else if(ptrs.size===1){const[[x,y]]=[...ptrs.values()];panStart={x,y,tx:vtx,ty:vty};}
+}));
+svg.style.cursor="grab";
+svg.style.touchAction="none";
+
+/* ============ PNG MODE ============ */
+if(new URLSearchParams(location.search).has("png")){
+  document.body.classList.add("png");
+  const pl=document.getElementById("pnglegend");
+  let html=`<div class="grp"><h4>My coverage (node fill) — role experience + builds</h4>
+   <div class="li"><span style="width:13px;height:13px;border-radius:50%;background:#5B8DEF;display:inline-block"></span>Deep — led in role and/or a build's core job</div>
+   <div class="li"><span style="width:13px;height:13px;border-radius:50%;background:#5B8DEF66;display:inline-block"></span>Working — hands-on role work or a supporting build</div>
+   <div class="li"><span style="width:13px;height:13px;border-radius:50%;border:2px solid #5B8DEF;display:inline-block"></span>Light — one touchpoint so far</div>
+   <div class="li"><span style="width:13px;height:13px;border-radius:50%;border:2px dashed #5B8DEF;display:inline-block"></span>Open ground — not yet in my portfolio</div></div>`;
+  html+=`<div class="grp"><h4>AceAnalytics builds — territory = product reach · badge filled = core / ring = supports</h4>`;
+  PRODUCTS.forEach(p=>{html+=`<div class="li"><span class="code">${p.id}</span><span style="width:11px;height:11px;border-radius:3px;background:${p.color};display:inline-block;${p.id==='FWK'?'border:1px solid #111':''}"></span>${p.name} — ${p.tag} <span style="color:#606060">· ${p.url}</span></div>`;});
+  html+=`</div><div class="grp"><h4>Reading it</h4>
+   <div class="li">Score = role experience (led / hands-on, resume) + builds (core / supports)</div>
+   <div class="li">Dashed territory = the ground a shipped build reaches; areas may overlap</div>
+   <div class="li">Dashed node = open ground — the honest to-do list</div>
+   <div class="li">Gold = candidate frameworks (F1–F8), carried personally, not shipped software</div></div>`;
+  pl.innerHTML=html;
+}
+</script>
+</body>
+</html>

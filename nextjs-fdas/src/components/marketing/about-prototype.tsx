@@ -246,6 +246,34 @@ export function AboutPrototypePage() {
         </div>
       </section>
 
+      <section style={{ padding: '110px 0 30px' }}>
+        <div className="wrap">
+          <Eyebrow op="OP_M">Coverage map</Eyebrow>
+          <h2 className="display" style={{ marginTop: 32, marginBottom: 16, fontSize: 'clamp(30px, 3.4vw, 46px)', lineHeight: 1.02 }}>
+            The bank FP&amp;A space, <span className="ital">mapped against my portfolio.</span>
+          </h2>
+          <p style={{ maxWidth: 760, color: 'var(--ink-2)', fontSize: 15, lineHeight: 1.65, marginBottom: 24 }}>
+            Six functional systems and 60 capabilities of a bank FP&amp;A mandate &mdash; every node scored by
+            role experience plus the agentic tools I&apos;ve shipped, with each product&apos;s territory drawn
+            over the ground it covers. Hover a capability for the receipts; chips link to each product.
+          </p>
+          <div style={{ border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden', background: '#EBEBEB' }}>
+            <iframe
+              src="/fpa-coverage-map-public.html"
+              title="Bank FP&A capability coverage map"
+              loading="lazy"
+              style={{ width: '100%', height: '84vh', minHeight: 620, border: 0, display: 'block', background: '#EBEBEB' }}
+            />
+          </div>
+          <p style={{ marginTop: 10, fontSize: 12, color: 'var(--ink-3)' }}>
+            Interactive &mdash; scroll to zoom, drag to pan &middot;{' '}
+            <a href="/fpa-coverage-map-public.html" target="_blank" rel="noopener" style={{ color: 'var(--ink-2)', textDecoration: 'underline' }}>
+              open full screen &#8599;
+            </a>
+          </p>
+        </div>
+      </section>
+
       <section style={{ padding: '120px 0' }}>
         <div className="wrap">
           <Eyebrow op="OP_V">Values</Eyebrow>

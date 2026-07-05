@@ -340,6 +340,7 @@ body.locked .sitenav{display:none}
     <nav class="nav" id="nav">
       <button data-view="dashboard" class="active"><span class="n">1</span> Overview</button>
       <button data-view="fitmap"><span class="n">2</span> How I Fit the Role</button>
+      <button data-view="covmap" style="padding-left:26px"><span class="n">2.1</span> FP&amp;A Coverage Map</button>
       <button data-view="qa"><span class="n">3</span> My Approach</button>
       <button data-view="frameworks"><span class="n">4</span> Frameworks</button>
       <button data-view="madeepdive"><span class="n">5</span> M&amp;A Process Deep Dive</button>
@@ -534,6 +535,22 @@ body.locked .sitenav{display:none}
     </section>
 
     <!-- ============ 3. Q&A ============ -->
+    <!-- ============ 2.1 FP&A COVERAGE MAP ============ -->
+    <section class="view" id="covmap">
+      <div class="wrap">
+        <h2 class="sec">FP&amp;A Coverage Map</h2>
+        <p class="lead">The whole Bank FP&amp;A space — six functional systems, 60 capabilities — with every node scored by my role experience plus the agentic tools I’ve shipped, and each product’s territory drawn over the ground it covers. Hover any capability for the receipts: the role, the work, and this profile’s emphasis.</p>
+        <div class="callout" style="margin-bottom:16px">
+          <div class="h">How to read it</div>
+          Solid nodes are capabilities I’ve led or productized; half-tone is working coverage; outlined is light; dashed is open ground — the honest to-do list. Dashed territories are shipped AceAnalytics builds (chips link to each product). Scroll to zoom, drag to pan.
+        </div>
+        <div style="border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#EBEBEB">
+          <iframe id="covmapFrame" src="fpa-coverage-map.html" title="Bank FP&amp;A capability coverage map" loading="lazy" scrolling="yes" style="width:100%;height:84vh;min-height:600px;border:0;display:block;background:#EBEBEB"></iframe>
+        </div>
+        <p class="disc">Node fill = my coverage (experience + builds) · territories = product reach · gold = candidate frameworks · <a href="fpa-coverage-map.html" target="_blank" rel="noopener">open full screen &#8599;</a></p>
+      </div>
+    </section>
+
     <section class="view" id="qa">
       <div class="wrap">
         <h2 class="sec">My Approach</h2>
