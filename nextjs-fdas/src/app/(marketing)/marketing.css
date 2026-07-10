@@ -4409,3 +4409,90 @@
   }
 
 }
+
+
+/* ============================================================
+   MOBILE OVERRIDES (appended 2026-07) — additive, <=700px only.
+   Desktop rendering above 700px is untouched.
+   ============================================================ */
+@media (max-width: 700px) {
+  .ace-marketing { overflow-x: hidden; }
+  .ace-marketing .wrap { padding-left: 18px; padding-right: 18px; }
+  .ace-marketing img, .ace-marketing video { max-width: 100%; height: auto; }
+
+  /* long single-line mono eyebrows must be allowed to wrap */
+  .ace-marketing .eyebrow { flex-wrap: wrap; white-space: normal; row-gap: 2px; }
+
+  /* --- hub: hero market panel stacks vertically --- */
+  .ace-marketing .mkt .ticker-strip { grid-template-columns: repeat(4, 1fr); }
+  .ace-marketing .mkt .ticker-strip > div { border-bottom: 1px solid var(--line); }
+  .ace-marketing .mkt .body { grid-template-columns: 1fr; }
+  .ace-marketing .mkt .left-pane { border-right: 0; border-bottom: 1px solid var(--line); }
+  .ace-marketing .mkt .hdr { flex-wrap: wrap; }
+  .ace-marketing .mkt .chart-wrap { max-width: 100%; overflow: hidden; }
+  .ace-marketing .mkt .chart-wrap svg { width: 100%; height: auto; }
+  .ace-marketing .hero-main-title { font-size: clamp(38px, 11vw, 54px); }
+
+  /* --- product pages: tool rail scrolls inside the viewport --- */
+  .ace-marketing .pp-tabs { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .ace-marketing .pp-tabs::-webkit-scrollbar { display: none; }
+  .ace-marketing .pp-tab { flex: 0 0 auto; }
+
+  /* --- mock tables & product windows: contained horizontal scroll --- */
+  .ace-marketing table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .ace-marketing .prx-mock, .ace-marketing .prx-chrome { max-width: 100%; }
+}
+
+
+/* ============================================================
+   MOBILE OVERRIDES V2 (audit-driven, 2026-07) — <=700px only.
+   Fixes: product hero min-content blowout, mock clipping, hub
+   pinned-section dead zones, footer wordmark, contact band.
+   ============================================================ */
+@media (max-width: 700px) {
+  /* --- product hero: release the grid min-content trap (lattice/credit/forecasting) --- */
+  .ace-marketing .pp-hero-grid { grid-template-columns: minmax(0, 1fr); }
+  .ace-marketing .pp-hero-grid > * { min-width: 0; max-width: 100%; }
+  .ace-marketing .pp-hero-copy, .ace-marketing .pp-hero-art { min-width: 0; max-width: 100%; }
+  .ace-marketing .pp-hero-grid * { overflow-wrap: anywhere; }
+
+  /* --- product mock windows: fit the card, wrap chips, scroll interiors --- */
+  .ace-marketing .prx-mock { max-width: 100%; min-width: 0; }
+  .ace-marketing .prx-chrome { flex-wrap: wrap; row-gap: 4px; }
+  .ace-marketing .prx-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ace-marketing .prx-body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* --- hub: pinned scroll sections become static stacks (kills dead-scroll zones) --- */
+  .ace-marketing .tool-pin { height: auto; }
+  .ace-marketing .tool-pin .stick { position: static; height: auto; padding: 56px 0; align-items: flex-start; }
+  .ace-marketing .tool-pin .content { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .ace-marketing .tool-pin .slide { position: relative !important; opacity: 1 !important; transform: none !important; pointer-events: auto !important; margin-bottom: 48px; }
+  .ace-marketing .tool-pin .tabs { display: none; }
+  .ace-marketing .philosophy-pin { height: auto; }
+  .ace-marketing .philosophy-pin .stick { position: static; height: auto; padding: 48px 0; }
+  .ace-marketing .phil-split { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .ace-marketing .phil-left .item { opacity: 1 !important; }
+  .ace-marketing .phil-right { min-height: 300px; }
+  .ace-marketing .philosophy-pin .progress { display: none; }
+
+  /* --- hub: Dialect terminal reserved-height void --- */
+  .ace-marketing .dlct .sql-terminal-ghost { display: none; }
+  .ace-marketing .dlct .sql-terminal-live { position: static; }
+  .ace-marketing .dlct .sql-terminal { min-height: 240px; }
+
+  /* --- footer wordmark: fit "AceAnalytics.dev" on one phone line --- */
+  .ace-marketing .mega { font-size: clamp(26px, 9.6vw, 60px); }
+
+  /* --- contact band (about): release min-content, wrap long links --- */
+  .ace-marketing .grid-2-even { grid-template-columns: minmax(0, 1fr); }
+  .ace-marketing .contact-band .wrap, .ace-marketing .contact-band .rows { max-width: 100%; min-width: 0; }
+  .ace-marketing .contact-band .row { flex-wrap: wrap; }
+  .ace-marketing .contact-band .v { min-width: 0; overflow-wrap: anywhere; }
+
+  /* --- pp-cta on dark pages: keep the primary action legible (text2sql) --- */
+  .ace-marketing .pp-cta.dark .actions a { color: #EBEBEB; }
+  .ace-marketing .pp-cta.dark .actions a.btn-primary { background: #EBEBEB !important; color: #111 !important; }
+
+  /* --- tab rails: subtle affordance that they scroll --- */
+  .ace-marketing .pp-tabs { mask-image: linear-gradient(to right, #000 92%, transparent); -webkit-mask-image: linear-gradient(to right, #000 92%, transparent); }
+}

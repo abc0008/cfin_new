@@ -303,6 +303,42 @@ body.locked .sitenav{display:none}
 .gatecard button:hover{background:#FFAC03;color:#111111}
 .gateerr{color:#C5543A;font-size:12.5px;margin-top:12px}
 </style>
+<style id="mobile-overrides">
+/* mobile-only (<=700px): sidebar stacks above content, nav becomes a scroll row */
+@media (max-width: 700px) {
+  html, body { overflow-x: hidden; }
+  .layout { flex-direction: column; }
+  .sidebar { position: static; width: 100%; flex: 0 0 auto; height: auto; overflow: visible; padding-bottom: 4px; }
+  .nav { display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 4px; padding: 8px 12px; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav button { flex: 0 0 auto; width: auto; white-space: nowrap; margin-bottom: 0; padding: 8px 12px; }
+  .nav button[data-view="covmap"] { padding-left: 12px !important; }
+  .sidefoot { display: none; }
+  .wrap { padding: 20px 16px; }
+  .topbar { flex-wrap: wrap; }
+  .topbar h1 { font-size: clamp(19px, 5.5vw, 26px); }
+  .topbar .meta { flex-wrap: wrap; }
+  .tbl { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  iframe { max-width: 100%; }
+}
+</style>
+<style id="mobile-overrides-v2">
+@media (max-width: 700px) {
+  /* tables: real inner scroll (fitmap + references) */
+  .tbl { display: block; max-width: 100%; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .tbl thead, .tbl tbody { display: table; min-width: 640px; width: 100%; }
+  .tbl th, .tbl td { min-width: 150px; }
+  /* framework jump chips: wrap instead of clip */
+  .fjump { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+  /* 12-month plan: readable at natural width, scrolls sideways */
+  div:has(> svg[aria-label^="First 12 months"]) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  svg[aria-label^="First 12 months"] { min-width: 660px; }
+  /* framework chip legibility */
+  .b-phase, .ln, .tg { font-size: 11px !important; }
+  /* M&A deep-dive: show the whole inner doc in page flow */
+  #maFrame { height: 1960px !important; }
+}
+</style>
 </head>
 <body class="locked">
 
