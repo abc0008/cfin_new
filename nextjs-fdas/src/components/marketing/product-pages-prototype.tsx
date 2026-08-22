@@ -2,9 +2,10 @@
 
 import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
-import { ParallaxMock, PeerLensMock } from '@/components/marketing/product-mocks'
+import { AnnexMock, MarketLensMock, ParallaxMock, PeerLensMock } from '@/components/marketing/product-mocks'
 import { Eyebrow, ProductSubnav, useReveal } from '@/components/marketing/shared'
 import {
+  ANNEX_URL,
   BOOK_DEMO_URL,
   CFIN_WORKSPACE_URL,
   CREDIT_SPREAD_URL,
@@ -16,6 +17,10 @@ import {
 const TEXT2SQL_APP_URL =
   process.env.NEXT_PUBLIC_TEXT2SQL_APP_URL || 'https://text2sql.aceanalytics.dev'
 const TEXT2SQL_GUIDED_MODE_URL = `${TEXT2SQL_APP_URL.replace(/\/+$/, '')}/guided-mode`
+
+const MARKET_LENS_URL =
+  process.env.NEXT_PUBLIC_MARKET_LENS_APP_URL || 'https://marketlens.aceanalytics.dev'
+const MARKET_LENS_DEMO_URL = `${MARKET_LENS_URL.replace(/\/+$/, '')}/b/35583+873`
 
 export function CfinProductDetailPage() {
   return (
@@ -1273,6 +1278,414 @@ export function PeerLensProductDetailPage() {
         primaryHref={PEER_ANALYSIS_URL}
         secondary="Read the methods"
         secondaryHref="/product/peer-analysis#methods"
+        accent={accent}
+      />
+    </main>
+  )
+}
+
+export function MarketLensProductDetailPage() {
+  const accent = 'var(--accent)'
+  return (
+    <main className="pp pp-rm">
+      <ProductSubnav />
+
+      <section className="pp-hero">
+        <div className="wrap pp-hero-grid">
+          <div className="pp-hero-copy">
+            <div className="pp-eyebrow">
+              <span className="op" style={{ color: accent }}>
+                OP_MKTL
+              </span>
+              <span className="pill">marketlens.aceanalytics.dev</span>
+            </div>
+            <h1 className="pp-h1">
+              Every market a bank is in,
+              <br />
+              <span className="ital" style={{ color: accent }}>
+                read from the record.
+              </span>
+            </h1>
+            <p className="pp-lede">
+              Market Lens takes any US bank and returns its footprint - every county it holds deposits
+              in, ranked and labeled by size, growth, and franchise stage. Built from FDIC Summary of
+              Deposits, Census, BEA, and BLS. The AI executive brief is citation-guarded: every claim
+              links to a computed number, and any figure the model invents is dropped before it ships.
+            </p>
+            <div className="pp-hero-actions">
+              <a className="btn btn-primary" href={MARKET_LENS_DEMO_URL}>
+                Open Market Lens →
+              </a>
+              <a className="btn btn-ghost" href={MARKET_LENS_DEMO_URL}>
+                Try the demo
+              </a>
+            </div>
+            <div className="pp-hero-tags">
+              {[
+                ['925', 'metros ranked for growth'],
+                ['81', 'markets · Pinnacle pro-forma'],
+                ['0', 'uncited AI claims'],
+              ].map(([a, b], i) => (
+                <div key={i} className="pp-tag" style={{ '--tc': accent } as React.CSSProperties}>
+                  <div className="t">{a}</div>
+                  <div className="s">{b}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="pp-hero-art">
+            <MarketLensMock />
+          </div>
+        </div>
+      </section>
+
+      <section className="pp-strip">
+        <div className="wrap">
+          <CapCard
+            ix="01"
+            title="County choropleth"
+            body="Deposit share mapped county by county, with perceptually even ramps, hatching where no SOD filing exists, and a legend that survives a black-and-white board print."
+            accent={accent}
+          />
+          <CapCard
+            ix="02"
+            title="Ranked market tables"
+            body="Every market ordered by deposits, with sparklines for the trend and sticky totals that stay on screen. CSV export carries the same numbers and the same footnotes - no quiet rounding."
+            accent="var(--accent-slate)"
+          />
+          <CapCard
+            ix="03"
+            title="Top-5 competitors per market"
+            body="For each market, the five institutions holding share against you - drawn from the same filings, so the comparison is apples to apples."
+            accent={accent}
+          />
+          <CapCard
+            ix="04"
+            title="Citation-guarded brief"
+            body="An AI executive brief where every claim links back to a computed number. A guardrail drops any figure the model invented; interpretation is AI, arithmetic is code."
+            accent="var(--accent-orange)"
+          />
+        </div>
+      </section>
+
+      <section className="pp-split">
+        <div className="wrap">
+          <div className="pp-split-head">
+            <Eyebrow op="OP_MKTL_02">Three labels per market</Eyebrow>
+            <h2 className="pp-h2">
+              Size, growth,
+              <br />
+              and{' '}
+              <span className="ital" style={{ color: accent }}>
+                where you actually stand.
+              </span>
+            </h2>
+          </div>
+          <div className="grid-2-even" style={{ marginTop: 56 }}>
+            <div>
+              <p className="pp-lede" style={{ maxWidth: '60ch' }}>
+                A bank&apos;s footprint is not a list of branches. Market Lens labels each market three
+                ways so a CFO can read the map in one pass - how big the market is, how fast it is
+                growing against every other metro in the country, and what the bank&apos;s own position
+                in it looks like over time.
+              </p>
+            </div>
+            <div className="specs">
+              {[
+                ['Size tier', 'Major · Secondary · Small Metro · Micropolitan · Rural'],
+                ['Growth tier', 'High · Medium · Low - ranked against all 925 US metro areas'],
+                ['Franchise stage', 'New Entrant · Expanding · Entrenched Leader · Established-Mature · Pulling Back · Limited-Service Foothold'],
+                ['Unit', 'County, rolled up to CBSA where the market is defined'],
+                ['Vintage', 'FDIC SOD as of June 30 · Census, BEA, BLS latest release'],
+              ].map(([key, value], i) => (
+                <div className="row" key={i}>
+                  <div className="k">{key}</div>
+                  <div className="v">{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="pp-split">
+        <div className="wrap">
+          <div className="pp-split-head">
+            <Eyebrow op="OP_MKTL_03">Data sources</Eyebrow>
+            <h2 className="pp-h2">
+              Four public series.
+              <br />
+              No black box.
+            </h2>
+          </div>
+          <div className="pp-modules">
+            {[
+              {
+                ix: 'M.01',
+                name: 'FDIC SOD',
+                body: 'Summary of Deposits - branch-level deposits by county, the spine of the footprint and every share calculation.',
+                color: 'var(--accent)',
+              },
+              {
+                ix: 'M.02',
+                name: 'Census',
+                body: 'Population and domestic migration by county. Who is arriving, who is leaving, and how fast.',
+                color: 'var(--accent-slate)',
+              },
+              {
+                ix: 'M.03',
+                name: 'BEA',
+                body: 'GDP and personal income by metro area. Establishes the economic weight behind the deposit base.',
+                color: 'var(--accent-2)',
+              },
+              {
+                ix: 'M.04',
+                name: 'BLS',
+                body: 'Employment and labor force. The near-term read on whether a market is tightening or slipping.',
+                color: 'var(--accent-orange)',
+              },
+            ].map((module, i) => (
+              <div key={i} className="pp-module" style={{ '--m-color': module.color } as React.CSSProperties}>
+                <div className="ix">{module.ix}</div>
+                <h3>{module.name}</h3>
+                <p>{module.body}</p>
+                <div className="arrow">→</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="pp-rm-statements" id="methods">
+        <div className="wrap">
+          <div className="pp-split-head">
+            <Eyebrow op="OP_MKTL_04">How the brief is guarded</Eyebrow>
+            <h2 className="pp-h2">
+              Agentic analysis
+              <br />
+              you can{' '}
+              <span className="ital" style={{ color: accent }}>
+                audit line by line.
+              </span>
+            </h2>
+          </div>
+          <p className="pp-lede" style={{ marginTop: 24, maxWidth: '70ch' }}>
+            Every tier, share, and rank is computed in code from the filed series before the model sees
+            anything. The AI writes the executive brief over those computed values and must cite one for
+            each claim - a guardrail checks each figure against the computed set and drops any claim
+            that does not match. Nothing on the page is a number the model made up. Run it on Pinnacle
+            Financial Partners (81 markets, $96B pro-forma) or ServisFirst Bank (22 markets) and check
+            it yourself.
+          </p>
+        </div>
+      </section>
+
+      <PPFlow
+        op="OP_MKTL_05"
+        title={
+          <>
+            Enter.{' '}
+            <span className="ital" style={{ color: accent }}>
+              Map.
+            </span>{' '}
+            Brief.
+          </>
+        }
+        steps={[
+          {
+            n: '01',
+            t: 'Enter a bank',
+            b: 'Type a name or FDIC CERT. Market Lens pulls the full branch footprint from the Summary of Deposits.',
+          },
+          {
+            n: '02',
+            t: 'Read the map',
+            b: 'A county choropleth with accessible ramps and hatching, ranked market tables with sticky totals, and top-5 competitors per market.',
+          },
+          {
+            n: '03',
+            t: 'Take the brief',
+            b: 'An AI executive brief where every claim links to its computed number - and an honest CSV that matches what you just read.',
+          },
+        ]}
+        accent={accent}
+      />
+
+      <PPCta
+        title={
+          <>
+            Know the footprint.
+            <br />
+            Then prove <span className="ital">every line of it.</span>
+          </>
+        }
+        sub="Market Lens replaces the hand-built market study with public-data analysis you can audit - and it sits beside Peer Lens as the footprint half of the picture."
+        primary="Open Market Lens"
+        primaryHref={MARKET_LENS_DEMO_URL}
+        secondary="Read the methods"
+        secondaryHref="/product/market-lens#methods"
+        accent={accent}
+      />
+    </main>
+  )
+}
+
+export function AnnexProductDetailPage() {
+  const accent = 'var(--accent-slate)'
+  return (
+    <main className="pp pp-rm">
+      <ProductSubnav />
+
+      <section className="pp-hero">
+        <div className="wrap pp-hero-grid">
+          <div className="pp-hero-copy">
+            <div className="pp-eyebrow">
+              <span className="op" style={{ color: accent }}>
+                OP_ANNX
+              </span>
+              <span className="pill">annex.aceanalytics.dev</span>
+            </div>
+            <h1 className="pp-h1">
+              Every target screened,
+              <br />
+              <span className="ital" style={{ color: accent }}>
+                every deal defensible.
+              </span>
+            </h1>
+            <p className="pp-lede">
+              Annex screens the FDIC universe for acquisition targets, then builds the deal in a live
+              Deal Lab - price, synergies, and marks as levers, with accretion, earnback, CET1, and IRR
+              recomputing as you move them. Board packs ship source-backed: every figure carries its
+              lineage back to the Call Report. Nothing is invented.
+            </p>
+            <div className="pp-hero-actions">
+              <a
+                className="btn btn-primary"
+                style={{ background: accent, color: '#fff' }}
+                href={ANNEX_URL}
+              >
+                Open Annex →
+              </a>
+              <a className="btn btn-ghost" href={ANNEX_URL}>
+                Try the demo
+              </a>
+            </div>
+            <div className="pp-hero-tags">
+              {[
+                ['~4,600', 'FDIC targets screened'],
+                ['Live', 'accretion · earnback · CET1 · IRR'],
+                ['0', 'figures without lineage'],
+              ].map(([a, b], i) => (
+                <div key={i} className="pp-tag" style={{ '--tc': accent } as React.CSSProperties}>
+                  <div className="t">{a}</div>
+                  <div className="s">{b}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="pp-hero-art">
+            <AnnexMock />
+          </div>
+        </div>
+      </section>
+
+      <section className="pp-strip">
+        <div className="wrap">
+          <CapCard
+            ix="01"
+            title="Outside-in target screening"
+            body="Screen the full FDIC universe by asset band, market overlap, funding mix, and capital. Build a defensible target list from regulatory data - no data-room access required."
+            accent={accent}
+          />
+          <CapCard
+            ix="02"
+            title="The Deal Lab"
+            body="Price, cost synergies, and purchase-accounting marks are levers. Accretion, tangible-book dilution, earnback, CET1, and IRR recompute the instant you move them."
+            accent="var(--accent-orange)"
+          />
+          <CapCard
+            ix="03"
+            title="Bolt-on or MOE"
+            body="Model a bolt-on tuck-in or a merger of equals - stock or cash consideration, exchange ratios, and pro-forma ownership handled in one surface."
+            accent={accent}
+          />
+          <CapCard
+            ix="04"
+            title="Board packs with lineage"
+            body="Export board-ready Bolt-On and MOE packs where every figure traces to its Call Report source. The model interprets the numbers; it never invents one."
+            accent="var(--accent-plum)"
+          />
+        </div>
+      </section>
+
+      <section className="pp-rm-statements" id="methods">
+        <div className="wrap">
+          <div className="pp-split-head">
+            <Eyebrow op="OP_ANNX_02">How a deal gets built</Eyebrow>
+            <h2 className="pp-h2">
+              Sourced from regulators,
+              <br />
+              and{' '}
+              <span className="ital" style={{ color: accent }}>
+                defensible to a board.
+              </span>
+            </h2>
+          </div>
+          <p className="pp-lede" style={{ marginTop: 24, maxWidth: '70ch' }}>
+            Annex starts from FDIC and Call Report data - no data-room access required. It screens the
+            universe to a defensible target set, lets you build the deal in the Deal Lab, and assembles a
+            board pack where accretion, earnback, CET1, and IRR each carry a citation back to the filed
+            number. The model reasons over the figures; it never fabricates one.
+          </p>
+        </div>
+      </section>
+
+      <PPFlow
+        op="OP_ANNX_03"
+        title={
+          <>
+            Screen.{' '}
+            <span className="ital" style={{ color: accent }}>
+              Build.
+            </span>{' '}
+            Defend.
+          </>
+        }
+        steps={[
+          {
+            n: '01',
+            t: 'Screen the field',
+            b: 'Filter the FDIC universe by size, market overlap, funding, and capital to a shortlist of defensible acquisition targets.',
+          },
+          {
+            n: '02',
+            t: 'Build in the Deal Lab',
+            b: 'Set price, synergies, and marks. Watch accretion, earnback, CET1, and IRR move live across a bolt-on or MOE structure.',
+          },
+          {
+            n: '03',
+            t: 'Ship the board pack',
+            b: 'Export a source-backed Bolt-On or MOE pack. Every figure carries its lineage back to the Call Report - ready for the board.',
+          },
+        ]}
+        accent={accent}
+      />
+
+      <PPCta
+        title={
+          <>
+            Source the target.
+            <br />
+            Prove the <span className="ital">deal.</span>
+          </>
+        }
+        sub="Annex replaces the scattered M&A workbook with outside-in screening, a live Deal Lab, and board packs where every number is traceable."
+        primary="Open Annex"
+        primaryHref={ANNEX_URL}
+        secondary="Read the methods"
+        secondaryHref="/product/annex#methods"
         accent={accent}
       />
     </main>
