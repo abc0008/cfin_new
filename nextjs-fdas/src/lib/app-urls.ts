@@ -27,6 +27,12 @@ const PEER_ANALYSIS_APP_URL =
 /** Peer Lens — bank peer-analysis app (its own subdomain). */
 export const PEER_ANALYSIS_URL = trimTrailingSlash(PEER_ANALYSIS_APP_URL)
 
+/** Annex — M&A target screener & deal lab (its own subdomain). */
+export const ANNEX_URL = resolvePublicUrl(
+  process.env.NEXT_PUBLIC_ANNEX_APP_URL,
+  'https://annex.aceanalytics.dev',
+)
+
 const CFIN_WORKSPACE_DEFAULT_URL = 'https://aceanalytics.dev/workspace'
 export const CFIN_WORKSPACE_URL = resolvePublicUrl(
   process.env.NEXT_PUBLIC_CFIN_WORKSPACE_URL,
